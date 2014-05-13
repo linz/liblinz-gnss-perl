@@ -6,7 +6,7 @@
 use strict;
 
 package LINZ::GNSS;
-our $VERSION='1.0';
+our $VERSION='1.0.1';
 
 use LINZ::GNSS::FileCompression;
 use LINZ::GNSS::FileTypeList;
@@ -101,7 +101,7 @@ sub CoordSysList
 {
     if( ! $CoordSysList )
     {
-        LINZ::Geodetic::newFromCoordSysDef();
+        $CoordSysList=LINZ::Geodetic::CoordSysList->newFromCoordSysDef();
     }
     return $CoordSysList;
 }

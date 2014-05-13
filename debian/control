@@ -1,0 +1,30 @@
+Source: liblinz-gnss-perl
+Section: perl
+Priority: optional
+Maintainer: Chris Crook <ccrook@linz.govt.nz>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.2
+Homepage: 
+#Vcs-Git: git://git.debian.org/collab-maint/liblinz-gnss-perl.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/liblinz-gnss-perl.git;a=summary
+
+Package: liblinz-gnss-perl
+Architecture: all
+Depends: ${misc:Depends} liblinz-geodetic-perl,
+    libconfig-general-perl,
+    libdbd-sqlite3-perl,
+    libdbi-perl,
+    liblog-log4perl-perl,
+    libtime-modules-perl,
+    liburi-perl,
+    libxml-simple-perl,
+    libstorable-perl,
+    libtime-local-perl
+Description: LINZ::GNSS perl modules for managing GNSS data downloads
+ LINZ::GNSS perl modules
+ .
+ Provides GNSS support functions, mainly around managing downloads of 
+ GNSS data from various data centres and managing a cache of downloaded files.
+ These provide the core functionality of the Bernese GETDATA utility.
+
+    

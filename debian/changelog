@@ -1,8 +1,10 @@
-liblinz-gnss-perl (1.0.2-1) UNRELEASED; urgency=low
+liblinz-gnss-perl (1.0.2-1) precise; urgency=low
 
   * Reducing logging level in getdata
+  * Reducing logging level in getdata
+  * Reducing logging level
 
- -- Chris Crook <ccrook@linz.govt.nz>  Thu, 15 May 2014 10:50:46 +1200
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 15 May 2014 10:52:03 +1200
 
 liblinz-gnss-perl (1.0.1-1) precise; urgency=low
 

@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.0.1-1) precise; urgency=low
+
+  * Bug fix: returning coordinate system list fix
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 14 May 2014 15:34:33 +1200
+
 liblinz-gnss-perl (1.0-1) stable; urgency=low
 
   * Initial release 

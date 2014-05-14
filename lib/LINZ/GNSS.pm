@@ -6,7 +6,7 @@
 use strict;
 
 package LINZ::GNSS;
-our $VERSION='1.0.1';
+our $VERSION='1.0.2';
 
 use LINZ::GNSS::FileCompression;
 use LINZ::GNSS::FileTypeList;

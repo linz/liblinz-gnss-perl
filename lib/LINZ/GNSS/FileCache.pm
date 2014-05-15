@@ -61,7 +61,9 @@ sub new
     if( ! -d $basepath )
     {
         my $errval;
+        my $umask=umask 0000;
         make_path($basepath,{error=>\$errval});
+        umask $umask;
         croak "Cannot create LINZ::GNSS::FileCache cache directory at $basepath\n" if @$errval;
     }
     my $dbfile=$basepath.'/cache.db';

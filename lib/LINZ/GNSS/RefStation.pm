@@ -185,8 +185,15 @@ sub GetRefStations
     if( exists( $options{cache_dir} ) )
     {
         $cachedir = $options{cache_dir};
+        if( ! -d $cachdir )
+        {
+            my $errval;
+            my $umask=umask(0000);
+            make_path($cachdir,{error=>\$errval});
+            umask($umask);
+        }
         croak("Invalid cache directory $cachedir") 
-            if ! -d $cachedir && ! make_path($cachedir);
+            if ! -d $cachedir;
     }
     my $fileglob=$filename;
     $fileglob =~ s/\[ssss\]/????/;

@@ -65,6 +65,17 @@ our $prioritized_centers=[];
 our $ftp_user='anonymous';
 our $ftp_password='none';
 
+sub _makepath
+{
+    my ($path)=@_;
+    return 1 if -d $path;
+    my $errval;
+    my $umask=umask(0000);
+    make_path($path,{error=>\$errval, mode=>0777});
+    umask($umask);
+    return -d $path ? 1 : 0;
+}
+
 =head2 LINZ::GNSS::DataCenter->new($cfgdc)
 
 Creates a LINZ::GNSS::DataCenter from the information in a configuration section.  The
@@ -134,7 +145,7 @@ sub new
     # Use the data centre id and the process id ($$) to achieve this
     # Each downloaded file will use fileid to generate a unique file name
     my $id='dc'.(++$LINZ::GNSS::DataCenter::nextid);
-    my $scratchdir=$LINZ::GNSS::DataCenter::scratchdir."/$id"."_".$$;
+    my $scratchdir=$LINZ::GNSS::DataCenter::scratchdir."/gnss_gdt_$id"."_".$$;
 
     # Process the object
     $uri =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined for datacenter $name\n"/eg;
@@ -210,13 +221,9 @@ sub LoadDataCenters
     $logger->debug("Loading data centres");
 
     # Configuration information used by all centres
-    my $scratchdir=$cfg->{scratchdir} || '/tmp/ppdc';
-    if( ! -d $scratchdir )
-    {
-        my $errval;
-        make_path($scratchdir,{error=>\$errval, mode=>0777});
-        croak "Cannot create LINZ::GNSS::DataCenter::scratchdir $scratchdir\n" if @$errval; 
-    }
+    my $scratchdir=$cfg->{scratchdir} || '/tmp';
+    _makepath($scratchdir) ||
+        croak "Cannot create LINZ::GNSS::DataCenter::scratchdir $scratchdir\n" ;
     $LINZ::GNSS::DataCenter::scratchdir=$scratchdir;
 
     # Default login information
@@ -546,9 +553,7 @@ sub _putfile
         unless $self->{scheme} eq 'file';
     my $target=$spec->{path};
     $target = $self->{basepath}.'/'.$target if $self->{basepath};
-    my $errval;
-    make_path($target,{error=>\$errval});
-        croak "Cannot create target directory $target\n" if @$errval; 
+    _makepath($target) || croak "Cannot create target directory $target\n"; 
     $target=$target.'/'.$spec->{filename};
     move($source,$target) || croak "Cannot copy file to $target\n";
 }
@@ -622,8 +627,7 @@ sub getData
     if( ! -d $scratchdir )
     {
         my $errval;
-        make_path($scratchdir,{error=>\$errval});
-        if( @$errval)
+        if( ! _makepath($scratchdir) )
         {
             $self->_logger->fatal("Cannot make download directory $scratchdir");
             croak "Cannot make download directory $scratchdir\n";

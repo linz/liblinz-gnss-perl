@@ -106,6 +106,13 @@ sub _loadHeader
         $self->_loadWritableField(\$line,20,20,'rectype');
         $self->_loadWritableField(\$line,40,20,'recversion');
     }
+    elsif($rectype eq 'ANTENNA: DELTA H/E/N')
+    {
+        my $x=_trimsub($data,0,14)+0.0;
+        my $y=_trimsub($data,14,14)+0.0;
+        my $z=_trimsub($data,28,14)+0.0;
+        $self->{delta_hen}=[$x,$y,$z];
+    }
     elsif($rectype eq 'APPROX POSITION XYZ')
     {
         my $x=_trimsub($data,0,14)+0.0;
@@ -283,9 +290,13 @@ The following access functions are provided:
 
 =item $rxfile->recversion *
 
-=item $rxfile->xyz *
+=item $rxfile->xyz 
 
-Returns an array [$x,$y,$z]
+Returns an array [$x,$y,$z].  
+
+=item $rxfile->delta_hen 
+
+Returns an array [$dh,$de,$dn].  
 
 =item $rxfile->obstypes
 
@@ -331,6 +342,7 @@ sub starttime { return $_[0]->{starttime}; }
 sub endtime { return $_[0]->{endtime}; }
 sub interval { return $_[0]->{interval}; }
 sub xyz  { return $_[0]->{xyz}; }
+sub delta_hen  { return $_[0]->{delta_hen}; }
 sub nobs { return $_[0]->{nobs}; }
 sub headers { return $_[0]->{headers}; }
 

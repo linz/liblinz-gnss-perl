@@ -185,11 +185,11 @@ sub GetRefStations
     if( exists( $options{cache_dir} ) )
     {
         $cachedir = $options{cache_dir};
-        if( ! -d $cachdir )
+        if( ! -d $cachedir )
         {
             my $errval;
             my $umask=umask(0000);
-            make_path($cachdir,{error=>\$errval});
+            make_path($cachedir,{error=>\$errval});
             umask($umask);
         }
         croak("Invalid cache directory $cachedir") 

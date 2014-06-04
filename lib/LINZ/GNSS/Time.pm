@@ -142,7 +142,7 @@ sub datetime_seconds {
     my $offset=0;
     if( defined($doy) )
     {
-        $mon=0; $day=1; $offset=$doy*$SECS_PER_DAY;
+        $mon=0; $day=1; $offset=($doy-1)*$SECS_PER_DAY;
     }
     my $seconds;
     if ($local) {

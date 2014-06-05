@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.1.4-1) precise; urgency=low
+
+  * Error in configuration - location of crx2rnx not correct
+  * Adding additional dependencies for compression utilities
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 05 Jun 2014 14:46:20 +1200
+
 liblinz-gnss-perl (1.1.3-1) precise; urgency=low
 
   * Bug fix: ensuring log file writeable by group

@@ -20,7 +20,10 @@ Depends: ${misc:Depends} liblinz-geodetic-perl,
     liburi-perl,
     libxml-simple-perl,
     libstorable-perl,
-    libtime-local-perl
+    libtime-local-perl,
+    linz-rinex-rnxcmp,
+    gzip,
+    ncompress
 Description: LINZ::GNSS perl modules for managing GNSS data downloads
  LINZ::GNSS perl modules
  .

@@ -32,8 +32,8 @@ Loads configuration information structured as
   <CompressionTypes>
      <Compression>
          name hatanaka
-         compress /usr/local/bin/rnx2crx -f [input] 
-         uncompress /usr/local/bin/rnx2crx -f [input]
+         compress /usr/bin/rnx2crx -f [input] 
+         uncompress /usr/bin/rnx2crx -f [input]
          presuffix .ddo
          postsuffix .ddd
      </Compression>

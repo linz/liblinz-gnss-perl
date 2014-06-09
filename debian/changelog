@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.1.5-1) precise; urgency=low
+
+  * Adding missing positionz stations to list
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 10 Jun 2014 10:49:05 +1200
+
 liblinz-gnss-perl (1.1.4-1) precise; urgency=low
 
   * Error in configuration - location of crx2rnx not correct

@@ -42,6 +42,7 @@ use fields qw (
     password
     basepath
     ftp
+    timeout
     connected
     fileid
     _logger
@@ -64,6 +65,7 @@ our $centers=[];
 our $prioritized_centers=[];
 our $ftp_user='anonymous';
 our $ftp_password='none';
+our $ftp_timeout=30;
 
 sub _makepath
 {
@@ -120,6 +122,7 @@ sub new
     $self=fields::new($self) unless ref $self;
     my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
     my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
+    my $timeout = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
@@ -173,6 +176,7 @@ sub new
     $self->{user} = $user;
     $self->{password} = $pwd;
     $self->{ftp}=undef;
+    $self->{timeout} = $timeout;
     $self->{connected}=undef;
     $self->{fileid}=0;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
@@ -467,13 +471,14 @@ sub connect
         my $host=$self->{host};
         my $user=$self->{user};
         my $pwd=$self->{password};
+        my $timeout=$self->{timeout};
 
         eval
         {
             my $name=$self->{name};
             $self->_logger->info("Connecting datacenter $name to host $host");
             $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
-            my $ftp=Net::FTP->new( $host )
+            my $ftp=Net::FTP->new( $host, Timeout=>$timeout )
                || croak "Cannot connect to $host\n";
 
             $self->{ftp}=$ftp;

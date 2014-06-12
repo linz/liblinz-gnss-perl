@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.1.6-1) precise; urgency=low
+
+  * Updating ftp timeout
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 12 Jun 2014 13:07:13 +1200
+
 liblinz-gnss-perl (1.1.5-1) precise; urgency=low
 
   * Adding missing positionz stations to list

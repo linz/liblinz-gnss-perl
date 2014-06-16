@@ -262,7 +262,9 @@ sub _scanObs
 
 =head2 $rxfile->xxx
 
-Functions for accessing RINEX file information from the file
+Functions for accessing RINEX file information from the file.  The fields indicated with 
+an asterisk can be used as functions to update the metadata.  The update values will be
+used by the write function which copies the rinex file.
 
 The following access functions are provided:
 
@@ -369,7 +371,8 @@ sub recversion  { return _getset(@_) }
 =head2 $rxfile->write($filename)
 
 Copies the rinex file to a new location.  If any of the updatable fields have been altered
-then the new values are copied into header records.
+then the new values are copied into header records.  Note that then entire file is copied,
+even if the file was loaded with skip_obs=>1.
 
 =cut
 

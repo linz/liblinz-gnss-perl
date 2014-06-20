@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.1.7-1) precise; urgency=low
+
+  * Adding to RinexObsFile documentation
+  * Fixing ultra filenames to be no more than 8 chars.  Cutting out ref stations more than 500km away
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 20 Jun 2014 15:52:29 +1200
+
 liblinz-gnss-perl (1.1.6-1) precise; urgency=low
 
   * Updating ftp timeout

@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+use strict;
+use Getopt::Std;
 
 use LINZ::GNSS::Time qw/
     time_elements
@@ -8,9 +10,9 @@ use LINZ::GNSS::Time qw/
     $SECS_PER_DAY
     /;
 
-$syntax=<<EOF;
+my $syntax=<<EOF;
 
-Syntax: gpsday [date]
+Syntax: gpsday [-f format] date 
 
 Converts dates between different GPS formats.  Dates can be entered as:
 
@@ -23,13 +25,23 @@ Converts dates between different GPS formats.  Dates can be entered as:
 All are in terms of UTC time.  Seconds are referred to the start of the day,
 (ie 00:00:00)
 
+Format is a string that can include:
+   D  the date as yyyy-mm-dd
+   W  the week
+   d  the day of week as a number
+   n  the day of year
+   Y  the year
+   u  the unix timestamp
 EOF
 
 
 @ARGV || die $syntax;
 
+my %opts;
+getopts('f:h',\%opts);
+
 my $time=join(' ',@ARGV);
-die $syntax if $time eq '-h'; 
+die $syntax if $opts{h};
 
 my $seconds;
 if( $time=~ /^((?:19|20)\d\d)\W*(\d\d)\W*(\d\d)$/ )
@@ -59,14 +71,33 @@ else
     
 my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($seconds);
 
-my $day=substr('MonTueWedThuFriSatSun',$wday*3,3);
+my $day=substr('SunMonTueWedThuFriSat',$wday*3,3);
 
 my $datestr=seconds_datetime($seconds);
 
-print "Date           : $datestr ($day)\n";
-print "Year/day       : $year $doy\n";
-print "GNSS week/day  : $gnssweek $wday\n";
-print "Unix timestamp : $seconds\n";
+if( $opts{f} )
+{
+    my $format=$opts{f};
+    my $strings={
+        'D'=>substr($datestr,0,10),
+        'W'=>$gnssweek,
+        'd'=>$wday,
+        'n'=>sprintf("%03d",$doy),
+        'Y'=>$year,
+        'u'=>$seconds,
+    };
+    $format=$opts{f};
+    $format=~ s/([DWdnYu])/$strings->{$1}/eg;
+    print $format,"\n";
+}
+else
+{
+    print "Date           : $datestr ($day)\n";
+    print "Year/day       : $year $doy\n";
+    print "GNSS week/day  : $gnssweek $wday\n";
+    print "Unix timestamp : $seconds\n";
+    print "\nNote: all values are UTC\n";
+}
 
 
 

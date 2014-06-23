@@ -5,7 +5,7 @@
   This is currently not written as a general purpose SINEX file reader/writer.
 
   The current purpose is simply to read station coordinate/covariance information.
-  All sorts of assumptions are made - essentially hope this works with Bernese generated
+  All sorts of assumptions are made - essentially hoping this works with Bernese generated
   SINEX files from ADDNEQ...
 
 =cut
@@ -372,8 +372,132 @@ sub _scanStationXYZ
            if exists $stations->{$code} && exists $stations->{$code}->{$solnid};
     }
 
+    $self->{solnstns}=\@solnstns;
+    $self->{solnprms}=$prms;
+
 
     return 1;
  }
+
+=head2 $sf->filterStationsOnly($filteredsnx)
+
+Creates a new version of the SINEX file containing only the station 
+coordinate data.
+
+=cut
+
+sub filterStationsOnly
+{
+    my( $self, $filteredsnx ) = @_;
+    my $source=$self->{filename};
+
+    open( my $tgt, ">$filteredsnx" ) || croak("Cannot open output SINEX $filteredsnx\n");
+    open( my $src, "<$source" ) || croak("Cannot reopen SINEX $source\n");
+
+    my $solnstns=$self->{solnstns};
+    my $prms=$self->{solnprms};
+    my $prmmap={};
+    foreach my $k (keys %$prms)
+    {
+        my $prm=$prms->{$k};
+        my $id=$prm->{stn}->{prmoffset}+$prm->{pno};
+        $prmmap->{$k}=$id+1;
+    }
+
+    my $nprm=scalar(@$solnstns)*3;
+
+    my $section='';
+    while( my $line=<$src> )
+    {
+        if( $line =~ /^\%\=SNX/ )
+        {
+            substr($line,60,5)=sprintf("%05d",$nprm);
+            substr($line,68)="S           \n";
+        }
+        elsif( $line =~ /^\+(.*?)\s*$/ )
+        {
+            $section=$1;
+        }
+        elsif( $line =~ /^\-/ )
+        {
+            $section='';
+        }
+        elsif( $line =~ /^\*/ )
+        {
+        }
+        elsif( $section =~ /SOLUTION\/(ESTIMATE|APRIORI)/ )
+        {
+            $line =~ /^
+               \s([\s\d]{5})  # param id
+               /x;
+            my $id=_trim($1)+0;
+            next if ! exists $prmmap->{$id};
+            substr($line,1,5)=sprintf("%5d",$prmmap->{$id});
+        }
+        elsif( $section =~ /SOLUTION\/MATRIX_(ESTIMATE|APRIORI)\s+L\s+COVA/ )
+        {
+            my $zero=sprintf("%21.14E",0.0);
+            my $vcv=[];
+            foreach my $i (0..$nprm-1)
+            {
+                $vcv->[$i]=[];
+                foreach my $j (0..$i)
+                {
+                    $vcv->[$i]->[$j]=$zero;
+                }
+            }
+
+            my $line1=$line;
+            while( $line1 )
+            {
+                $line=$line1;
+                $line1=<$src>;
+                last if $line =~ /^\-/;
+                next if $line =~ /^\*/;
+                $line =~ /^
+                    \s([\s\d]{5})
+                    \s([\s\d]{5})
+                    \s([\s\dE\+\-\.]{21})
+                    (?:\s([\s\dE\+\-\.]{21}))?
+                    (?:\s([\s\dE\+\-\.]{21}))?
+                    /x;
+                my ($p0,$p1,$cvc)=($1+0,$2+0,[$3,$4,$5]);
+                next if ! exists $prmmap->{$p0};
+                my $rc0=$prmmap->{$p0}-1;
+                foreach my $ip (0,1,2)
+                {
+                    my $p1i=$p1+$ip;
+                    next if $cvc->[$ip] eq '';
+                    next if ! exists $prmmap->{$p1i};
+                    my $rc1=$prmmap->{$p1i}-1;
+                    if( $rc1 < $rc0 ){ $vcv->[$rc0]->[$rc1]=$cvc->[$ip]; }
+                    else { $vcv->[$rc1]->[$rc0]=$cvc->[$ip]; }
+                }
+            }
+
+            foreach my $i (1 .. $nprm)
+            {
+                my $ic=$i-1;
+                for(my $j0=1; $j0 <= $i; $j0+=3 )
+                {
+                    printf $tgt " %5d %5d",$i,$j0;
+                    foreach my $k (0 .. 2)
+                    {
+                        my $j=$j0+$k;
+                        last if $j > $i;
+                        print $tgt " ".$vcv->[$ic]->[$j-1];
+                    }
+                    print $tgt "\n";
+                }
+            }
+            $section='';
+            next;
+        }
+        print $tgt $line;
+    }
+    close($src);
+    close($tgt);
+}
+
 
 1;

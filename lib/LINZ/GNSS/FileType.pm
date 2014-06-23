@@ -422,15 +422,16 @@ sub availableTime
     $freq=$SECS_PER_DAY if $freq > $SECS_PER_DAY;
     $daysecs -= $freq while $daysecs > 0;
     $seconds -= $daysecs;
-    $seconds--;
 
     $seconds += $self->{latencysecs};
+    $seconds--;
     if( $self->{latencydow} >= 0 )
     {
         my $wday=$self->{latencydow}-(gmtime($seconds))[6];
         $wday+=7 if $wday < 0;
         $seconds+=$wday*$SECS_PER_DAY;
     }
+    $seconds++;
     return $seconds, $self->{retrysecs}, $seconds+$self->{max_delaysecs};
 }
 

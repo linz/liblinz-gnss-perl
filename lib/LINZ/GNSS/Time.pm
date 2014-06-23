@@ -274,6 +274,12 @@ sub start_time_gnss_week {
     my $start_time = $GNSSTIME0 + $gnss_week * $SECS_PER_WEEK;
 }
 
+=head2 $secs=gnss_week($weekno)
+
+Converts a GNSS week to the timestamp for the start of the week
+
+=cut 
+
 sub gnssweek_seconds {
     my $gnss_week = shift;
     return $gnss_week * $SECS_PER_WEEK + $GNSSTIME0;

@@ -1,0 +1,70 @@
+#!/usr/bin/perl
+
+use LINZ::GNSS::Time qw/
+    time_elements
+    seconds_datetime 
+    datetime_seconds
+    gnssweek_seconds
+    $SECS_PER_DAY
+    /;
+
+$syntax=<<EOF;
+
+Syntax: gpsday [date]
+
+Converts dates between different GPS formats.  Dates can be entered as:
+
+   yyyy-mm-dd    Year, month, day
+   yyyy-ddd      Year, day number
+   wwww-d        GPS week, day
+   ssssssssss    Unix time stamp
+   now           Right now!
+
+All are in terms of UTC time.  Seconds are referred to the start of the day,
+(ie 00:00:00)
+
+EOF
+
+
+@ARGV || die $syntax;
+
+my $time=join(' ',@ARGV);
+die $syntax if $time eq '-h'; 
+
+my $seconds;
+if( $time=~ /^((?:19|20)\d\d)\W*(\d\d)\W*(\d\d)$/ )
+{
+    $seconds=datetime_seconds($1.'-'.$2.'-'.$3);
+}
+elsif( $time=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
+{
+    $seconds=datetime_seconds(sprintf("%04d-%03d",$1,$2));
+}
+elsif( $time=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
+{
+    $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
+}
+elsif( $time =~ /^\d{10}$/ )
+{
+    $seconds=$time+0;
+}
+elsif( lc($time) eq 'now' )
+{
+    $seconds=time();
+}
+else
+{
+    die "Invalid date specified: $time\n";
+}
+    
+my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($seconds);
+
+my $datestr=seconds_datetime($seconds);
+
+print "Date           : $datestr\n";
+print "Year/day       : $year $doy\n";
+print "GNSS week/day  : $gnssweek $wday\n";
+print "Unix timestamp : $seconds\n";
+
+
+

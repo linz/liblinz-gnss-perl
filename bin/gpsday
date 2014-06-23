@@ -59,9 +59,11 @@ else
     
 my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($seconds);
 
+my $day=substr('MonTueWedThuFriSatSun',$wday*3,3);
+
 my $datestr=seconds_datetime($seconds);
 
-print "Date           : $datestr\n";
+print "Date           : $datestr ($day)\n";
 print "Year/day       : $year $doy\n";
 print "GNSS week/day  : $gnssweek $wday\n";
 print "Unix timestamp : $seconds\n";

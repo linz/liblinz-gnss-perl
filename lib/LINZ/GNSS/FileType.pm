@@ -3,7 +3,7 @@ use strict;
 # Simple hash subtypes
 
 package LINZ::GNSS::FileType::TimeCodes;
-use fields qw( timestamp yyyy yy wwww ww ddd d hh h);
+use fields qw( timestamp daysecs yyyy yy wwww ww ddd d hh h);
 
 sub new
 {
@@ -337,7 +337,7 @@ sub timeCodes {
     my ($self,$timestamp) = @_;
     my $increment=$self->{frequencysecs};
     my $time = int(($timestamp-$GNSSTIME0)/$increment)*$increment+$GNSSTIME0;
-    my ($year, $yday, $wday, $hour) = (gmtime($time))[ 5, 7, 6, 2 ];
+    my ($year, $yday, $wday, $hour, $min, $sec) = (gmtime($time))[ 5, 7, 6, 2, 1, 0 ];
     $year += 1900;
     my $doy = sprintf( "%03d", $yday + 1 );
     my $woy = sprintf( "%02d", int($yday/7) );
@@ -347,6 +347,7 @@ sub timeCodes {
     my $hcode=$hourcodes->{$hstr};
     my $codes=new LINZ::GNSS::FileType::TimeCodes();
     $codes->{timestamp}=$time;
+    $codes->{daysecs}=$hour*3600+$min*60+$sec;
     $codes->{yyyy}=$ystr, 
     $codes->{yy}=substr($ystr,2);
     $codes->{wwww}=sprintf("%04d",$gnss_week);
@@ -414,7 +415,16 @@ sub availableTime
     # Get the last element if this is a sequence
     my $timecode = $self->timeCodes( $request->end_epoch );
     my $seconds=$timecode->{timestamp};
-    $seconds += $self->{frequencysecs}+$self->{latencysecs};
+    my $daysecs=$timecode->{daysecs};
+    # Shift the end time to the end of period, except that 
+    # don't move more than the end of the day
+    my $freq=$self->{frequencysecs};
+    $freq=$SECS_PER_DAY if $freq > $SECS_PER_DAY;
+    $daysecs -= $freq while $daysecs > 0;
+    $seconds -= $daysecs;
+    $seconds--;
+
+    $seconds += $self->{latencysecs};
     if( $self->{latencydow} >= 0 )
     {
         my $wday=$self->{latencydow}-(gmtime($seconds))[6];

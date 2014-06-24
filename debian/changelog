@@ -1,3 +1,15 @@
+liblinz-gnss-perl (1.2.0-1) precise; urgency=low
+
+  * Fixing calculation of availability of data
+  * Adding station parameter filter to SinexFile
+  * Tidying up calculation of availability.  Adding gpsday utility
+  * Adding day name to output
+  * Adding output options to gpsday
+  * Fixing latency
+  * Fixing calculation of expected available time
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 24 Jun 2014 14:26:00 +1200
+
 liblinz-gnss-perl (1.1.8-1) precise; urgency=low
 
   * Second fix of reference station weighting scheme

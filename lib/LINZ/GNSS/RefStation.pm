@@ -329,6 +329,8 @@ range will be included. Default is 100.
 
 =back
 
+=back
+
 =cut
 
 sub _calc_range_factor

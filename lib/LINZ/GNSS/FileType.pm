@@ -98,7 +98,8 @@ use fields qw(
     compression
     latency
     latencysecs
-    latencydow
+    supply_frequency
+    supplyfreqsecs
     retry
     retrysecs
     max_delay
@@ -176,42 +177,48 @@ sub new
     require LINZ::GNSS::FileTypeList;
     my $default = LINZ::GNSS::FileTypeList->getType($type,$subtype);
     $default ||= {};
+
     my $filename = $cfgft->{filename} || $default->{filename} ||
         croak "Filename missing for file type $type:$subtype\n";
+
     my $use_station = $filename =~ /\[ssss\]/i;
+
     my $path = $cfgft->{path} || $default->{path} ||
         croak "Path missing for file type $type:$subtype\n";
+
     my $frequency = lc($cfgft->{frequency}) || $default->{frequency} || 'daily';
     croak "Inconsistent frequency for product $type:$subtype\n"
         if exists($default->{frequency}) && $frequency ne $default->{frequency};
     my $frequencysecs = $freqmap->{$frequency};
     $frequencysecs ||
         croak "Invalid frequency $frequency for file type $type:$subtype\n";
+
     my $priority = $cfgft->{priority} || $default->{priority} || 0;
+
     my $retention = $cfgft->{retention} || '';
     croak "Invalid retention $retention for file type $type:$subtype\n"
         if $retention !~ /^(?:(\d+)\s+days?)?$/;
     $retention=$1+1;
+
     my $compression=$cfgft->{compression} || $default->{compression} || '';
     $compression=lc($compression);
     croak "Invalid compression $compression for $type:$subtype" if
         $compression !~ /^(none|hatanaka|compress|gzip|hatanaka\+(compress|gzip))?$/;
+
+    my $supplyfreq=lc($cfgft->{supply_frequency}) || $default->{supply_frequency}
+          || $frequency;
+    my $supplyfreqsecs = $freqmap->{$supplyfreq};
+    $supplyfreqsecs ||
+        croak "Invalid supply_frequency $supplyfreq for file type $type:$subtype\n";
+
     my $latency=$cfgft->{latency} || $default->{latency} || '';
     $latency=lc($latency);
     croak "Invalid latency $latency for $type:$subtype\n" if 
-        $latency !~ /^(?:(\d+(?:\.\d+)?)\s+(minutes?|hours?)
-                       |(\d+(?:\.\s+)?)\s+(days?)(?:\s+weekly\s+
-                       (?:(mon|tues|wedsnes|thurs|fri|satur|sun)day))?)?$/x;
-    my $latencysecs=($1+$3+0)*60;
-    my $latencydow=-1;
-    my $units=$2.$4;
-    my $dow=$5;
+        $latency !~ /^(?:(\d+(?:\.\d+)?)\s+(minutes?|hours?|days?))?$/x;
+    my $latencysecs=($1+0)*60;
+    my $units=$2;
     $latencysecs *= 60 if $units !~ /^m/;
     $latencysecs *= 24 if $units =~ /^d/;
-    if( $dow )
-    {
-        $latencydow=index('sun mon tue wed thu fri sat',substr($dow,0,3))/4;
-    }
 
     my $retry=$cfgft->{retry} || $default->{retry} || '1 day';
     $retry=lc($retry);
@@ -241,7 +248,8 @@ sub new
     $self->{compression}=$compression;
     $self->{latency}=$latency;
     $self->{latencysecs}=$latencysecs;
-    $self->{latencydow}=$latencydow;
+    $self->{supply_frequency}=$supplyfreq;
+    $self->{supplyfreqsecs}=$supplyfreqsecs;
     $self->{retry}=$retry;
     $self->{retrysecs}=$retrysecs;
     $self->{max_delay}=$max_delay;
@@ -413,18 +421,13 @@ sub availableTime
 {
     my($self,$request) = @_;
     # Get the last element if this is a sequence
-    my $timecode = $self->timeCodes( $request->end_epoch );
-    my $seconds=$timecode->{timestamp};
-    # Shift to end of interval (ie beginning of next)
-    $seconds += $self->{frequencysecs};
+    my $timestamp=$request->end_epoch;
+    my $increment=$self->{supplyfreqsecs};
+
+    # Find the beginning of the next supply period (end of this one)
+    my $seconds = (int(($timestamp-$GNSSTIME0)/$increment)+1)*$increment+$GNSSTIME0;
 
     $seconds += $self->{latencysecs};
-    if( $self->{latencydow} >= 0 )
-    {
-        my $wday=$self->{latencydow}-(gmtime($seconds))[6];
-        $wday+=7 if $wday < 0;
-        $seconds+=$wday*$SECS_PER_DAY;
-    }
     return $seconds, $self->{retrysecs}, $seconds+$self->{max_delaysecs};
 }
 

@@ -12,7 +12,7 @@ use LINZ::GNSS::Time qw/
 
 my $syntax=<<EOF;
 
-Syntax: gpsday [-f format] date 
+Syntax: gpsdate [-f format] date 
 
 Converts dates between different GPS formats.  Dates can be entered as:
 

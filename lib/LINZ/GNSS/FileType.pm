@@ -415,13 +415,8 @@ sub availableTime
     # Get the last element if this is a sequence
     my $timecode = $self->timeCodes( $request->end_epoch );
     my $seconds=$timecode->{timestamp};
-    my $daysecs=$timecode->{daysecs};
-    # Shift the end time to the end of period, except that 
-    # don't move more than the end of the day
-    my $freq=$self->{frequencysecs};
-    $freq=$SECS_PER_DAY if $freq > $SECS_PER_DAY;
-    $daysecs -= $freq while $daysecs > 0;
-    $seconds -= $daysecs;
+    # Shift to end of interval (ie beginning of next)
+    $seconds += $self->{frequencysecs};
 
     $seconds += $self->{latencysecs};
     if( $self->{latencydow} >= 0 )

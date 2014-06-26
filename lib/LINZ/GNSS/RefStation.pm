@@ -97,10 +97,25 @@ sub LoadConfig
     }
 }
 
+=head2 my $filepath=LINZ::GNSS::RefStation::RefStationFile($code)
+
+Returns the filepath in which a reference station definition file is stored
+
+=cut
+
+sub RefStationFile
+{
+    my ($code)=@_;
+    $code=uc($code);
+    my $filepath=$refstn_filename;
+    $filepath=~s/\[ssss\]/$code/g;
+    return $filepath;
+}
+
 =head2 my $list=LINZ::GNSS::RefStation::GetRefStations($filepattern,%options)
 
 Returns an array hash of RefStation objects.  The list is loaded from the files
-mathcing the supplied file name pattern, which should include the string [ssss] 
+matching the supplied file name pattern, which should include the string [ssss] 
 that will be substituted with the name of the station.  Each matching file will
 attempt to be loaded, and added to the list if successful.  
 
@@ -617,6 +632,8 @@ sub new
         my $code=$xml->{code} || die "Code not defined\n";
         my $start_date=datetime_seconds($xml->{start_date}) || 
             die "Start date not defined\n";
+        my $version_date=datetime_seconds($xml->{version_date}) || 
+            die "Version date not defined\n";
         my $end_date=datetime_seconds($xml->{end_date}) || 0;
         my $site=$xml->{site} || $code;
         my $priority=$xml->{priority} || 0;

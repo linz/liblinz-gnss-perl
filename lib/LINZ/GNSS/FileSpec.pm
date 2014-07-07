@@ -8,7 +8,7 @@ repositories.
 =cut
 
 
-package LINZ::GNSS::FileType::FileSpec;
+package LINZ::GNSS::FileSpec;
 use fields qw ( 
     path 
     filename 
@@ -22,7 +22,7 @@ use fields qw (
     timestamp 
 );
 
-=head $spec=new LINZ::GNSS::FileSpec($hash)
+=head2 $spec=new LINZ::GNSS::FileSpec($hash)
 
 Blesses a hash into the FileSpec class.  It is assumed to have values for all of the 
 attributes (as per below)
@@ -73,6 +73,8 @@ Station code if applicable
 =item timestamp
 
 Timestamp of the file (? check this!)
+
+=back
 
 =cut
 

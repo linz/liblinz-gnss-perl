@@ -419,7 +419,7 @@ sub _filespec
     my $path=$self->_expandName($self->path,$jobid,$tc,$stn,$stncodes);
     my $filename=$self->_expandName($self->filename,$jobid,$tc,$stn,$stncodes);
 
-    my $spec = new LINZ::GNSS::FileType::FileSpec();
+    my $spec = new LINZ::GNSS::FileSpec();
     $spec->{path}=$path;
     $spec->{filename}=$filename;
     $spec->{compression}=$self->compression;

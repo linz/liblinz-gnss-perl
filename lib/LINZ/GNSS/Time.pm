@@ -34,6 +34,7 @@ our @EXPORT = qw(
     datetime_seconds
     seconds_datetime
     ymdhms_seconds
+    seconds_ymdhms
     start_time_utc_day
     start_time_gnss_week
     seconds_decimal_yr
@@ -199,6 +200,31 @@ sub ymdhms_seconds {
     }
     return $seconds;
 }
+
+=head2 ($year,$month,$day,$hour,$min,$sec)=seconds_ymdhms($seconds,$local)
+
+Returns a timestamp split into component parts.  The year includes the century
+and the months are numbered 1 to 12.  Uses gmtime unless $local evaluates to true.
+
+=cut
+
+sub seconds_ymdhms
+{
+    my($seconds,$local)=@_;
+    my ($sec, $min, $hr, $day, $mon, $year);
+    if( $local )
+    {
+        ($sec, $min, $hr, $day, $mon, $year) = localtime($seconds);
+    }
+    else
+    {
+        ($sec, $min, $hr, $day, $mon, $year) = gmtime($seconds);
+    }
+    $mon++;
+    $year+=1900;
+    return ($year,$mon,$day,$hr,$min,$sec);
+}
+
 
 
 sub year_seconds {

@@ -6,6 +6,19 @@ liblinz-gnss-perl (1.4.0-1) precise; urgency=low
   * Adding option to remove source files after merge
   * Packaging
   * Documentation fixes and bug fix
+  * Packaging
+  * More bug fixes on FileSpec
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 07 Jul 2014 14:46:20 +1200
+
+liblinz-gnss-perl (1.4.0-1) precise; urgency=low
+
+  * Adding seconds_ymdhms function
+  * Adding LINZ::GNSS::RinexFile::Merge
+  * Splitting FileSpec into separate module and documenting
+  * Adding option to remove source files after merge
+  * Packaging
+  * Documentation fixes and bug fix
 
  -- Chris Crook <ccrook@linz.govt.nz>  Mon, 07 Jul 2014 14:30:38 +1200
 

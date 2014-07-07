@@ -12,63 +12,6 @@ sub new
     return$self;
 }
 
-package LINZ::GNSS::FileType::FileSpec;
-use fields qw ( 
-    path 
-    filename 
-    basepath 
-    filepath 
-    compression 
-    type 
-    subtype 
-    station 
-    jobid 
-    timestamp 
-);
-
-sub new
-{
-    my($self) = @_;
-    $self = fields::new($self) unless ref $self;
-    return $self;
-}
-
-sub path { return $_[0]->{path}; }
-sub filename { return $_[0]->{filename}; }
-sub basepath { $_[0]->{basepath} = $_[1] if defined $_[1]; return $_[0]->{basepath}; }
-sub compression { return $_[0]->{compression}; }
-sub type { return $_[0]->{type}; }
-sub subtype { return $_[0]->{subtype}; }
-sub station { return $_[0]->{station}; }
-sub timestamp { return $_[0]->{timestamp}; }
-
-sub filepath 
-{
-    my ($self)=@_;
-    my $bp=$self->{basepath};
-    $bp .= '/' if $bp;
-    return $bp.$self->{path}.'/'.$self->{filename};
-}
-    
-sub asString
-{
-    my ($self,$prefix)=@_;
-    my $result = <<EOD;
-    LINZ::GNSS::FileSpec:
-      path={path}
-      filename={filename}
-      compression={compression}
-      type={type}
-      subtype={subtype}
-      station={station}
-      jobid={jobid}
-      timestamp={timestamp}
-EOD
-    $result=~ s/\{(\w+)\}/$self->{$1}/eg;
-    $result=~ s/^$1//mg if $result =~ /^(\s+)/;
-    $result=~ s/^/$prefix/emg if $prefix;
-    return $result;
-}
 
 =head1 LINZ::GNSS::FileType
 
@@ -108,6 +51,7 @@ use fields qw(
 
 
 use Carp;
+use LINZ::GNSS::FileSpec;
 use LINZ::GNSS::Time qw(
     $SECS_PER_DAY
     $SECS_PER_HOUR

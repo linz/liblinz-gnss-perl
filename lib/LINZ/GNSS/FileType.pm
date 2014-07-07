@@ -419,15 +419,16 @@ sub _filespec
     my $path=$self->_expandName($self->path,$jobid,$tc,$stn,$stncodes);
     my $filename=$self->_expandName($self->filename,$jobid,$tc,$stn,$stncodes);
 
-    my $spec = new LINZ::GNSS::FileSpec();
-    $spec->{path}=$path;
-    $spec->{filename}=$filename;
-    $spec->{compression}=$self->compression;
-    $spec->{type}=$self->type;
-    $spec->{subtype}=$self->subtype;
-    $spec->{station}=$stn;
-    $spec->{jobid}=$jobid;
-    $spec->{timestamp}=$tc->{timestamp};
+    my $spec = new LINZ::GNSS::FileSpec(
+        path=>$path,
+        filename=>$filename,
+        compression=>$self->compression,
+        type=>$self->type,
+        subtype=>$self->subtype,
+        station=>$stn,
+        jobid=>$jobid,
+        timestamp=>$tc->{timestamp},
+    );
     return $spec;
 }
 

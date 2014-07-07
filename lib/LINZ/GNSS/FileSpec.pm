@@ -31,8 +31,9 @@ attributes (as per below)
 
 sub new
 {
-    my($self) = @_;
+    my($self,%data) = @_;
     $self = fields::new($self) unless ref $self;
+    foreach my $k (keys %data){ $self->{$k}=$data{$k}; }
     return $self;
 }
 

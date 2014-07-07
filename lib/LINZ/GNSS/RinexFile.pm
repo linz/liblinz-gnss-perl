@@ -478,6 +478,10 @@ a hash that can include
 
 If defined that the data will be filtered to the specified session
 
+=item remove=>1
+
+If true then the original files will be removed
+
 =back
 
 =back
@@ -535,6 +539,13 @@ sub Merge
             $rx->write($of,session=>$options{session},skip_header=>1);
         }
         close($of);
+        if( $options{remove} )
+        {
+            foreach my $rfn (@$sourcefiles)
+            {
+                unlink($rfn);
+            }
+        }
         move($ofn,$target);
     };
     if( $@ )

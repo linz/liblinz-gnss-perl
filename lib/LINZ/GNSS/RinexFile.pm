@@ -3,8 +3,9 @@ use strict;
 package LINZ::GNSS::RinexFile;
 
 no warnings qw/substr/;
+use File::Copy;
 use Carp;
-use LINZ::GNSS::Time qw(ymdhms_seconds);
+use LINZ::GNSS::Time qw(ymdhms_seconds seconds_ymdhms);
 
 
 =head1 LINZ::GNSS::RinexFile - scan a rinex observation file for various information
@@ -48,6 +49,7 @@ sub new
     close($f);
     return $self;
 }
+
 
 sub _trimsub
 {
@@ -136,16 +138,24 @@ sub _loadHeader
     }
     elsif( $rectype eq 'TIME OF FIRST OBS' )
     {
+        $self->_loadWritableField(\$line,0,43,'firstobstime');
+        $data=substr($line,0,60);
         $data =~ /(.{6})(.{6})(.{6})(.{6})(.{6})(.{13}).{0,5}(.{0,3})/;
         my ($year,$mon,$day,$hour,$min,$sec,$sys) = ($1,$2,$3,$4,$5,$6,$7);
         $self->{_year}=$year;
         $self->{starttime}=ymdhms_seconds($year,$mon,$day,$hour,$min,$sec);
         $self->{endtime}=$self->{starttime};
     }
+    elsif( $rectype eq 'TIME OF LAST OBS' )
+    {
+        $self->_loadWritableField(\$line,0,43,'lastobstime');
+    }
     elsif( $rectype eq 'INTERVAL' )
     {
         $self->{interval}=_trimsub($data)+0.0;
     }
+    $self->{marknumber} = $self->{markname} if ! exists $self->{marknumber} eq '';
+    $self->{interval} = 0 if ! exists $self->{marknumber} eq '';
     return $line;
 }
 
@@ -198,10 +208,11 @@ sub _scanObs
 {
     my($self,$f,$session,$of) = @_;
     my $nobs=0;
+    my $lasttime;
+    my $copy=1;
     while( my $line=<$f> )
     {
         next if $line =~ /^\s*$/;
-        print $of $line if $of;
         if( $line =~ /^
             \s([\s\d]\d)
             \s([\s\d]\d)
@@ -217,19 +228,31 @@ sub _scanObs
             $year += 1900;
             $year += 100 if $year < $self->{_year};
             my $endtime=ymdhms_seconds($year,$mon,$day,$hour,$min,$sec);
-            if( ! $session || ($endtime >= $session->[0] || $endtime <= $session->[1]) )
+            if( $lasttime )
             {
+                my $interval=$endtime-$lasttime;
+                $self->{interval} = $interval if
+                    $self->{interval} == 0 || ($interval > 0 && $interval < $self->{interval});
+            }
+            $lasttime=$endtime;
+        
+            $copy=0;
+            if( ! $session || ($endtime >= $session->[0] && $endtime <= $session->[1]) )
+            {
+                $copy=1;
                 $nobs++ if $eflag ne '6';
                 $self->{endtime} = $endtime if $endtime > $self->{endtime};
             }
+
             # Skip for additional satellite ids
             my $nskip=int(($nsat-1)/12);
             # Number of obs records
             $nskip += $nsat * (1 + int(($self->{nobstypes}-1)/5));
+            print $of $line if $of && $copy;
             while( $line && $nskip-- )
             {
                 $line=<$f>;
-                print $of $line if $of;
+                print $of $line if $of && $copy;
             }
         }
         elsif( $line =~ /^
@@ -243,6 +266,7 @@ sub _scanObs
             ([\s\d][\s\d]\d)
             /x )
         {
+            print $of $line if $of;
             my $nskip=$8;
             while( $nskip--)
             {
@@ -314,7 +338,7 @@ The start time epoch in seconds
 
 =item $rxfile->endtime
 
-The start time epoch in seconds
+The end time epoch in seconds (set when observations have been scanned)
 
 =item $rxfile->interval
 
@@ -367,27 +391,56 @@ sub anttype  { return _getset(@_) }
 sub recnumber  { return _getset(@_) } 
 sub rectype  { return _getset(@_) } 
 sub recversion  { return _getset(@_) } 
+sub firstobstime  { return _getset(@_) } 
+sub lastobstime  { return _getset(@_) } 
 
-=head2 $rxfile->write($filename)
+=head2 $rxfile->write($filename,%options)
 
 Copies the rinex file to a new location.  If any of the updatable fields have been altered
 then the new values are copied into header records.  Note that then entire file is copied,
 even if the file was loaded with skip_obs=>1.
 
+options can include:
+
+=over
+
+=item skip_header=1
+The header will not be copied
+
+=item skip_obs=1
+The observations will not be copied
+
+=item session=[start,end]
+Only observations from the session will be copied
+
+=back
+
 =cut
 
 sub write 
 {
-    my ($self,$filename) = @_;
+    my ($self,$filename,%options) = @_;
     my $srcfile=$self->filename;
-    my $tgtfile=$filename;
     my $options=$self->{_options};
     open( my $fsrc, "<$srcfile" ) || croak("Cannot reopen $srcfile\n");
-    open( my $ftgt, ">$tgtfile" ) || croak("Cannot open $tgtfile\n");
+
+    my $tgtfile=$filename;
+    my $ftgt;
+    my $close=0;
+    if( ref( $tgtfile ))
+    {
+        $ftgt=$tgtfile;
+        $tgtfile="output file";
+    }
+    else
+    {
+        open( $ftgt, ">$tgtfile" ) || croak("Cannot open $tgtfile\n");
+        $close=1;
+    }
     eval
     {
-        $self->_scanHeader($fsrc,$ftgt);
-        $self->_scanObs($fsrc,$options->{session},$ftgt);
+        $self->_scanHeader($fsrc,$options{skip_header} ? '' : $ftgt);
+        $self->_scanObs($fsrc,$options{session},$ftgt,1) if ! $options{skip_obs};
     };
     if( $@ )
     {
@@ -395,8 +448,104 @@ sub write
     }
 
     close($fsrc);
-    close($ftgt);
+    close($ftgt) if $close;
 }
 
+=head2 LINZ::GNSS::RinexFile::Merge($sourcefiles,$target,$options)
+
+Merges a set of Rinex files into a single file.  Assumes that the files are non-overlapping
+sequential data.  Raises an exception if the contents are not consistent.
+
+Parameters are 
+
+=over
+
+=item $sourcefiles
+
+an array hash of input files
+
+=item $target 
+
+the name of a target file to write
+
+=item $options
+
+a hash that can include
+
+=over
+
+=item session=[start,end]
+
+If defined that the data will be filtered to the specified session
+
+=back
+
+=back
+
+=cut
+
+sub Merge
+{
+    my($sourcefiles,$target,%options) = @_;
+
+    my @rxfiles;
+    foreach my $rfn (@$sourcefiles)
+    {
+        push(@rxfiles,LINZ::GNSS::RinexFile->new($rfn,{skip_obs=>1}));
+    }
+    @rxfiles = sort { $a->starttime <=> $b->starttime } @rxfiles;
+
+    my $rx0=shift(@rxfiles);
+
+    foreach my $rx (@rxfiles)
+    {
+        foreach my $test (qw/ 
+                version type satsys 
+                markname marknumber 
+                antnumber anttype 
+                recnumber rectype recversion 
+                delta_hen 
+                obstypes
+            /)
+        {
+            my $v0=$rx0->{$test};
+            my $v1=$rx->{$test};
+            if( ref($v0) eq 'ARRAY') { $v0=join(' ',@$v0); $v1=join(' ',@$v1); }
+            croak("Cannot merge RINEX: inconsistent $test\n") if $v0 ne $v1;
+        }
+    }
+
+    my $ofn=$target.'.merge';
+    open(my $of,">$ofn") || croak("Cannot open merged RINEX $ofn\n");
+    eval
+    {
+        if( $options{session} )
+        {
+            my $format="%6d%6d%6d%6d%6d%13.7f";
+            $rx0->firstobstime(sprintf($format,seconds_ymdhms($options{session}->[0])));
+            $rx0->lastobstime(sprintf($format,seconds_ymdhms($options{session}->[1])));
+        }
+        elsif( @rxfiles )
+        {
+            $rx0->lastobstime($rxfiles[-1]->lastobstime());
+        }
+        $rx0->write($of,session=>$options{session});
+        foreach my $rx (@rxfiles)
+        {
+            $rx->write($of,session=>$options{session},skip_header=>1);
+        }
+        close($of);
+        move($ofn,$target);
+    };
+    if( $@ )
+    {
+        my $msg=$@;
+        unlink($ofn) if -f $ofn;
+        croak($@);
+    };
+
+
+
+}
 
 1;

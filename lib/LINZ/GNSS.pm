@@ -66,21 +66,24 @@ sub LoadConfig
     my($filename) = @_;
     my $config=_Config($filename);
 
-    if( exists $config->{logsettings} )
+    eval
     {
-        my $logcfg=$config->{logsettings};
-        my $logfile=_expandvar($config->{logdir}).'/'._expandvar($config->{logfile});
-        $logcfg =~ s/\[logfilename\]/$logfile/eg;
-        Log::Log4perl->init(\$logcfg);
-    }
-    elsif( exists $ENV{DEBUG_LINZGNSS} )
-    {
-        Log::Log4perl->easy_init($DEBUG);
-    }
-    else
-    {
-        Log::Log4perl->easy_init($WARN);
-    }
+        if( exists $config->{logsettings} )
+        {
+            my $logcfg=$config->{logsettings};
+            my $logfile=_expandvar($config->{logdir}).'/'._expandvar($config->{logfile});
+            $logcfg =~ s/\[logfilename\]/$logfile/eg;
+            Log::Log4perl->init(\$logcfg);
+        }
+        elsif( exists $ENV{DEBUG_LINZGNSS} )
+        {
+            Log::Log4perl->easy_init($DEBUG);
+        }
+        else
+        {
+            Log::Log4perl->easy_init($WARN);
+        }
+    };
     LINZ::GNSS::FileCompression::LoadCompressionTypes( $config );
     LINZ::GNSS::FileTypeList::LoadDefaultTypes( $config );
     LINZ::GNSS::DataCenter::LoadDataCenters( $config );

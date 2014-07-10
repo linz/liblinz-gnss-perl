@@ -298,6 +298,24 @@ sub AvailableStations
     return wantarray ? @stncodes : \@stncodes;
 }
 
+=head2 LINZ::GNSS::DataCenter::SourceDescriptions
+
+Returns a string listing the priorities data centres.
+
+=cut
+
+sub SourceDescriptions
+{
+    my $dsc='';
+    my $prefix="";
+    foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+    {
+        $dsc .= $prefix.$center->description;
+        $prefix="\n";
+    }
+    return $dsc;
+}
+
 =head2 LINZ::GNSS::DataCenter::WhenAvailable( $request )
 
 Tests the prioritised datacenters to see when the request should be able to be serviced.
@@ -409,6 +427,44 @@ sub priority { return $_[0]->{priority}; }
 sub scheme { return $_[0]->{scheme}; }
 sub basepath { return $_[0]->{basepath}; }
 sub _logger { return $_[0]->{_logger}; }
+
+=head2 $text = $center->description()
+
+Returns a text description of the data center and the file types it provides
+
+=cut
+
+sub description
+{
+    my($self)=@_;
+    my $dsc='Data center: '.$self->name.' ('.$self->{scheme}.'://'.$self->{host}.")\n";
+    my $usestn=0;
+    my $prefix="    Data types: ";
+    foreach my $ft (@{$self->filetypes->types})
+    {
+        $dsc .= $prefix.$ft->type.': '.$ft->subtype."\n";
+        $prefix="                ";
+        $usestn ||= $ft->use_station;
+    }
+    if( $usestn )
+    {
+        $prefix="      Stations: ";
+        my $nst=0;
+        foreach my $st ($self->stations)
+        {
+            $dsc.=$prefix.$st;
+            $nst++;
+            $prefix=' ';
+            if( $nst == 12 )
+            {
+                $prefix="\n                ";
+                $nst=0;
+            }
+        }
+        $dsc .= "\n";
+    }
+    return $dsc;
+}
 
 
 =head2 $when,$files = $center->checkRequest($request)

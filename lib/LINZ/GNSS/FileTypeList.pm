@@ -158,21 +158,42 @@ sub getTypes
     $subtype=uc($subtype);
     my $plus= $subtype eq '' || $subtype=~s/\+$//;;
     my @result=();
-    return @result if ! exists $self->{$type};
-    my $basepriority=0;
-    if( $subtype ne '' )
+    if( exists $self->{$type} )
     {
-        return @result if ! exists $self->{$type}->{$subtype};
-        push(@result,$self->{$type}->{$subtype});
-        $basepriority=$result[0]->{priority};
-    }
-    if( $plus )
-    {
-        foreach my $t (values %{$self->{$type}})
+        my $basepriority=0;
+        if( $subtype ne '' )
         {
-            push(@result,$t) if $t->{priority} > $basepriority;
+            return @result if ! exists $self->{$type}->{$subtype};
+            push(@result,$self->{$type}->{$subtype});
+            $basepriority=$result[0]->{priority};
         }
-        @result = sort {$b->{priority} <=> $a->{priority}} @result;
+        if( $plus )
+        {
+            foreach my $t (values %{$self->{$type}})
+            {
+                push(@result,$t) if $t->{priority} > $basepriority;
+            }
+            @result = sort {$b->{priority} <=> $a->{priority}} @result;
+        }
+    }
+    return wantarray ? @result : \@result;
+}
+
+=head2 @types=$typelist->types()
+
+Return an array of all types provided by the data source
+
+=cut
+
+sub types
+{
+    my($self)=@_;
+    my @basetypes=('ORB','ERP','OBS');
+    my @othertypes=grep { $_ ne 'ORB' && $_ ne 'ERP' && $_ ne 'OBS' } sort keys %$self;
+    my @result=();
+    foreach my $t (@basetypes,@othertypes)
+    {
+        push(@result,@{$self->getTypes($t)});
     }
     return wantarray ? @result : \@result;
 }

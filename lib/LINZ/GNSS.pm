@@ -1,6 +1,29 @@
 
 =head1 LINZ::GNSS - Module providing GNSS data functions
 
+This module provides functions to support processing GNSS data.  The majority of the 
+scripts relate to selecting and retrieving GNSS reference data (orbits, ERP, reference
+station RINEX files).  The module also provides components for handling RINEX and SINEX
+files and managing GNSS time formats.
+
+=head2 See Also
+
+=over
+
+=item LINZ::GNSS::DataCenter defines a location from which reference data can be retrieved
+
+=item LINZ::GNSS::FileCache handles a local file cache in which downloaded data is saved
+
+=item LINZ::GNSS::RinexFile limited reading and copying RINEX observation files
+
+=item LINZ::GNSS::SinexFile limited reading and copying SINEX results files
+
+=item LINZ::GNSS::Time functions for converting GNSS time formats
+
+=item /etc/bernese52/getdata.conf  Configuration file for data centres and reference stations
+
+=back
+
 =cut
 
 use strict;
@@ -91,7 +114,7 @@ sub LoadConfig
     LINZ::GNSS::RefStation::LoadConfig( $config );
 }
 
-=head2 $cslist=LINZ::GNSS::CoordSysList()
+=head2 $cslist=LINZ::GNSS::CoordSysList
 
 Returns a LINZ::Geodetic::CoordSysList based on the coordsys.def file defined in the configuration.
 

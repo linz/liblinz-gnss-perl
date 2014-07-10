@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.5.0-1) precise; urgency=low
+
+  * Adding functions for describing data centers
+  * Error handling around logger initiallization, to allow running without logger
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 10 Jul 2014 20:14:10 +1200
+
 liblinz-gnss-perl (1.4.0-1) precise; urgency=low
 
   * Adding seconds_ymdhms function

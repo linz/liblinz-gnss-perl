@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.5.1-1) precise; urgency=low
+
+  * Updating POD documentation
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 11 Jul 2014 13:37:50 +1200
+
 liblinz-gnss-perl (1.5.0-1) precise; urgency=low
 
   * Adding functions for describing data centers

@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.5.2-1) precise; urgency=low
+
+  * Fixing to be able to load files with no outages
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 15 Jul 2014 10:52:31 +1200
+
 liblinz-gnss-perl (1.5.1-1) precise; urgency=low
 
   * Updating POD documentation

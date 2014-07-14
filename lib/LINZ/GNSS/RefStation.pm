@@ -3,7 +3,7 @@ use Math::Trig;
 
 =head1 LINZ::GNSS::RefStation
 
-LINZ::GNSS::RefStation manages the definition of a reference sattion, including availability and the coordinate model.
+LINZ::GNSS::RefStation manages the definition of a reference station, including availability and the coordinate model.
 
 =cut
 
@@ -651,7 +651,7 @@ sub new
 
         my $outages=[];
         my $xo=$xml->{outages};
-        if( $xo )
+        if( ref($xo) eq 'ARRAY' )
         {
             foreach my $x (@$xo)
             {

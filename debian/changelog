@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.5.3-1) precise; urgency=low
+
+  * Fixing locations of ERP data in cache
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 25 Jul 2014 15:03:11 +1200
+
 liblinz-gnss-perl (1.5.2-1) precise; urgency=low
 
   * Fixing to be able to load files with no outages

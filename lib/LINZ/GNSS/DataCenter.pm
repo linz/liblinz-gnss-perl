@@ -339,7 +339,9 @@ sub WhenAvailable
 =head2 $status, $when, $files = LINZ::GNSS::DataCenter::FillRequest( $request, $target )
 
 Tries to fill a data request to a target datacenter.  Will try each prioritized 
-data center from highest to lowest priority.
+data center from highest to lowest priority, except that if the request includes a 
+station then the algorithm will favour data centers that explicitly provide the station
+over wildcard matches.
 
 Returns a status, when the files expect to be available, and an array ref of downloaded file specs. 
 The status is one of the values returned by getData;
@@ -364,7 +366,29 @@ sub FillRequest
     my $available=undef;
     my $status = UNAVAILABLE;
     my $downloaded = [];
+
+    # Find potential centers to supply the data, based on centers priority,
+    # but favouring exact station match over wildcard match
+    my @centers=();
+    my @unmatch_centers=();
     foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+    {
+        # Try matching exact station
+        my ($when) = $center->checkRequest($request,1);
+        if( $when )
+        {
+            push(@centers,$center);
+            next;
+        }
+        # Try matching inexactly
+        ($when) = $center->checkRequest($request,0);
+        if( $when )
+        {
+            push(@unmatch_centers,$center);
+        }
+    }
+
+    foreach my $center (@centers, @unmatch_centers)
     {
         my ($result, $when, $files) = $center->getData($request,$target);
         next if $result eq UNAVAILABLE;
@@ -467,7 +491,7 @@ sub description
 }
 
 
-=head2 $when,$files = $center->checkRequest($request)
+=head2 $when,$files = $center->checkRequest($request, $matchstation)
 
 Checks whether a data centre should be able to supply a request. Returns when 
 the request should be able to be filled, and the list of files the it will 
@@ -477,6 +501,11 @@ The list of files returned is based on the best available type expected.
 Currently the system does not support trying a less good type if the best
 is not available.
 
+If $matchstation is set to true then the the request must match a listed
+station for the data centre.  Otherwise if the data center supports "all stations"
+(ie wildcard station code *), then it may return a value even if the station
+code is not matched explicitly.
+
 Returns $when=0 if the request cannot be filled from this list.
 Return $files undefined when the request cannot be filled now
 
@@ -484,10 +513,10 @@ Return $files undefined when the request cannot be filled now
 
 sub checkRequest 
 {
-    my( $self, $request ) = @_;
+    my( $self, $request, $matchstation ) = @_;
     return 0,undef if 
         $request->use_station && 
-        ! ($self->{allstations} || exists $self->{stncodes}->{uc($request->station)});
+        ! (($self->{allstations} && ! $matchstation) || exists $self->{stncodes}->{uc($request->station)});
     return $self->filetypes->checkRequest($request);
 }
 

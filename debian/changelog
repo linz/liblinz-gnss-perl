@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.7.0-1) precise; urgency=low
+
+  * Adding support for http datacenter (for VMF)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 01 Aug 2014 07:54:34 +1200
+
 liblinz-gnss-perl (1.6.0-1) precise; urgency=low
 
   * Improving data center selection for stations

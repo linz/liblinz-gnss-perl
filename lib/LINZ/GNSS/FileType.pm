@@ -3,7 +3,7 @@ use strict;
 # Simple hash subtypes
 
 package LINZ::GNSS::FileType::TimeCodes;
-use fields qw( timestamp daysecs yyyy yy wwww ww ddd d hh h);
+use fields qw( timestamp daysecs yyyy yy mm dd wwww ww ddd d hh h);
 
 sub new
 {
@@ -289,8 +289,9 @@ sub timeCodes {
     my ($self,$timestamp) = @_;
     my $increment=$self->{frequencysecs};
     my $time = int(($timestamp-$GNSSTIME0)/$increment)*$increment+$GNSSTIME0;
-    my ($year, $yday, $wday, $hour, $min, $sec) = (gmtime($time))[ 5, 7, 6, 2, 1, 0 ];
+    my ($year, $month, $mday, $yday, $wday, $hour, $min, $sec) = (gmtime($time))[ 5, 4, 3, 7, 6, 2, 1, 0 ];
     $year += 1900;
+    $month++;
     my $doy = sprintf( "%03d", $yday + 1 );
     my $woy = sprintf( "%02d", int($yday/7) );
     my $gnss_week = int( ( $time - $GNSSTIME0 ) / $SECS_PER_WEEK );
@@ -302,6 +303,8 @@ sub timeCodes {
     $codes->{daysecs}=$hour*3600+$min*60+$sec;
     $codes->{yyyy}=$ystr, 
     $codes->{yy}=substr($ystr,2);
+    $codes->{mm}=sprintf("%02d",$month);
+    $codes->{dd}=sprintf("%02d",$mday);
     $codes->{wwww}=sprintf("%04d",$gnss_week);
     $codes->{ww}=$woy;
     $codes->{ddd}=$doy, 

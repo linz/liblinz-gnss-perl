@@ -13,6 +13,10 @@ Data can be either accessed via ftp, in which case they have a uri structured as
 
     ftp://usr:pwd@ftp.somewhere
 
+or http
+
+    http://www.somewhere..
+
 or they can be simple file system locations (typically for a cache), in which case the uri is 
 a local file uri defining the base directory of the store, eg
 
@@ -621,6 +625,22 @@ sub _getfile
             croak "Cannot retrieve $file from $host\n";
         }
         $self->_logger->info("Retrieved $file from $host");
+    }
+    elsif( $self->scheme eq 'http' )
+    {
+        require LWP::Simple;
+        my $host=$self->{host};
+        my $url="http://$host"."$path/$file";
+        my $content=LWP::Simple::get($url);
+        if( ! $content )
+        {
+            self->_logger->warn("Cannot retrieve $url");
+            croak("Cannot retrieve $url");
+        }
+        open(my $f, ">$target" ) || croak("Cannot create file $target\n");
+        binmode($f);
+        print $f $content;
+        close($f);
     }
 }
 

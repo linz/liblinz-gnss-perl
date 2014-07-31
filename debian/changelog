@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.7.1-1) precise; urgency=low
+
+  * Fixing location of VMF files in Bernese campaign
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 01 Aug 2014 08:50:42 +1200
+
 liblinz-gnss-perl (1.7.0-1) precise; urgency=low
 
   * Adding support for http datacenter (for VMF)

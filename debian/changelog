@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.8.0-1) precise; urgency=low
+
+  * Excluding reference stations within 5 metres
+  * Adding DCB files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 01 Aug 2014 14:38:01 +1200
+
 liblinz-gnss-perl (1.7.1-1) precise; urgency=low
 
   * Fixing location of VMF files in Bernese campaign

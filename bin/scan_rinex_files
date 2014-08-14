@@ -24,7 +24,7 @@ my $opts={};
 getopts('rh',$opts);
 my $recursive=$opts->{r};
 
-if( $opts{h} )
+if( $opts->{h} || ! @ARGV )
 {
     print $syntax;
     exit;

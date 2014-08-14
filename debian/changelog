@@ -1,3 +1,12 @@
+liblinz-gnss-perl (1.9.0-1) precise; urgency=low
+
+  * Adding clock files data type
+  * Adding the scan_rinex_files script
+  * Minor fix to scan_rinex_files
+  * Fixing cut/paste error in conf file
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 15 Aug 2014 11:10:02 +1200
+
 liblinz-gnss-perl (1.8.0-1) precise; urgency=low
 
   * Excluding reference stations within 5 metres

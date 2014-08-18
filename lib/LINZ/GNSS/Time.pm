@@ -46,6 +46,7 @@ our @EXPORT = qw(
     get_week_start
     is_leap_year
     seconds_julianday
+    julianday_seconds
 );
 
 our @EXPORT_OK = qw(
@@ -261,6 +262,18 @@ sub seconds_julianday
     # for timestamp
     my $jday=int($seconds/(60*60*24))+40587;
     return $jday;
+}
+
+=head2 $seconds=julianday_seconds($jday)
+
+Returns the timestamp corresponding to a julian day
+
+=cut
+
+sub julianday_seconds
+{
+    my ($jday)=@_;
+    return ($jday-40587)*(60*60*24);
 }
 
 sub seconds_decimal_yr {

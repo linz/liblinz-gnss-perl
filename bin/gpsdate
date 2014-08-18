@@ -7,6 +7,7 @@ use LINZ::GNSS::Time qw/
     seconds_datetime 
     datetime_seconds
     gnssweek_seconds
+    seconds_julianday
     $SECS_PER_DAY
     /;
 
@@ -20,6 +21,7 @@ Converts dates between different GPS formats.  Dates can be entered as:
    yyyy-ddd      Year, day number
    wwww-d        GPS week, day
    ssssssssss    Unix time stamp
+   jjjjj         Julian day
    now           Right now!
 
 All are in terms of UTC time.  Seconds are referred to the start of the day,
@@ -32,6 +34,7 @@ Format is a string that can include:
    n  the day of year
    Y  the year
    u  the unix timestamp
+   j  julian day
 EOF
 
 
@@ -60,6 +63,10 @@ elsif( $time =~ /^\d{10}$/ )
 {
     $seconds=$time+0;
 }
+elsif( $time =~ /^\d{5}$/ )
+{
+    $seconds=julianday_seconds($time);
+}
 elsif( lc($time) eq 'now' )
 {
     $seconds=time();
@@ -72,7 +79,7 @@ else
 my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($seconds);
 
 my $day=substr('SunMonTueWedThuFriSat',$wday*3,3);
-
+my $jday=seconds_julianday($seconds);
 my $datestr=seconds_datetime($seconds);
 
 if( $opts{f} )
@@ -85,9 +92,10 @@ if( $opts{f} )
         'n'=>sprintf("%03d",$doy),
         'Y'=>$year,
         'u'=>$seconds,
+        'j'=>$jday,
     };
     $format=$opts{f};
-    $format=~ s/([DWdnYu])/$strings->{$1}/eg;
+    $format=~ s/([DWdnYuj])/$strings->{$1}/eg;
     print $format,"\n";
 }
 else
@@ -95,6 +103,7 @@ else
     print "Date           : $datestr ($day)\n";
     print "Year/day       : $year $doy\n";
     print "GNSS week/day  : $gnssweek $wday\n";
+    print "Julian day     : $jday\n";
     print "Unix timestamp : $seconds\n";
     print "\nNote: all values are UTC\n";
 }

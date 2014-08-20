@@ -211,7 +211,7 @@ gzipped or unix compressed, and inside zip files.
 If the -r (recursive) option is specified then the list of files can include
 directories that will be scanned recursively.
 
-If the -a (append) option is specified then the file header is omitted.
+If the -a (append) option is specified then the file header is omitted from the output.
 
 =cut
 

@@ -1,3 +1,13 @@
+liblinz-gnss-perl (1.10.0-1) precise; urgency=low
+
+  * Fixing location of clock files in Bernese directories
+  * Adding handling of julian day in gpsdate
+  * Adding support for local directory target for downloads
+  * Fixing help contents
+  * Fixing help contents
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 20 Aug 2014 20:27:27 +1200
+
 liblinz-gnss-perl (1.9.0-1) precise; urgency=low
 
   * Adding clock files data type

@@ -11,40 +11,17 @@ use LINZ::GNSS::Time qw/
     $SECS_PER_DAY
     /;
 
-my $syntax=<<EOF;
-
-Syntax: gpsdate [-f format] date 
-
-Converts dates between different GPS formats.  Dates can be entered as:
-
-   yyyy-mm-dd    Year, month, day
-   yyyy-ddd      Year, day number
-   wwww-d        GPS week, day
-   ssssssssss    Unix time stamp
-   jjjjj         Julian day
-   now           Right now!
-
-All are in terms of UTC time.  Seconds are referred to the start of the day,
-(ie 00:00:00)
-
-Format is a string that can include:
-   D  the date as yyyy-mm-dd
-   W  the week
-   d  the day of week as a number
-   n  the day of year
-   Y  the year
-   u  the unix timestamp
-   j  julian day
-EOF
-
-
-@ARGV || die $syntax;
 
 my %opts;
 getopts('f:h',\%opts);
 
+if( ! @ARGV || $opts{h} )
+{
+    help();
+    exit();
+}
+
 my $time=join(' ',@ARGV);
-die $syntax if $opts{h};
 
 my $seconds;
 if( $time=~ /^((?:19|20)\d\d)\W*(\d\d)\W*(\d\d)$/ )
@@ -91,22 +68,69 @@ if( $opts{f} )
         'd'=>$wday,
         'n'=>sprintf("%03d",$doy),
         'Y'=>$year,
+        'y'=>substr($year,2),
         'u'=>$seconds,
         'j'=>$jday,
     };
     $format=$opts{f};
-    $format=~ s/([DWdnYuj])/$strings->{$1}/eg;
+    $format=~ s/([DWdnYyuj])/$strings->{$1}/eg;
     print $format,"\n";
 }
 else
 {
-    print "Date           : $datestr ($day)\n";
-    print "Year/day       : $year $doy\n";
-    print "GNSS week/day  : $gnssweek $wday\n";
-    print "Julian day     : $jday\n";
-    print "Unix timestamp : $seconds\n";
+    print "Date                : $datestr ($day)\n";
+    print "Year/day            : $year $doy\n";
+    print "GNSS week/day       : $gnssweek $wday\n";
+    print "Modified Julian day : $jday\n";
+    print "Unix timestamp      : $seconds\n";
     print "\nNote: all values are UTC\n";
 }
 
+sub help
+{
+    my ($brief)=@_;
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
+    {
+        -verbose=>$brief ? 99 : 2,
+        -sections=>'Synopsis',
+        -exitval=>2,
+    });
+}
 
+__DATA__
 
+=head1 Name
+
+gpsdate - Convert between GPS date formats
+
+=head1 Synopsis
+
+    gpsdate [-f format] date
+
+=head1 Description
+
+Converts dates between different GPS formats.  Dates can be entered as:
+
+   yyyy-mm-dd    Year, month, day
+   yyyy-ddd      Year, day number
+   wwww-d        GPS week, day
+   ssssssssss    Unix time stamp
+   jjjjj         Julian day
+   now           Right now!
+
+All are in terms of UTC time.  Seconds are referred to the start of the day,
+(ie 00:00:00)
+
+If the format parameter is specified then the output will be a string based
+on the format with the following substitutions.
+
+   D  the date as yyyy-mm-dd
+   W  the week
+   d  the day of week as a number
+   n  the day of year
+   Y  the year
+   u  the unix timestamp
+   j  julian day
+
+=cut

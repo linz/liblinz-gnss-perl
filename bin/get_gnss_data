@@ -19,51 +19,42 @@ if( $@ )
 }
 
 my %opts;
-getopts('d',\%opts);
+getopts('d:lh',\%opts);
 my $dir=$opts{d} || '.';
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
 
-if( @ARGV < 2 )
+if( $opts{l} )
 {
-    print <<EOD;
-
-Syntax: get_gnss_data [-d dirname] type date [station ...]
-
-Retrieves GNSS data via the Bernese datapool file cache.
-Data is specified by the type/subtype, the date, and for 
-RINEX observations, the station name.
-
-The valid types and subtypes are listed below (the 
-subtype can be omitted, in which case the first type will
-be used (ie OBS is equivalent to OBS:FINAL)
-
-The date is specified by year and day of year, eg 2013:020.
-A range can be specified as 2013:020-025 or 2013:360-2014:001.
-
-The station(s) can be specified if the data type requires it.
-
-Files are retrieved to the current directory unless an
-alternative is specified using the -d options.
-
-The available types are:
-EOD
-    foreach my $ft (LINZ::GNSS::FileTypeList::types())
-    {
-        my $ftype=$ft->type.":".$ft->subtype;
-        my $fdesc=$ft->name;
-        printf "   %-12s %s\n",$ftype,$fdesc;
-    }
+    printFileTypes();
     exit();
 }
 
+if( ! @ARGV || $opts{h} )
+{
+    help();
+    exit();
+}
+
+die "Insufficient parameters\n" if @ARGV < 2;
 die "Invalid directory $dir specified\n" if ! -d $dir;
 
 eval
 {
     my $cache=LINZ::GNSS::FileCache::Cache();
-    my ($type,$date,@stations)=@ARGV;
+    my $type=shift(@ARGV);
+    my $date=$type;
+    if( $type =~ /^\d/)
+    {
+        $type='OBS';
+    }
+    else
+    {
+        $date=shift(@ARGV);
+    }
+
+    my @stations=@ARGV;
     my $request = join(' ',$type,$date,$stations[0]);
     $request = LINZ::GNSS::DataRequest::Parse($request);
     @stations=('') if ! $request->use_station;
@@ -94,3 +85,98 @@ if( $@ )
 {
     print "Failed: $@\n";
 }
+
+sub help
+{
+    my ($brief)=@_;
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
+    {
+        -verbose=>$brief ? 99 : 2,
+        -sections=>'Synopsis',
+        -exitval=>2,
+    });
+}
+
+sub printFileTypes
+{
+    my $types='';
+    print "Valid file types:subtypes are\n";
+
+    foreach my $ft (LINZ::GNSS::FileTypeList::types())
+    {
+        my $ftype=$ft->type.":".$ft->subtype;
+        my $fdesc=$ft->name;
+        my $usestn=$ft->use_station ? '*' : ' ';
+        printf "   %-12s %s\n",$ftype.$usestn,$fdesc;
+    }
+    print "Types marked with a '*' require a station code\n";
+}
+__DATA__
+
+=head1 Name
+
+get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in the Bernese datapool
+
+=head1 Synopsis
+
+    get_gnss_data [-d dirname] type date [station ...]
+    get_gnss_data -l
+
+=head1 Description
+
+Retrieves GNSS data via the Bernese datapool file cache.
+Data is specified by the type/subtype, the date, and for 
+RINEX observations, the station name.
+
+Files are retrieved to the current directory unless an
+alternative is specified using the -d option.
+
+=head1 Parameters
+
+=over
+
+=item type
+
+The data type (eg OBS, ORB) and subtype (eg RAPID, FINAL) can be
+specified separated by a ':'.  For example OBS:DAILY, ORB:FINAL.
+If the subtype is not defined then the first subtype for the type will
+be used (eg FINAL for OBS).  
+If the type is omitted altogether than OBS is assumed.
+The valid types and subtypes can be listed with the -l option.
+
+=item date
+
+The date is specified by year and day of year, eg 2013:020.
+A range can be specified as 2013:020-025 or 2013:360-2014:001.
+
+=item station ...
+
+For file types that require a station name one or more stations
+can be specified.
+
+=back
+
+=head1 Options
+
+=over
+
+=item -d dirname
+
+Specifies the directory into which files will be downloaded.  The default is the current directory.
+
+=item -l
+
+Just list the available file types and exit
+
+=back
+
+=head1 See also:
+
+=over
+
+=item LINZ::GNSS POD documentation for the LINZ::GNSS module
+
+=item LINZ::GNSS::FileCache POD documentation for the LINZ::GNSS::FileCache  module used to retrieve the files
+
+=cut

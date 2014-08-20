@@ -9,24 +9,14 @@ use LINZ::GNSS::RinexFile;
 use LINZ::Geodetic::Ellipsoid;
 use Getopt::Std;
 
-my $syntax=<<EOD;
-
-Syntax: scan_rinex_files [-r] file_or_dir ... > files.csv
-
-Prints a summary of RINEX files found to standard output. 
-
-If the -r (recursive) option is specified then the list of files can include
-directories that will be scanned recursively.
-
-EOD
-
 my $opts={};
-getopts('rh',$opts);
+getopts('rha',$opts);
 my $recursive=$opts->{r};
+my $append=$opts->{a};
 
 if( $opts->{h} || ! @ARGV )
 {
-    print $syntax;
+    help();
     exit;
 }
 
@@ -183,10 +173,45 @@ sub scan
 
 
 
-print "file\tsize\tdate\tmark\tnumber\tantenna\treceiver\tstart_time\tend_time\tduration\tinterval\tnobs\tobstypes\tlon\tlat\tsourcefile\n";
+print "file\tsize\tdate\tmark\tnumber\tantenna\treceiver\tstart_time\tend_time\tduration\tinterval\tnobs\tobstypes\tlon\tlat\tsourcefile\n" if ! $append;
 
 foreach my $f (@ARGV)
 {
     scan($f);
 }
+
+sub help
+{
+    my ($brief)=@_;
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
+    {
+        -verbose=>$brief ? 99 : 2,
+        -sections=>'Synopsis',
+        -exitval=>2,
+    });
+}
+
+__DATA__
+
+=head1 Name
+
+scan_rinex_files - Summarises the contents of RINEX files.
+
+=head1 Synopsis
+
+    scan_rinex_files [-r] [-a] file_or_dir ... > files.csv
+
+=head1 Description
+
+The scan_rinex_files command scans a specified list of files, identifying RINEX files 
+summarising their content in CSV format.  The RINEX files can be Hatanaka compressed, 
+gzipped or unix compressed, and inside zip files.
+
+If the -r (recursive) option is specified then the list of files can include
+directories that will be scanned recursively.
+
+If the -a (append) option is specified then the file header is omitted.
+
+=cut
 

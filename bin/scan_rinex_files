@@ -14,12 +14,7 @@ getopts('rha',$opts);
 my $recursive=$opts->{r};
 my $append=$opts->{a};
 
-if( $opts->{h} || ! @ARGV )
-{
-    help();
-    exit;
-}
-
+help(! $opts->{h}) if $opts->{h} || ! @ARGV;
 
 my $grs80=new LINZ::Geodetic::Ellipsoid(6378388.0,298.257222101);
 
@@ -201,6 +196,7 @@ scan_rinex_files - Summarises the contents of RINEX files.
 =head1 Synopsis
 
     scan_rinex_files [-r] [-a] file_or_dir ... > files.csv
+    scan_rinex_files -h
 
 =head1 Description
 

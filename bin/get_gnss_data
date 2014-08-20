@@ -31,11 +31,7 @@ if( $opts{l} )
     exit();
 }
 
-if( ! @ARGV || $opts{h} )
-{
-    help();
-    exit();
-}
+help(!$opts{h}) if $opts{h} || ! @ARGV;
 
 die "Insufficient parameters\n" if @ARGV < 2;
 die "Invalid directory $dir specified\n" if ! -d $dir;
@@ -122,6 +118,7 @@ get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in 
 
     get_gnss_data [-d dirname] type date [station ...]
     get_gnss_data -l
+    get_gnss_data -h
 
 =head1 Description
 

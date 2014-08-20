@@ -15,11 +15,7 @@ use LINZ::GNSS::Time qw/
 my %opts;
 getopts('f:h',\%opts);
 
-if( ! @ARGV || $opts{h} )
-{
-    help();
-    exit();
-}
+help(!$opts{h}) if $opts{h} || ! @ARGV;
 
 my $time=join(' ',@ARGV);
 
@@ -107,6 +103,7 @@ gpsdate - Convert between GPS date formats
 =head1 Synopsis
 
     gpsdate [-f format] date
+    gpsdate -h
 
 =head1 Description
 

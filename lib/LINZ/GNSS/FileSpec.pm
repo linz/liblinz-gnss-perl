@@ -98,8 +98,10 @@ sub filepath
 {
     my ($self)=@_;
     my $bp=$self->{basepath};
-    $bp .= '/' if $bp;
-    return $bp.$self->{path}.'/'.$self->{filename};
+    $bp .= '/' if $bp ne '';
+    $bp .= $self->{path};
+    $bp .= '/' if $self->{path} ne '';
+    return $bp.$self->{filename};
 }
 
 =head2 print $spec->asString

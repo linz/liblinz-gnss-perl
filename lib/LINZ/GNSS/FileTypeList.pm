@@ -188,6 +188,7 @@ Return an array of all types provided by the data source
 sub types
 {
     my($self)=@_;
+    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
     my @basetypes=('ORB','ERP','OBS');
     my @othertypes=grep { $_ ne 'ORB' && $_ ne 'ERP' && $_ ne 'OBS' } sort keys %$self;
     my @result=();

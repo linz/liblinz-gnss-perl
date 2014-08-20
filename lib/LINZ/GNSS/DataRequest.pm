@@ -37,7 +37,7 @@ our @EXPORT_OK=qw(
 
 use Carp;
 use LINZ::GNSS::FileTypeList;
-use LINZ::GNSS::Time qw(seconds_datetime);
+use LINZ::GNSS::Time qw(seconds_datetime yearday_seconds);
 
 
 =head1 LINZ::GNSS::DataRequest
@@ -125,8 +125,8 @@ sub new
     my($self,$jobid,$type,$subtype,$start,$end,$station) = @_;
     $self=fields::new($self) unless ref $self;
     $type=uc($type);
-    $subtype=uc($subtype);
-    $station=uc($station);
+    $subtype=uc($subtype // '');
+    $station=uc($station // '');
     $start = int($start);
     $end = int($end);
     # Check that there is at least one matching type/subtype defined...
@@ -216,6 +216,40 @@ sub status { return $_[0]->{status}; }
 sub status_message { return $_[0]->{status_message}; }
 sub available_date { return $_[0]->{available_date}; }
 sub supplied_subtype { return $_[0]->{supplied_subtype}; }
+
+=head2 LINZ::GNSS::DataRequest::Parse($string)
+
+Converts a string to a data request.  The string is formatted as 
+
+  [TYPE[:SUBTYPE]] YYYYY:DDD[-[YYYY:]DDD [CODE]
+
+The default type is OBS.  Code is required only for types that require a code!
+
+=cut 
+
+sub Parse
+{
+    my ($string,$jobid) = @_;
+    croak("Invalid data request string $string\n")
+       if $string !~ /^\s*
+           (?:(\w+)(?:\:([\w\+]+))?\s+)?
+           (\d{4})\:(\d{3})(?:\-(?:(\d{4})\:)?(\d{3}))?
+           (?:\s+(\w{4}))?
+           \s*$/x;
+    my $type=$1 // 'OBS';
+    my $subtype=$2 // '';
+    my $year0=$3;
+    my $doy0=$4;
+    my $year1 = $5 // $year0; 
+    my $doy1 = $6 // $doy0; 
+    my $code = $7;
+    $jobid = $jobid // 'job';
+
+    my $start =  yearday_seconds($year0,$doy0);
+    my $end = yearday_seconds($year1,$doy1)+(24*3600-1);
+
+    return LINZ::GNSS::DataRequest->new($jobid,$type,$subtype,$start,$end,$code);
+}
 
 =head2 $request->asString()
 

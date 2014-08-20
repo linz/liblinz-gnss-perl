@@ -29,6 +29,7 @@ of the type.  For example final orbits will have a higher priority than rapid or
 
 package LINZ::GNSS::FileType;
 use fields qw(
+    name
     type
     subtype
     filename
@@ -122,6 +123,8 @@ sub new
     my $default = LINZ::GNSS::FileTypeList->getType($type,$subtype);
     $default ||= {};
 
+    my $name = $cfgft->{name} || $default->{name} || 'No description available'; 
+
     my $filename = $cfgft->{filename} || $default->{filename} ||
         croak "Filename missing for file type $type:$subtype\n";
 
@@ -182,6 +185,7 @@ sub new
 
     $self->{type}=$type;
     $self->{subtype}=$subtype;
+    $self->{name}=$name;
     $self->{filename}=$filename;
     $self->{path}=$path;
     $self->{frequency}=$frequency;
@@ -228,14 +232,26 @@ The code for the type
 =item $type->subtype
 The code for the subtype
 
+=item $type->name
+The name (description) of the type 
+
 =item $type->filename
 The pattern for the filename
+
+=item $type->setFilename($pattern)
+Set the pattern for the filename
 
 =item $type->path
 The pattern for the filepath (directory)
 
+=item $type->setPath( $path )
+Set the pattern for the filepath (directory)
+
 =item $type->compression
 The compression used for the files
+
+=item $type->setCompression( $compression )
+Sets the compression used for the files
 
 =item $type->priority
 The priority of the subtype
@@ -265,9 +281,13 @@ defined in a data request)
 
 sub type{ return $_[0]->{type}; }
 sub subtype{ return $_[0]->{subtype}; }
+sub name{ return $_[0]->{name}; }
 sub filename{ return $_[0]->{filename}; }
+sub setFilename{ $_[0]->{filename}=$_[1]; }
 sub path{ return $_[0]->{path}; }
+sub setPath{ $_[0]->{path}=$_[1]; }
 sub compression{ return $_[0]->{compression}; }
+sub setCompression{ $_[0]->{compression} = $_[1]; }
 sub priority{ return $_[0]->{priority}; }
 sub frequency{ return $_[0]->{frequency}; }
 sub latency{ return $_[0]->{latency}; }
@@ -276,6 +296,7 @@ sub retry { return $_[0]->{retry}; }
 sub max_delay { return $_[0]->{max_delay }; }
 sub use_station{ return $_[0]->{use_station}; }
 
+=head2 
 
 =head2 $timecode = $type->timeCodes($time)
 

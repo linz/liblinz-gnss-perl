@@ -1,0 +1,96 @@
+#!/usr/bin/perl
+#
+#  Script to get GNSS data using the scripts and file cache provided by the GNSS modules.
+#
+
+use strict;
+use Getopt::Std;
+use LINZ::GNSS;
+use LINZ::GNSS::FileCache;
+use LINZ::GNSS::Time qw/seconds_datetime/;
+use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED INVALID);
+eval
+{
+    require LINZ::BERN::BernUtil;
+};
+if( $@ )
+{
+    die "The LINZ::BERN::BernUtil module is not installed\n";
+}
+
+my %opts;
+getopts('d',\%opts);
+my $dir=$opts{d} || '.';
+
+LINZ::BERN::BernUtil::SetBerneseEnv();
+LINZ::GNSS::LoadConfig();
+
+if( @ARGV < 2 )
+{
+    print <<EOD;
+
+Syntax: get_gnss_data [-d dirname] type date [station ...]
+
+Retrieves GNSS data via the Bernese datapool file cache.
+Data is specified by the type/subtype, the date, and for 
+RINEX observations, the station name.
+
+The valid types and subtypes are listed below (the 
+subtype can be omitted, in which case the first type will
+be used (ie OBS is equivalent to OBS:FINAL)
+
+The date is specified by year and day of year, eg 2013:020.
+A range can be specified as 2013:020-025 or 2013:360-2014:001.
+
+The station(s) can be specified if the data type requires it.
+
+Files are retrieved to the current directory unless an
+alternative is specified using the -d options.
+
+The available types are:
+EOD
+    foreach my $ft (LINZ::GNSS::FileTypeList::types())
+    {
+        my $ftype=$ft->type.":".$ft->subtype;
+        my $fdesc=$ft->name;
+        printf "   %-12s %s\n",$ftype,$fdesc;
+    }
+    exit();
+}
+
+die "Invalid directory $dir specified\n" if ! -d $dir;
+
+eval
+{
+    my $cache=LINZ::GNSS::FileCache::Cache();
+    my ($type,$date,@stations)=@ARGV;
+    my $request = join(' ',$type,$date,$stations[0]);
+    $request = LINZ::GNSS::DataRequest::Parse($request);
+    @stations=('') if ! $request->use_station;
+    foreach my $s (@stations)
+    {
+        $request = join(' ',$type,$date,$s);
+        $request = LINZ::GNSS::DataRequest::Parse($request);
+        my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
+        if( $status eq COMPLETED )
+        {
+            # print $request->status_message,"\n";
+            foreach my $f (@$files)
+            {
+                print "Retrieved: ",$f->filepath,"\n";
+            }
+        }
+        elsif( $status eq PENDING )
+        {
+            print "Data available until ",seconds_datetime($when),"\n";
+        }
+        elsif( $status eq DELAYED )
+        {
+            print "Data appears to be delayed - not yet available\n";
+        }
+    }
+};
+if( $@ )
+{
+    print "Failed: $@\n";
+}

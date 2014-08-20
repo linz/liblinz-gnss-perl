@@ -447,7 +447,7 @@ sub retrieveRequests
         {
             foreach my $request (@$requests)
             {
-                my($rstatus,$addfiles)=$self->retrieveRequest($request);
+                my($rstatus,$addfiles)=$self->retrieveRequest($target,$request);
                 push(@$downloaded,@$addfiles);
                 $status=$rstatus if $rstatus eq UNAVAILABLE;
             }
@@ -703,8 +703,8 @@ The following options are supported:
 
 =item download=>0/1
 
-If true then the script will attempt to download the data, otherwise it will attempt to 
-fill from the cache.  The default is 0.
+If true then the script will attempt to download the data, otherwise it will only attempt to 
+fill from the cache.  The default is 1.
 
 =item 1 queue=>0/1
 
@@ -728,8 +728,10 @@ will return UNAVAILABLE if the files are not already in the data cache.
 sub getData
 {
     my($self,$request,$target,%options) = @_;
+    $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
+    $target = LINZ::GNSS::DataCenter::LocalDirectory($target) if ! ref ($target);
     my ($lodged) = $self->getRequests(request=>$request);
-    my $download=$options{download};
+    my $download= exists($options{download}) ? $options{download} : 1;
     my $queue= exists($options{queue}) ? $options{queue} : 1;
     if( $lodged ) 
     { 

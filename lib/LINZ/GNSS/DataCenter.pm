@@ -57,6 +57,7 @@ use fields qw (
 use Carp;
 use Net::FTP;
 use URI;
+use URI::file;
 use File::Path qw( make_path remove_tree );
 use File::Copy;
 use Log::Log4perl;
@@ -157,9 +158,12 @@ sub new
     # Process the object
     $uri =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined for datacenter $name\n"/eg;
     my $uriobj=URI->new($uri);
+    my $scheme=$uriobj->scheme || 'file';
+    my $host='';
     my ($user,$pwd);
-    if( $uriobj->scheme ne 'file' )
+    if( $scheme ne 'file' )
     {
+        $host=$uriobj->host;
         my $userinfo = $uriobj->userinfo;
         ($user,$pwd)=split(/\:/,$userinfo,2);
         $user ||= $LINZ::GNSS::DataCenter::ftp_user;
@@ -174,8 +178,8 @@ sub new
     $self->{priority}=$priority;
     $self->{scratchdir}=$scratchdir;
     $self->{uri}=$uri;
-    $self->{scheme}=$uriobj->scheme;
-    $self->{host}=$uriobj->host;
+    $self->{scheme}=$scheme;
+    $self->{host}=$host;
     $self->{basepath}=$uriobj->path;
     $self->{user} = $user;
     $self->{password} = $pwd;
@@ -282,10 +286,47 @@ sub GetCenter
     return undef;
 }
 
+=head2 LINZ::GNSS::DataCenter::LocalDirectory( $dir, %opts )
+
+Creates a data center representing a local directory to which files can be stored.
+Files are uncompressed, filenames upper case unless specified otherwise.
+
+Options can include:
+
+=over
+
+=item lowerCaseNames=>1
+
+=back
+
+=cut
+
+sub LocalDirectory
+{
+    my($dir,%opts)=@_;
+    croak("GNSS data targer $dir is not a directory\n") if ! -d $dir;
+    my $cfg={
+        name=>'local',
+        uri=>$dir,
+        };
+    my $dtc=new LINZ::GNSS::DataCenter($cfg);
+    foreach my $ft ($dtc->filetypes->types)
+    {
+        my $filename=uc($ft->filename);
+        $filename =~ s/\.Z$//;
+        $filename =~ s/\.GZ$//;
+        $filename =~ s/\]D$/]O/;
+        $filename = lc($filename) if $opts{lowerCaseNames};
+        $ft->setFilename($filename);
+        $ft->setPath('');
+        $ft->setCompression('none');
+    }
+    return $dtc;
+}
+
 =head2 LINZ::GNSS::DataCenter::AvailableStations()
 
 Returns a sorted list of stations codes that may be available from the data centres
-
 =cut
 
 sub AvailableStations
@@ -330,6 +371,7 @@ Returns the earliest date available.
 sub WhenAvailable
 {
     my($request) = @_;
+    $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     my $available=undef;
     foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
     {
@@ -367,6 +409,7 @@ The status is one of the values returned by getData;
 sub FillRequest
 {
     my($request,$target) = @_;
+    $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     my $available=undef;
     my $status = UNAVAILABLE;
     my $downloaded = [];
@@ -518,6 +561,7 @@ Return $files undefined when the request cannot be filled now
 sub checkRequest 
 {
     my( $self, $request, $matchstation ) = @_;
+    $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     return 0,undef if 
         $request->use_station && 
         ! (($self->{allstations} && ! $matchstation) || exists $self->{stncodes}->{uc($request->station)});
@@ -678,6 +722,9 @@ skips the file.  It then attempts to download the file to a temporary location.
 If successful it converts it the the target compression, and finally copies it to the
 target location.  This way it should only install complete files in the target location.
 
+The target location can be either another data center object, or the name of a data center,
+or the name of a directory.
+
 Returns a status and an array ref of downloaded file specs, or already downloaded specs.
 
 Will return one of the following status codes
@@ -708,6 +755,21 @@ May also be because of an error encountered storing the data.
 sub getData
 {
     my($self,$request,$target) = @_;
+
+    # If target is not an object then try first a directory, then a named data center
+    if( ! ref($target) )
+    {
+        $target=LINZ::GNSS::DataCenter::LocalDirectory($target) if -d $target;
+    }
+    if( ! ref($target) )
+    {
+        my $dtc=LINZ::GNSS::DataCenter::GetCenter($target);
+        $target = $dtc if defined($dtc);
+    }
+    croak("Invalid target $target for DataCenter::getData\n") if ! ref($target) || ! $target->isa('LINZ::GNSS::DataCenter');
+
+    $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
+
     $self->_logger->debug("Running getData on ".$self->name." to ".$target->name." for request ".$request->reqid);
     my ($when, $files)=$self->checkRequest($request);
     my $downloaded=[];
@@ -787,7 +849,9 @@ sub getData
 
             # Define the name of the temporary download file...
 
-            my $targetfile=$tospec->{path}.'/'.$tospec->{filename};
+            my $targetfile=$tospec->{path};
+            $targetfile .= '/' if $targetfile ne '';
+            $targetfile .= $tospec->{filename};
             $self->_logger->info("Retrieving file $targetfile");
             $self->_logger->debug("Using scratch location $tempfile");
 

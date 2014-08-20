@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.10.1-1) precise; urgency=low
+
+  * Fixing help files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 21 Aug 2014 08:25:57 +1200
+
 liblinz-gnss-perl (1.10.0-1) precise; urgency=low
 
   * Fixing location of clock files in Bernese directories

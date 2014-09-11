@@ -15,8 +15,19 @@ package LINZ::GNSS::Time;
 
 =head1 LINZ::GNSS::Time
 
-LINZ::GNSS::Time - provides miscellaneous time functions
-and constants
+LINZ::GNSS::Time - provides miscellaneous time functions and constants
+
+The functions and constants can be exported with
+
+    use LINZ::GNSS::Time qw/time_elements .../;
+
+The following components can also  be exported
+
+    $SECS_PER_DAY
+    $SECS_PER_HOUR
+    $SECS_PER_WEEK
+    $GNSSTIME0
+    $TIMERE
 
 =cut
 
@@ -43,10 +54,12 @@ our @EXPORT = qw(
     gnssweek_seconds
     year_seconds
     yearday_seconds
+    seconds_yearday
     get_week_start
     is_leap_year
     seconds_julianday
     julianday_seconds
+    parse_gnss_date
 );
 
 our @EXPORT_OK = qw(
@@ -114,7 +127,7 @@ sub hour2alpha {
     return $alpha_hours[$hour];
 }
 
-=head2 LINZ::GNSS::Time::datetime_seconds
+=head2 $seconds=datetime_seconds($date_string)
 
 Converts a date string to timestamp.  The string can be formatted as 
 
@@ -356,10 +369,29 @@ sub is_leap_year {
    return 1;
 }
 
+=head2 my $seconds=yearday_seconds($year,$dayno)
+
+Determines the timestamp for the start of the day specified by year and day number.
+
+=cut 
+
 sub yearday_seconds
 {
     my($year,$day) = @_;
     return year_seconds($year)+($day-1)*$SECS_PER_DAY;
+}
+
+=head2 my ($year,$dayno)=seconds_yearday($seconds)
+
+Converts a timestamp to a year and day number
+
+=cut 
+
+sub seconds_yearday
+{
+    my( $seconds ) = @_;
+    my($year,$dayno) = (time_elements($seconds))[0,2];
+    return ($year,$dayno);
 }
 
 =head2 my $start, $end = LINZ::GNSS::Time::session_startend($year,$session)
@@ -398,6 +430,66 @@ sub session_startend
     my $end = $start + $length*$SECS_PER_HOUR;
     return ($start,$end);
 }
+
+=head2 $seconds=parse_gnss_date($datestr,$local)
+
+Parses a date in one of the following formats:
+
+   yyyy-mm-dd    Year, month, day
+   dd-mm-yyyy    Day, month, year
+   yyyymmdd      Year, nonth, day
+   yyyy-ddd      Year, day number
+   wwww-d        GPS week, day
+   ssssssssss    Unix time stamp
+   jjjjj         Julian day
+   now           Right now
+   now-ddd       ddd days before now
+
+=cut
+
+sub parse_gnss_date
+{
+    my($datestr)=@_;
+    my $seconds;
+    if( $datestr=~ /^((?:19|20)\d\d)\W+([01]?\d)\W+([0123]?\d)$/ )
+    {
+        $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
+    }
+    elsif( $datestr=~ /^([0123]?\d)\W+([01]?\d)\W+((?:19|20)\d\d)$/ )
+    {
+        $seconds=ymdhms_seconds($3,$2,$1,0,0,0);
+    }
+    elsif( $datestr=~ /^((?:19|20)\d\d)([01]\d)([0123]\d)$/ )
+    {
+        $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
+    }
+    elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
+    {
+        $seconds=yearday_seconds($1,$2);
+    }
+    elsif( $datestr=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
+    {
+        $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
+    }
+    elsif( $datestr =~ /^\d{10}$/ )
+    {
+        $seconds=$datestr+0;
+    }
+    elsif( $datestr =~ /^\d{5}$/ )
+    {
+        $seconds=julianday_seconds($datestr);
+    }
+    elsif( lc($datestr) =~ /^now(?:\-(\d+))?$/ )
+    {
+        $seconds=time()-$1*$SECS_PER_DAY;
+    }
+    else
+    {
+        croak("Invalid date specified: $datestr");
+    }
+    return $seconds;
+}
+    
 
 
 

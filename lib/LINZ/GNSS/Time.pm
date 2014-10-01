@@ -451,37 +451,45 @@ sub parse_gnss_date
 {
     my($datestr)=@_;
     my $seconds;
+    # yyyy mm dd
     if( $datestr=~ /^((?:19|20)\d\d)\W+([01]?\d)\W+([0123]?\d)$/ )
     {
         $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
     }
+    # dd mm yyyy
     elsif( $datestr=~ /^([0123]?\d)\W+([01]?\d)\W+((?:19|20)\d\d)$/ )
     {
         $seconds=ymdhms_seconds($3,$2,$1,0,0,0);
     }
+    # yyyymmdd
     elsif( $datestr=~ /^((?:19|20)\d\d)([01]\d)([0123]\d)$/ )
     {
         $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
     }
+    # yyyy ddd
     elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
     {
         $seconds=yearday_seconds($1,$2);
     }
+    # wwww d  (week day)
     elsif( $datestr=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
     {
         $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
     }
+    # ssssssssss
     elsif( $datestr =~ /^\d{10}$/ )
     {
         $seconds=$datestr+0;
     }
+    # ddddd
     elsif( $datestr =~ /^\d{5}$/ )
     {
         $seconds=julianday_seconds($datestr);
     }
+    # now-#
     elsif( lc($datestr) =~ /^now(?:\-(\d+))?$/ )
     {
-        $seconds=time()-$1*$SECS_PER_DAY;
+        $seconds=time()-($1 // 0)*$SECS_PER_DAY;
     }
     else
     {

@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.11.1-1) trusty; urgency=medium
+
+  * Comments and undefined value warning fix
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 01 Oct 2014 14:07:30 +1300
+
 liblinz-gnss-perl (1.11.0-1) trusty; urgency=medium
 
   * Moving general date parser into Time.pm

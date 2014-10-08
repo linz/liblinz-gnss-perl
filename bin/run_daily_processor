@@ -1,0 +1,34 @@
+#!/bin/perl
+#
+#  Script to run a daily processor.  This just creates and runs a LINZ::GNSS::DailyProcessor 
+#  instance using the specified configuration
+#
+
+use strict;
+use LINZ::GNSS::DailyProcessor;
+
+@ARGV || print <<EOD;
+
+syntax: run_daily_processor configuration_file [option=value option=value ...]
+
+EOD
+
+my $configfile=shift @ARGV;
+my @params=@ARGV;
+
+eval
+{
+    my $processor=new LINZ::GNSS::DailyProcessor($configfile,@params);
+    $processor->runProcessor( sub {
+        my $prescripts=$processor->get('prerun_script');
+        my $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
+        return if ! $ok;
+        $processor->runBernesePcf() if $processor->get('pcf');
+        my $postscripts=$processor->get('postrun_script');
+        $ok=$processor->runScripts($postscripts) if $postscripts !~ /^\s*none\s*$/i;
+        });
+};
+if( $@ )
+{
+    print "Processing failed: $@\n";
+}

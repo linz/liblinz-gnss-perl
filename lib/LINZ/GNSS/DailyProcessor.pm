@@ -161,16 +161,23 @@ sub runBernesePcf
     # to the target directory for the daily processing.
 
     my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
-        environment_variables=>{S=>$self->target}
+        CanOverwrite=>1,
+        EnvironmentVariables=>{S=>$self->target}
         );
+
+    my $start=$self->timestamp;
+    my $end=$start+$SECS_PER_DAY-1;
     my $campaign=LINZ::BERN::BernUtil::CreateCampaign(
+        $pcf,
+        CanOverwrite=>1,
+        SetSession=>[$start,$end],
         MakeSessionFile=>1,  # Daily session file
         UseStandardSessions=>1,
         );
     $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
     $ENV{PROCESSOR_CAMPAIGN_DIR}=$campaign->{CAMPAIGN};
     $self->setPcfParams($pcf_params,$campaign->{variables});
-    my $result=LINZ::BERN::BernUtil::RunPcf($pcf,$campaign,%$environment);
+    my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,%$environment);
     my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
     $self->{pcfstatus}=$status;
     my $return=1;
@@ -386,6 +393,7 @@ and $processor->get('ddd').
 sub setYearDay
 {
     my($self,$timestamp)=@_;
+    $self->set('timestamp',$timestamp);
     $self->cfg->setTime($timestamp);
     return ($self->get('yyyy'),$self->get('ddd'));
 }
@@ -620,6 +628,14 @@ Returns the current day of year being processed
 =cut
 
 sub day { return $_[0]->get('ddd'); }
+
+=head2 $processor->timestamp
+
+Returns unix timstamp of the start of the day being processed
+
+=cut
+
+sub timestamp { return $_[0]->get('timestamp'); }
 
 =head2 $processor->target
 

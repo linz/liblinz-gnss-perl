@@ -22,7 +22,8 @@ eval
     my $processor=new LINZ::GNSS::DailyProcessor($configfile,@params);
     $processor->runProcessor( sub {
         my $prescripts=$processor->get('prerun_script');
-        my $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
+        my $ok=1;
+        $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
         return if ! $ok;
         $processor->runBernesePcf() if $processor->get('pcf');
         my $postscripts=$processor->get('postrun_script');

@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.11.5-1) trusty; urgency=medium
+
+  * Adding function for example config file
+  * Adding ExampleConfig function, fixing lock error
+  * Adding options to run_daily_processor, fixing target directory for processing output
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 16 Oct 2014 11:56:20 +1300
+
 liblinz-gnss-perl (1.11.4-1) trusty; urgency=medium
 
   * Adding missing package dependency

@@ -71,7 +71,8 @@ sub runProcessor
 
     my $completefile=$self->get('complete_file');
     my $failfile=$self->get('fail_file');
-    my $retry_max_age=$runtime-$self->get('retry_max_age_days')*$SECS_PER_DAY;
+    my $retry_max_age=$self->get('retry_max_age_days')*$SECS_PER_DAY;
+    $retry_max_age=$runtime-$retry_max_age if $retry_max_age;
     my $retry_interval_days=$self->get('retry_interval_days');
 
     my $rerun=$self->get('rerun','0');
@@ -182,9 +183,10 @@ sub runBernesePcf
     # Create a Bernese environment.  Ensrue that the SAVEDISK area is redirected
     # to the target directory for the daily processing.
 
+    my $targetdir=File::Spec->rel2abs($self->target);
     my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
         CanOverwrite=>1,
-        EnvironmentVariables=>{S=>$self->target}
+        EnvironmentVariables=>{S=>$targetdir}
         );
 
     my $start=$self->timestamp;
@@ -220,7 +222,7 @@ sub runBernesePcf
         my $copydir=$self->get('pcf_fail_copy_dir','');
         if( $copydir )
         {
-            my $copytarget=$self->target.'/'.$copydir;
+            my $copytarget=$targetdir.'/'.$copydir;
             my $copysource=$campdir;
             if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
             {

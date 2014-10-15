@@ -9,11 +9,17 @@ use LINZ::GNSS::DailyProcessor;
 use Getopt::Std;
 
 my %opts;
-getopts('c',\%opts);
+getopts('cbfs:e:m:',\%opts);
 
-if( $opts{c} )
+if( $opts{c} || $opts{b} )
 {
-    print LINZ::GNSS::DailyProcessor::ExampleConfig;
+    my $config=LINZ::GNSS::DailyProcessor::ExampleConfig;
+    if( $opts{b})
+    {
+        $config=~s/^\#[^\n]*\n/\n/mg;
+        $config=~s/\n\s*\n/\n/g;
+    }
+    print $config;
     exit();
 }
 
@@ -22,12 +28,25 @@ if( $opts{c} )
 syntax: run_daily_processor [options] configuration_file [option=value option=value ...]
 
 Options can include
-   -c      Just print an example configuration file and exit
+   -c          Just print an example configuration file and exit
+   -b          Print example configuration more briefly
+   -f          Force retry of all failures 
+               (retry_max_age_days=0, retry_interval_days=0)
+   -s yyyy-ddd Start date
+   -e yyyy-ddd End date
+   -m #        Maximum number of days to process
 
 EOD
 
 my $configfile=shift @ARGV;
 my @params=@ARGV;
+if( $opts{f} )
+{
+    push(@params,'retry_max_age_days=0','retry_interval_days=0');
+}
+push(@params,'start_date='.$opts{s}) if $opts{s};
+push(@params,'end_date='.$opts{e}) if $opts{e};
+push(@params,'max_days_per_run='.$opts{m}) if $opts{m};
 
 eval
 {

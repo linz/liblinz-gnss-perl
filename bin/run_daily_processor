@@ -1,4 +1,4 @@
-#!/bin/perl
+#!/usr/bin/perl
 #
 #  Script to run a daily processor.  This just creates and runs a LINZ::GNSS::DailyProcessor 
 #  instance using the specified configuration
@@ -7,7 +7,7 @@
 use strict;
 use LINZ::GNSS::DailyProcessor;
 
-@ARGV || print <<EOD;
+@ARGV || die <<EOD;
 
 syntax: run_daily_processor configuration_file [option=value option=value ...]
 
@@ -18,6 +18,7 @@ my @params=@ARGV;
 
 eval
 {
+    die "$configfile is missing\n" if ! -e $configfile;
     my $processor=new LINZ::GNSS::DailyProcessor($configfile,@params);
     $processor->runProcessor( sub {
         my $prescripts=$processor->get('prerun_script');

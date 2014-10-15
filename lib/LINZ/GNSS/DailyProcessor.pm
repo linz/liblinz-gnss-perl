@@ -156,7 +156,13 @@ sub runBernesePcf
     $pcf_params //= $self->get('pcf_params');
 
     require LINZ::BERN::BernUtil;
-    my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment();
+
+    # Create a Bernese environment.  Ensrue that the SAVEDISK area is redirected
+    # to the target directory for the daily processing.
+
+    my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
+        environment_variables=>{S=>$self->target}
+        );
     my $campaign=LINZ::BERN::BernUtil::CreateCampaign(
         MakeSessionFile=>1,  # Daily session file
         UseStandardSessions=>1,

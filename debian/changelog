@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.11.3-1) trusty; urgency=medium
+
+  * Bug fixes on daily processor
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 15 Oct 2014 14:48:28 +1300
+
 liblinz-gnss-perl (1.11.2-1) trusty; urgency=medium
 
   * Untested implementation of DailyProcessor manager

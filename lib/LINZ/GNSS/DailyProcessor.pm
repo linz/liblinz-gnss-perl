@@ -17,6 +17,7 @@ package LINZ::GNSS::DailyProcessor;
 use Carp;
 use File::Path qw/make_path remove_tree/;
 use File::Which;
+use File::Copy::Recursive;
 use LINZ::GNSS::Config;
 use LINZ::GNSS::Time qw/
     $SECS_PER_DAY
@@ -63,6 +64,7 @@ sub runProcessor
     my $end_date=$self->getDate('end_date');
     my $runtime=time();
     my $maxruntime=$self->get('max_runtime_seconds','0');
+    my $maxdaysperrun=$self->get('max_days_per_run','0');
     # Set max run time to 1000 days if not specified or 0
     $maxruntime=1000*$SECS_PER_DAY if $maxruntime==0;
     my $endtime=$runtime+$maxruntime;
@@ -74,14 +76,16 @@ sub runProcessor
 
     my $rerun=$self->get('rerun','0');
 
+    my $runno=0;
     for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY )
     {
         # Have we run out of time
         if( time() > $endtime )
         {
-            $self->writeLog("Daily processor cancelled: max run time expired");
+            $self->warn("Daily processor cancelled: max_runtime_seconds expired");
             last;
         }
+
         my($year,$day)= $self->setYearDay($date);
 
         my $targetdir=$self->get('target_directory');
@@ -108,11 +112,26 @@ sub runProcessor
 
         # Can we get a lock on the file.
         next if ! $self->lock();
+        $runno++;
+        if( $maxdaysperrun > 0 && $runno > $maxdaysperrun )
+        {
+            $self->warn("Daily processor cancelled: max_days_per_run exceeded");
+            last;
+        }
         $self->cleanTarget();
         $self->info("Processing $year $day");
         eval
         {
-            $func->($self);
+            my $result=$func->($self);
+            if( ! $result )
+            {
+                die "Daily processing failed\n";
+            }
+            my $successfile=$self->get('test_success_file','');
+            if( $successfile && ! -d $self->target.'/'.$successfile )
+            {
+                die "Test file $successfile not created\n";
+            }
             $self->createMarkerFile($completefile);
             $self->info("Processing completed");
         };
@@ -175,9 +194,11 @@ sub runBernesePcf
         UseStandardSessions=>1,
         );
     $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
-    $ENV{PROCESSOR_CAMPAIGN_DIR}=$campaign->{CAMPAIGN};
+    my $campdir=$campaign->{CAMPAIGN};
+    $campdir =~ s/\$\{(\w+)\}/$ENV{$1}/eg;
+    $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
     $self->setPcfParams($pcf_params,$campaign->{variables});
-    my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,%$environment);
+    my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
     my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
     $self->{pcfstatus}=$status;
     my $return=1;
@@ -187,15 +208,31 @@ sub runBernesePcf
     }
     else
     {
-        $self->warn(join(': ','Bernese PCF $pcf failed',
+        $self->warn(join(': ',"Bernese PCF $pcf failed",
             $status->{fail_pid},
             $status->{fail_script},
             $status->{fail_prog},
             $status->{fail_message}
         ));
+        my $copydir=$self->get('pcf_fail_copy_dir','');
+        if( $copydir )
+        {
+            my $copytarget=$self->target.'/'.$copydir;
+            my $copysource=$campdir;
+            if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
+            {
+                $self->error("Failed to copy $copysource to $copytarget");
+            }
+        }
+    
         $return=0;
     }
-    $ENV{PROCESSOR_BERNESE_STATUS}=1;
+    my $save_campaign=$self->get('pcf_save_campaign_dir','');
+    if( ! $save_campaign )
+    {
+        LINZ::BERN::BernUtil::DeleteRuntimeEnvironment($environment);
+    }
+    $ENV{PROCESSOR_BERNESE_STATUS}=$return;
     return $return;
 }
 
@@ -491,12 +528,12 @@ sub lock
     $lockfile="$targetdir/$lockfile";
     my $lockexpiry=$self->get('lock_expiry_days');
     return 0 if -e $lockfile && -M $lockfile < $lockexpiry;
-    $self->writeLog("Overriding expired lock") if -e $lockfile;
+    $self->warn("Overriding expired lock") if -e $lockfile;
     return 0 if ! -d $targetdir && ! $self->makePath($targetdir);
     open(my $lf,">",$lockfile);
     if( ! $lf )
     {
-        $self->writeLog("Cannot create lockfile $lockfile\n");
+        $self->error("Cannot create lockfile $lockfile\n");
         return 0;
     }
     my $lockmessage="PID:$$";
@@ -514,7 +551,7 @@ sub lock
     }
     if( $check ne $lockmessage )
     {
-        $self->writeLog("Beaten to lockfile $lockfile\n");
+        $self->warn("Beaten to lockfile $lockfile\n");
         return 0;
     }
     return 1;
@@ -754,6 +791,11 @@ __END__
  
  pcf_params         V_ORBTYP=FINAL V_O=s
  pcf_params-rapid   V_ORBTYP=RAPID V_O=r
+
+ # If defined then all files from a failed run will be copied to the specified
+ # directory
+
+ pcf_fail_copy_dir fail_data
  
  # Pre-run and post run scripts.  These are run before and after the 
  # bernese job.  When these are run the Bernese environment is configured,
@@ -778,5 +820,9 @@ __END__
  
  prerun_script  none
  postrun_script none
+
+ # Optional name of a file to test for success of the processing run
+ 
+ test_success_file 
  
 =cut

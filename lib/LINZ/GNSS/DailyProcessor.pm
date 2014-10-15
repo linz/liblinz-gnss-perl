@@ -111,13 +111,16 @@ sub runProcessor
         }
 
         # Can we get a lock on the file.
-        next if ! $self->lock();
+        
+        next if $self->locked();
         $runno++;
         if( $maxdaysperrun > 0 && $runno > $maxdaysperrun )
         {
             $self->warn("Daily processor cancelled: max_days_per_run exceeded");
             last;
         }
+
+        next if ! $self->lock();
         $self->cleanTarget();
         $self->info("Processing $year $day");
         eval
@@ -555,6 +558,21 @@ sub lock
         return 0;
     }
     return 1;
+}
+
+=head2 $processor->locked
+
+Check if there is a lock on the current target
+
+=cut
+
+sub locked
+{
+    my($self)=@_;
+    my $targetdir=$self->target;
+    my $lockfile=$self->get('lock_file');
+    $lockfile="$targetdir/$lockfile";
+    return -e $lockfile;
 }
 
 =head2 $processor->unlock

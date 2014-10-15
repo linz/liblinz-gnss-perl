@@ -6,10 +6,23 @@
 
 use strict;
 use LINZ::GNSS::DailyProcessor;
+use Getopt::Std;
+
+my %opts;
+getopts('c',\%opts);
+
+if( $opts{c} )
+{
+    print LINZ::GNSS::DailyProcessor::ExampleConfig;
+    exit();
+}
 
 @ARGV || die <<EOD;
 
-syntax: run_daily_processor configuration_file [option=value option=value ...]
+syntax: run_daily_processor [options] configuration_file [option=value option=value ...]
+
+Options can include
+   -c      Just print an example configuration file and exit
 
 EOD
 

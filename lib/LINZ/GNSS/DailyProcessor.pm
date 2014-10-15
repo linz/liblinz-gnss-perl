@@ -682,6 +682,34 @@ Returns the current target directory
 
 sub target { return $_[0]->get('target'); }
 
+=head2 LINZ::GNSS::DailyProcessor::ExampleConfig
+
+Returns an example configuration file as a string.
+
+=cut
+
+sub ExampleConfig
+{
+    open(my $f,__FILE__) || return '';
+    my $config;
+    my $copy=0;
+    while( my $line=<$f> )
+    {
+        if( ! $copy )
+        {
+            $copy=$line =~ /^\s*\#start_config\s*$/;
+        }
+        else
+        {
+            last if $line =~ /^\s*\#end_config\s*$/;
+            $line=~ s/^\s*//;
+            $line=~ s/\s*$/\n/;
+            $config .= $line;
+        }
+    }
+    close($f);
+    return $config;
+}
           
 1;
 
@@ -690,6 +718,7 @@ __END__
 
 =head2 Example configuration file
 
+ #start_config
  # Configuration file for the daily processing code
  #
  # This is read and processed using the LINZ::GNSS::Config module.
@@ -778,9 +807,13 @@ __END__
  # Use file names (possibly wildcarded) for specific files.
  
  clean_on_start all
+
+ # Optional name of a file to test for success of the processing run
+ 
+ test_success_file 
  
  # =======================================================================
- # The following items are used by the run_daily_processing script
+ # The following items are used by the runBernesePcf function
  #
  # The name of the Bernese PCF to run
  
@@ -792,18 +825,26 @@ __END__
  pcf_params         V_ORBTYP=FINAL V_O=s
  pcf_params-rapid   V_ORBTYP=RAPID V_O=r
 
- # If defined then all files from a failed run will be copied to the specified
- # directory
+ # Directory into which to copy Bernese campaign files if the PCF fails.
+ # (Note: this is relative to the target directory for the daily process.
+ # Files are not copied if this is not saved).
 
  pcf_fail_copy_dir fail_data
+
+ # By default the Bernese runtime environment is deleted once the script has finished.
+ # Use pcf_save_campaign_dir to leave it unchanged (though it may be overwritten by
+ # the campaign for subsequent days)
+
+ pcf_save_campaign_dir 0
  
  # Pre-run and post run scripts.  These are run before and after the 
- # bernese job.  When these are run the Bernese environment is configured,
+ # bernese job by the run_daily_processor script.  
+ # When these are run the Bernese environment is configured,
  # including the Bernese environment variables.  Three additional variables
  # are defined
  #
  #    PROCESSOR_CAMPAIGN      The Bernese campaign id
- #    PROCESSOR_CAMPAIGN_DIR  The Bernese campaign id
+ #    PROCESSOR_CAMPAIGN_DIR  The Bernese campaign id (if it has not been deleted)
  #    PROCESSOR_STATUS        (Only applies to the post_run script) either 0 or 1 
  #                            depending on whether the Bernese BPE script ran 
  #                            successfully or not.
@@ -821,8 +862,6 @@ __END__
  prerun_script  none
  postrun_script none
 
- # Optional name of a file to test for success of the processing run
- 
- test_success_file 
+ #end_config
  
 =cut

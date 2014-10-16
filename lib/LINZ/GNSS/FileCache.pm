@@ -693,7 +693,7 @@ Emulate the LINZ::GNSS::DataCenter getData function (with an additional options)
 
 $request is the data request 
 
-$target is the target datacenter for the request.
+$target is the target datacenter or directory name for the request. If this is not defined then the data will be downloaded (if requested) but not copied to a target.  
 
 %options defines the options for getting the data:
 
@@ -729,7 +729,7 @@ sub getData
 {
     my($self,$request,$target,%options) = @_;
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
-    $target = LINZ::GNSS::DataCenter::LocalDirectory($target) if ! ref ($target);
+    $target = LINZ::GNSS::DataCenter::LocalDirectory($target) if $target && ! ref ($target);
     my ($lodged) = $self->getRequests(request=>$request);
     my $download= exists($options{download}) ? $options{download} : 1;
     my $queue= exists($options{queue}) ? $options{queue} : 1;
@@ -743,10 +743,14 @@ sub getData
     }
 
     # Fill the request if downloading
-    $self->fillRequest($request) if $download;
+    my $status = $self->fillRequest($request) if $download;
+    my $downloaded=[];
 
     # Retrieve the request
-    my($status,$downloaded)= $self->retrieveRequest($target,$request);
+    if( $target )
+    {
+        ($status,$downloaded)= $self->retrieveRequest($target,$request);
+    }
 
     # If the request wasn't already queued, and we didn't want to queue it
     # then delete the request.

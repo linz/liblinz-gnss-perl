@@ -12,6 +12,7 @@ use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED I
 eval
 {
     require LINZ::BERN::BernUtil;
+    require LINZ::BERN::CrdFile;
 };
 if( $@ )
 {
@@ -19,8 +20,9 @@ if( $@ )
 }
 
 my %opts;
-getopts('d:lh',\%opts);
+getopts('d:f:ilhc',\%opts);
 my $dir=$opts{d} || '.';
+$dir='' if $opts{c};
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
@@ -33,47 +35,88 @@ if( $opts{l} )
 
 help(!$opts{h}) if $opts{h} || ! @ARGV;
 
-die "Insufficient parameters\n" if @ARGV < 2;
-die "Invalid directory $dir specified\n" if ! -d $dir;
+my $date=shift(@ARGV);
+
+die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n" 
+   if $date !~ /^[12]\d\d\d\:\d\d\d(?:\-(?:[12]\d\d\d\:)?\d\d\d)?$/;
+
+my @input=();
+if( $opts{f} )
+{
+    my $argfile=$opts{f};
+    open(my $args,"<",$argfile) || die "Cannot open file $argfile\n";
+    push(@input,<$args>);
+    close($args);
+}
+elsif( $opts{i} )
+{
+    push(@input,<STDIN>);
+}
+else
+{
+    push(@input,join(' ',@ARGV));
+}
 
 eval
 {
     my $cache=LINZ::GNSS::FileCache::Cache();
-    my $type=shift(@ARGV);
-    my $date=$type;
-    if( $type =~ /^\d/)
-    {
-        $type='OBS';
-    }
-    else
-    {
-        $date=shift(@ARGV);
-    }
 
-    my @stations=@ARGV;
-    my $request = join(' ',$type,$date,$stations[0]);
-    $request = LINZ::GNSS::DataRequest::Parse($request);
-    @stations=('') if ! $request->use_station;
-    foreach my $s (@stations)
+    foreach my $argdata (@input)
     {
-        $request = join(' ',$type,$date,$s);
-        $request = LINZ::GNSS::DataRequest::Parse($request);
-        my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
-        if( $status eq COMPLETED )
+        my @args=split(' ',$argdata);
+
+        my $type=shift(@args);
+        next if $type eq '';
+
+        my @stations;
+        while(my $s= shift @args)
         {
-            # print $request->status_message,"\n";
-            foreach my $f (@$files)
+            if( $s =~ /^crd\:(.*)$/i )
             {
-                print "Retrieved: ",$f->filepath,"\n";
+                my $filename=$1;
+                die "Cannot find Bernese .CRD file $filename\n" if ! -e $filename;
+                my $cf=new LINZ::BERN::CrdFile($filename);
+                foreach my $mark ($cf->stations())
+                {
+                    push(@stations,$mark->code());
+                }
+            }
+            else
+            {
+                push(@stations,$s);
             }
         }
-        elsif( $status eq PENDING )
+
+        my $request = join(' ',$type,$date,$stations[0]);
+        $request = LINZ::GNSS::DataRequest::Parse($request);
+        @stations=('') if ! $request->use_station;
+        while (my $s=shift @stations)
         {
-            print "Data available until ",seconds_datetime($when),"\n";
-        }
-        elsif( $status eq DELAYED )
-        {
-            print "Data appears to be delayed - not yet available\n";
+            $request = join(' ',$type,$date,$s);
+            my $reqstr=$type;
+            $reqstr .= " for $s" if $s;
+            $request = LINZ::GNSS::DataRequest::Parse($request);
+            my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
+            if( $status eq COMPLETED )
+            {
+                # print $request->status_message,"\n";
+                foreach my $f (@$files)
+                {
+                    print "Retrieved $reqstr: ",$f->filepath,"\n";
+                }
+            }
+            elsif( $status eq PENDING )
+            {
+                print "Data $reqstr available until ",seconds_datetime($when),"\n";
+            }
+            elsif( $status eq DELAYED )
+            {
+                print "Data $reqstr appears to be delayed - not yet available\n";
+            }
+            else
+            {
+                print "Data $reqstr not available\n";
+            }
         }
     }
 };
@@ -116,7 +159,9 @@ get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in 
 
 =head1 Synopsis
 
-    get_gnss_data [-d dirname] type date [station ...]
+    get_gnss_data [-d dirname | -c] date type [station ...]
+    get_gnss_data [-d dirname | -c] -f filename date
+    get_gnss_data [-d dirname | -c] -i date
     get_gnss_data -l
     get_gnss_data -h
 
@@ -133,24 +178,24 @@ alternative is specified using the -d option.
 
 =over
 
+=item date
+
+The date is specified by year and day of year, eg 2013:020.
+A range can be specified as 2013:020-025 or 2013:360-2014:001.
+
 =item type
 
 The data type (eg OBS, ORB) and subtype (eg RAPID, FINAL) can be
 specified separated by a ':'.  For example OBS:DAILY, ORB:FINAL.
 If the subtype is not defined then the first subtype for the type will
 be used (eg FINAL for OBS).  
-If the type is omitted altogether than OBS is assumed.
 The valid types and subtypes can be listed with the -l option.
-
-=item date
-
-The date is specified by year and day of year, eg 2013:020.
-A range can be specified as 2013:020-025 or 2013:360-2014:001.
 
 =item station ...
 
 For file types that require a station name one or more stations
-can be specified.
+can be specified. Station can be specified as crd:filename, in
+which case station codes will be extracted from a Bernese .CRD file.
 
 =back
 
@@ -158,9 +203,23 @@ can be specified.
 
 =over
 
+=item -c
+
+Specifies that the files will be retrieved to the cache, but not copied to a target directory
+
 =item -d dirname
 
 Specifies the directory into which files will be downloaded.  The default is the current directory.
+
+=item -f filename
+
+Specifies that requests will be read from the specified file.  Each line will be treated as 
+as set of arguments (type station ...)
+
+=item -i
+
+Specifies that the requests will be read from the standard input. Each line will be treated as a 
+set of arguments (type station ...)
 
 =item -l
 
@@ -175,5 +234,7 @@ Just list the available file types and exit
 =item LINZ::GNSS POD documentation for the LINZ::GNSS module
 
 =item LINZ::GNSS::FileCache POD documentation for the LINZ::GNSS::FileCache  module used to retrieve the files
+
+=back
 
 =cut

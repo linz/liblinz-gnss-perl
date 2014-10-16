@@ -110,6 +110,19 @@ sub runProcessor
             next if -M $targetdir.'/'.$failfile < $retry_interval_days;
             $self->deleteMarkerFile($failfile);
         }
+       
+        # Do we have prerequisite files
+        my $skip=0;
+        foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
+        {
+            if(! -e $targetdir.'/'.$prerequisite )
+            {
+                $self->info("Skipping $year $day as $prerequisite not found");
+                $skip=1;
+                last;
+            }
+        }
+        next if $skip;
 
         # Can we get a lock on the file.
         
@@ -175,6 +188,9 @@ sub runBernesePcf
     my($self,$pcf,$pcf_params)=@_;
     # If pcf is blank then need a name
     $pcf ||= $self->get('pcf');
+    # Skip if specified as blank or none.
+    return 1 if $pcf eq '' || lc($pcf) eq 'none';
+
     # If params is defined then use (which allows overriding default params with none)
     $pcf_params //= $self->get('pcf_params');
 
@@ -818,6 +834,11 @@ __END__
  max_days_per_run 0
  max_runtime_seconds 0
  
+ # Pre-requesite file(s).  If specified then days will be skipped if their 
+ # directory does not include this specified file(s)
+ 
+ prerequesite_files
+
  # Clean on start setting controls which files are removed from the
  # result directory when the jobs starts.  The default is just to remove
  # the job management files (above).
@@ -835,7 +856,7 @@ __END__
  # =======================================================================
  # The following items are used by the runBernesePcf function
  #
- # The name of the Bernese PCF to run
+ # The name of the Bernese PCF to run (use NONE to skip bernese processing)
  
  pcf          POSDAILY
  

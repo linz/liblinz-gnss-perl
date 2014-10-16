@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.11.6-1) trusty; urgency=medium
+
+  * Updating get_gnss_data to better support pre-caching of PositioNZ daily processing data
+  * Adding prerequisite to daily processor and handling PCF=NONE
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 17 Oct 2014 09:07:46 +1300
+
 liblinz-gnss-perl (1.11.5-1) trusty; urgency=medium
 
   * Adding function for example config file

@@ -44,7 +44,17 @@ if( @ARGV && ($ARGV[0] eq '-b' || $ARGV[0] eq '-B') )
 
     if( $batch )
     {
-        my $cmd='perl '.$0.' '.join(' ',@ARGV);
+        my $cmd=$^X;
+        unshift(@ARGV,$0);
+        foreach my $a (@ARGV)
+        {
+            if( $a !~ /^[\w\/\.]+$/ )
+            {
+                $a =~ s/\'/'"'"'/g;
+                $a = "'".$a."'";
+            }
+            $cmd .= ' '.$a;
+        }
         print "Running in batch mode\n";
         print "Command: $cmd\n";
         print "Log file: $batchlog\n";

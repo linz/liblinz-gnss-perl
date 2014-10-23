@@ -76,10 +76,19 @@ sub runProcessor
     my $retry_interval_days=$self->get('retry_interval_days');
 
     my $rerun=$self->get('rerun','0');
+    my $stopfile=$self->get('stop_file','');
 
     my $runno=0;
     for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY )
     {
+        # Test for a stop file ..
+       
+        if( $stopfile && -e $stopfile )
+        {
+            $self->error("Stopped by \"stop file\" $stopfile");
+            last;
+        }
+    
         # Have we run out of time
         if( time() > $endtime )
         {
@@ -852,6 +861,10 @@ __END__
  # Optional name of a file to test for success of the processing run
  
  test_success_file 
+
+ # File that will stop the scirpt if it exists
+ 
+ stop_file ${configdir}/stop_daily_processing
  
  # =======================================================================
  # The following items are used by the runBernesePcf function

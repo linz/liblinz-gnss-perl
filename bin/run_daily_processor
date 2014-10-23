@@ -9,7 +9,7 @@ use LINZ::GNSS::DailyProcessor;
 use Getopt::Std;
 
 my %opts;
-getopts('cbfs:e:m:',\%opts);
+getopts('hcbfs:e:m:',\%opts);
 
 if( $opts{c} || $opts{b} )
 {
@@ -35,6 +35,7 @@ Options can include
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
    -m #        Maximum number of days to process
+   -h          Halt running processes by creating a "stop file"
 
 EOD
 
@@ -52,6 +53,24 @@ eval
 {
     die "$configfile is missing\n" if ! -e $configfile;
     my $processor=new LINZ::GNSS::DailyProcessor($configfile,@params);
+    if( $opts{h} )
+    {
+        my $stop_file=$processor->get('stop_file','');
+        if( $stop_file )
+        {
+            open(my $sf,">",$stop_file) || die "Cannot create stop file $stop_file\n";
+            print $sf "Delete this file to allow the daily processor to run\n";
+            close($sf);
+            print "Create stop file $stop_file\n";
+            print "This will stop the daily processor at the end of the current job\n";
+            print "Delete this file to allow the processor to run again.\n";
+        }
+        else
+        {
+            print "The configuration does not define a stop_file .. processor cannot be halted\n";
+        }
+        exit();
+    }
     $processor->runProcessor( sub {
         my $prescripts=$processor->get('prerun_script');
         my $ok=1;

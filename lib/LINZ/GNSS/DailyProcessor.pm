@@ -17,6 +17,7 @@ package LINZ::GNSS::DailyProcessor;
 use Carp;
 use File::Path qw/make_path remove_tree/;
 use File::Which;
+use File::Copy;
 use File::Copy::Recursive;
 use LINZ::GNSS::Config;
 use LINZ::GNSS::Time qw/
@@ -235,6 +236,18 @@ sub runBernesePcf
     if( $status->{status} eq 'OK' )
     {
         $self->info('Bernese PCF $pcf successfully run');
+        my $copyfiles=$self->get('pcf_copy_files','');
+        if( $copyfiles )
+        {
+            foreach my $file (split(' ',$copyfiles))
+            {
+                my $src="$campdir/$file";
+                my $target=$file;
+                $target =~ s/.*[\\\/]//;
+                $target="$targetdir/$target";
+                File::Copy::copy($src,$target) if -e $src;
+            }
+        }
     }
     else
     {
@@ -878,6 +891,10 @@ __END__
  
  pcf_params         V_ORBTYP=FINAL V_O=s
  pcf_params-rapid   V_ORBTYP=RAPID V_O=r
+
+ # Files that will be copied to the target directory if the PCF succeeds
+ 
+ pcf_copy_files   
 
  # Directory into which to copy Bernese campaign files if the PCF fails.
  # (Note: this is relative to the target directory for the daily process.

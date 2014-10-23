@@ -26,7 +26,7 @@ if( $opts{c} || $opts{C} )
 
 @ARGV || die <<EOD;
 
-syntax: run_daily_processor [options] configuration_file [option=value option=value ...]
+syntax: run_daily_processor [options] configuration_file [stop|restart] [option=value option=value ...]
 
 Options can include
    -b          Run in batch mode (using at now)
@@ -38,13 +38,19 @@ Options can include
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
    -m #        Maximum number of days to process
-   -h          Halt running processes by creating a "stop file"
-   -H          Delete the stop file and restart
+   -h          Halt running processes by creating a "stop file" (same as "stop")
+   -H          Delete the stop file and restart (same as "restart")
 
 EOD
 
 my $configfile=shift @ARGV;
-my @params=@ARGV;
+my @params;
+foreach my $prm (@ARGV)
+{
+    push(@params,$prm) if $prm =~ /\=/;
+    $opts{h}=1 if lc($prm) eq 'stop';
+    $opts{H}=1 if lc($prm) eq 'restart';
+}
 if( $opts{f} )
 {
     push(@params,'retry_max_age_days=0','retry_interval_days=0');

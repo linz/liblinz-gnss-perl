@@ -236,7 +236,7 @@ sub runBernesePcf
     if( $status->{status} eq 'OK' )
     {
         $self->info('Bernese PCF $pcf successfully run');
-        my $copyfiles=$self->get('pcf_copy_files','');
+        my $copyfiles=$self->get('pcf_save_files','');
         if( $copyfiles )
         {
             foreach my $file (split(' ',$copyfiles))
@@ -884,7 +884,7 @@ __END__
  #
  # The name of the Bernese PCF to run (use NONE to skip bernese processing)
  
- pcf          POSDAILY
+ pcf          PNZDAILY
  
  # PCF parameters to override, written as 
  #  xxx1=yyy1 xxx2=yyy2 ...
@@ -894,7 +894,7 @@ __END__
 
  # Files that will be copied to the target directory if the PCF succeeds
  
- pcf_copy_files   
+ pcf_save_files   BPE/PNZDAILY.OUT
 
  # Directory into which to copy Bernese campaign files if the PCF fails.
  # (Note: this is relative to the target directory for the daily process.

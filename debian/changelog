@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.12.0-1) trusty; urgency=medium
+
+  * Adding stop file option to daily processor
+  * Adding batch option to daily processor
+  * Improved escapign in RunBatch
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 24 Oct 2014 08:02:51 +1300
+
 liblinz-gnss-perl (1.11.6-1) trusty; urgency=medium
 
   * Updating get_gnss_data to better support pre-caching of PositioNZ daily processing data

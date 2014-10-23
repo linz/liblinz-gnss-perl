@@ -6,15 +6,16 @@
 
 use strict;
 use LINZ::GNSS::DailyProcessor;
+use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
-getopts('hcbfs:e:m:',\%opts);
+getopts('hHcCfs:e:m:',\%opts);
 
-if( $opts{c} || $opts{b} )
+if( $opts{c} || $opts{C} )
 {
     my $config=LINZ::GNSS::DailyProcessor::ExampleConfig;
-    if( $opts{b})
+    if( $opts{C})
     {
         $config=~s/^\#[^\n]*\n/\n/mg;
         $config=~s/\n\s*\n/\n/g;
@@ -28,14 +29,17 @@ if( $opts{c} || $opts{b} )
 syntax: run_daily_processor [options] configuration_file [option=value option=value ...]
 
 Options can include
+   -b          Run in batch mode (using at now)
+   -B logfile  Run in batch mode and specify the log file
    -c          Just print an example configuration file and exit
-   -b          Print example configuration more briefly
+   -C          Print example configuration more briefly
    -f          Force retry of all failures 
                (retry_max_age_days=0, retry_interval_days=0)
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
    -m #        Maximum number of days to process
    -h          Halt running processes by creating a "stop file"
+   -H          Delete the stop file and restart
 
 EOD
 
@@ -53,9 +57,9 @@ eval
 {
     die "$configfile is missing\n" if ! -e $configfile;
     my $processor=new LINZ::GNSS::DailyProcessor($configfile,@params);
+    my $stop_file=$processor->get('stop_file','');
     if( $opts{h} )
     {
-        my $stop_file=$processor->get('stop_file','');
         if( $stop_file )
         {
             open(my $sf,">",$stop_file) || die "Cannot create stop file $stop_file\n";
@@ -70,6 +74,12 @@ eval
             print "The configuration does not define a stop_file .. processor cannot be halted\n";
         }
         exit();
+    }
+    unlink($stop_file) if $stop_file && $opts{H};
+    if( $stop_file && -e $stop_file )
+    {
+        print "Processor not started because stop file $stop_file is present\n".
+        print "Use -S option to restart.\n";
     }
     $processor->runProcessor( sub {
         my $prescripts=$processor->get('prerun_script');

@@ -159,21 +159,21 @@ sub getRaw
 {
     my($self,$key,$default)=@_;
 
-    $key=lc($key);
+    my $lkey=lc($key);
 
-    return $self->{args}->{$key} if exists $self->{args}->{$key};
+    return $self->{args}->{$lkey} if exists $self->{args}->{$lkey};
 
     my $cfg=$self->{args}->{config};
 
     if( $cfg )
     {
-        my $cfgkey=$key.'-'.$cfg;
+        my $cfgkey=$lkey.'-'.$cfg;
         return $self->{data}->{$cfgkey} if exists $self->{data}->{$cfgkey};
     };
 
-    return $self->{data}->{$key} if exists $self->{data}->{$key};
+    return $self->{data}->{$lkey} if exists $self->{data}->{$lkey};
 
-    if( $key =~ /^pid_(\d)$/ )
+    if( $lkey =~ /^pid_(\d)$/ )
     {
         my $nch=$1;
         my $value='0000000000'.$$;

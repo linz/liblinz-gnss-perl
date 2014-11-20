@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.14.0-1) trusty; urgency=medium
+
+  * Adding pcf_cpufile option
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 21 Nov 2014 09:20:58 +1300
+
 liblinz-gnss-perl (1.13.0-1) trusty; urgency=medium
 
   * Fixed lower casing of keys for environment variables

@@ -213,7 +213,8 @@ sub runBernesePcf
     my $targetdir=File::Spec->rel2abs($self->target);
     my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
         CanOverwrite=>1,
-        EnvironmentVariables=>{S=>$targetdir,CPU_FILE=>$pcf_cpu}
+        EnvironmentVariables=>{S=>$targetdir},
+        CpuFile=>$pcf_cpu,
         );
 
     my $start=$self->timestamp;

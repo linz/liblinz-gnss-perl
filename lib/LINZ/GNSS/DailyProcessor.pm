@@ -203,6 +203,7 @@ sub runBernesePcf
 
     # If params is defined then use (which allows overriding default params with none)
     $pcf_params //= $self->get('pcf_params');
+    my $pcf_cpu=$self->get('pcf_cpufile','UNIX'); 
 
     require LINZ::BERN::BernUtil;
 
@@ -212,7 +213,7 @@ sub runBernesePcf
     my $targetdir=File::Spec->rel2abs($self->target);
     my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
         CanOverwrite=>1,
-        EnvironmentVariables=>{S=>$targetdir}
+        EnvironmentVariables=>{S=>$targetdir,CPU_FILE=>$pcf_cpu}
         );
 
     my $start=$self->timestamp;
@@ -885,6 +886,10 @@ __END__
  # The name of the Bernese PCF to run (use NONE to skip bernese processing)
  
  pcf          PNZDAILY
+
+ # The name of the CPU file that will be used (default is UNIX.CPU)
+ 
+ pcf_cpufile  UNIX
  
  # PCF parameters to override, written as 
  #  xxx1=yyy1 xxx2=yyy2 ...

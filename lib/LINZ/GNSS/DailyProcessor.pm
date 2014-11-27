@@ -63,6 +63,8 @@ sub runProcessor
     my ($self,$func) = @_;
     my $start_date=$self->getDate('start_date');
     my $end_date=$self->getDate('end_date');
+    my $increment=int($self->get('date_increment',1)+0);
+    $increment > 0 || die "date_increment must be greater than 0\n";
     my $runtime=time();
     my $maxruntime=$self->get('max_runtime_seconds','0');
     my $maxdaysperrun=$self->get('max_days_per_run','0');
@@ -80,7 +82,7 @@ sub runProcessor
     my $stopfile=$self->get('stop_file','');
 
     my $runno=0;
-    for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY )
+    for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY*$increment )
     {
         # Test for a stop file ..
        
@@ -231,6 +233,8 @@ sub runBernesePcf
     $campdir =~ s/\$\{(\w+)\}/$ENV{$1}/eg;
     $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
     $self->setPcfParams($pcf_params,$campaign->{variables});
+    $self->info("Campaign dir: $campdir");
+    $self->info("Target dir: $ENV{S}");
     my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
     my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
     $self->{pcfstatus}=$status;
@@ -848,6 +852,10 @@ __END__
  
  start_date-rapid -17
  end_date-rapid -2
+
+ # Number of days to subtract for each day processed
+
+ date_increment 1
  
  # Limits on number of jobs.  0 = unlimited
  # Maximum number of days is the maximum number of days that will be processed,
@@ -879,7 +887,7 @@ __END__
 
  # File that will stop the scirpt if it exists
  
- stop_file ${configdir}/stop_daily_processing
+ stop_file ${configdir}/${configname}.stop
  
  # =======================================================================
  # The following items are used by the runBernesePcf function

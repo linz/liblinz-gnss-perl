@@ -38,6 +38,8 @@ The following variables are defined:
 
 =item ${configdir} - the directory of the configuration file
 
+=item ${configname} - the name of the configuration file
+
 =item ${yyyy} - the currently set year
 
 =item ${ddd} - the currently set day of year
@@ -94,6 +96,11 @@ sub new
     $configdir=~ s/.$//;
     $configdir='.' if $configdir eq '';
     $args{configdir}=$configdir;
+    my $configname=$cfgfile;
+    $configname=~ s/.*[\\\/]//;
+    $configname=~ s/\..*//;
+    $args{configname}=$configname;
+
 
     croak("Configuration file $cfgfile is missing\n") if ! -f $cfgfile;
 

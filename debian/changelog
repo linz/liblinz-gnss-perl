@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.15.0-1) trusty; urgency=medium
+
+  * Minor fixes to allow daily processing to hndle non-consecutive days (eg every 5th day)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 04 Dec 2014 11:30:31 +1300
+
 liblinz-gnss-perl (1.14.1-1) trusty; urgency=medium
 
   * Fixing handling of CPU file

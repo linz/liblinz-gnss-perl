@@ -120,7 +120,7 @@ sub runProcessor
         {
             next if $date < $retry_max_age;
             next if -M $targetdir.'/'.$failfile < $retry_interval_days;
-            $self->deleteMarkerFile($failfile);
+            $self->deleteMarkerFiles($failfile);
         }
        
         # Do we have prerequisite files

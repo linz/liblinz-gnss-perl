@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.15.1-1) trusty; urgency=medium
+
+  * Fixing bug in skipping failed jobs
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 09 Dec 2014 12:29:14 +1300
+
 liblinz-gnss-perl (1.15.0-1) trusty; urgency=medium
 
   * Minor fixes to allow daily processing to hndle non-consecutive days (eg every 5th day)

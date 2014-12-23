@@ -22,24 +22,33 @@ if( @ARGV && ($ARGV[0] eq '-b' || $ARGV[0] eq '-B') )
     my $batch=0;
     my $batchlog=0;
 
+    my($sc,$mi,$hr,$dy,$mo,$yr)=(localtime())[0,1,2,3,4,5];
+    my $script=$0;
+    $script=~ s/.*[\\\/]//;
+    $script=~ s/\..*//;
+    $batchlog=sprintf("%s_%04d%02d%02d%02d%02d%02d.log",
+        $script,$yr+1900,$mo+1,$dy,$hr,$mi,$sc);
+
     if( $ARGV[0] eq '-b' )
     {
         $batch=1;
         shift(@ARGV);
-        my($sc,$mi,$hr,$dy,$mo,$yr)=(localtime())[0,1,2,3,4,5];
-        my $script=$0;
-        $script=~ s/.*[\\\/]//;
-        $script=~ s/\..*//;
-        $batchlog=sprintf("%s_%04d%02d%02d%02d%02d%02d.log",
-            $script,$yr+1900,$mo+1,$dy,$hr,$mi,$sc);
     }
 
     elsif( $ARGV[0] eq '-B' )
     {
         $batch=1;
         shift(@ARGV);
-        $batchlog=shift(@ARGV);
-        die "Log file not specified with -B\n" if ! $batchlog;
+        my $log=shift(@ARGV);
+        die "Log file not specified with -B\n" if ! $log;
+        if( -d $log )
+        {
+            $batchlog="$log/$batchlog";
+        }
+        else
+        {
+            $batchlog=$log;
+        }
     }
 
     if( $batch )

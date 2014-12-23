@@ -66,8 +66,9 @@ sub runProcessor
     my $increment=int($self->get('date_increment',1)+0);
     $increment > 0 || die "date_increment must be greater than 0\n";
     my $runtime=time();
-    my $maxruntime=$self->get('max_runtime_seconds','0');
+    my $maxruntime=$self->get('max_runtime');
     my $maxdaysperrun=$self->get('max_days_per_run','0');
+    $maxruntime=($1*60+$2)*60 if $maxruntime=~ /^(\d\d?)\:(\d\d)$/;
     # Set max run time to 1000 days if not specified or 0
     $maxruntime=1000*$SECS_PER_DAY if $maxruntime==0;
     my $endtime=$runtime+$maxruntime;
@@ -80,10 +81,15 @@ sub runProcessor
 
     my $rerun=$self->get('rerun','0');
     my $stopfile=$self->get('stop_file','');
+    my $maxconsecutivefails=$self->get('max_consecutive_fails','0')+0;
+    my $faillist=[];
 
     my $runno=0;
+    my $terminate=0;
     for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY*$increment )
     {
+        last if $terminate;
+
         # Test for a stop file ..
        
         if( $stopfile && -e $stopfile )
@@ -95,7 +101,7 @@ sub runProcessor
         # Have we run out of time
         if( time() > $endtime )
         {
-            $self->warn("Daily processor cancelled: max_runtime_seconds expired");
+            $self->warn("Daily processor cancelled: max_runtime expired");
             last;
         }
 
@@ -163,12 +169,21 @@ sub runProcessor
             }
             $self->createMarkerFile($completefile);
             $self->info("Processing completed");
+            $faillist=[];
         };
         if( $@ )
         {
             my $message=$@;
             $self->warn("Processing failed: $message");
-            $self->createMarkerFile($failfile);
+            push(@$faillist,$self->createMarkerFile($failfile));
+            if( $maxconsecutivefails && scalar(@$faillist) >= $maxconsecutivefails )
+            {
+                unlink(@$faillist);
+                $self->warn('Processing stopped as maximum number of consecutive failures reached');
+                $terminate = 1;
+            }
+
+
         }
         $self->unlock();
     }
@@ -530,6 +545,7 @@ sub createMarkerFile
     open(my $mf,">",$marker);
     print $mf $message;
     close($mf);
+    return $marker;
 }
 
 =head2 $processor->markerFileExists($file)
@@ -861,10 +877,18 @@ __END__
  # Maximum number of days is the maximum number of days that will be processed,
  # not including days that don't need processing.
  # Maximum run time defines the latest time after the script is initiated that
- # it will start a new job.
+ # it will start a new job. It is formatted as hh:mm
  
  max_days_per_run 0
- max_runtime_seconds 0
+ max_runtime 0:00
+
+ # Maximum consecutive failures.  If this number of consecutive failures occurs then
+ # the processing is aborted and the failed status files are removed.  This assumes 
+ # that there is some system failure rather than problems with individual days, so
+ # leaves the unprocessed days ready to run again. Missing or 0 will accept any number
+ # of failures.
+ 
+ max_consecutive_fails 0
  
  # Pre-requesite file(s).  If specified then days will be skipped if their 
  # directory does not include this specified file(s)
@@ -882,7 +906,7 @@ __END__
  clean_on_start all
 
  # Optional name of a file to test for success of the processing run
- 
+
  test_success_file 
 
  # File that will stop the scirpt if it exists

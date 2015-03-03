@@ -18,6 +18,8 @@ files and managing GNSS time formats.
 
 =item LINZ::GNSS::SinexFile limited reading and copying SINEX results files
 
+=item LINZ::GNSS::BLQFile reading and writing BLQ ocean loading files
+
 =item LINZ::GNSS::Time functions for converting GNSS time formats
 
 =item /etc/bernese52/getdata.conf  Configuration file for data centres and reference stations

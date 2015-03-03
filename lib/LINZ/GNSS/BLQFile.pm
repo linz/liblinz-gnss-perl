@@ -237,19 +237,31 @@ sub codeIndex
     return $self->{code_index};
 }
 
-=head2 $data=$blqf->codeBLQ($code)
+=head2 $data=$blqf->loadingForCode($code [,$matchword] )
 
 Returns BLQ data matching a station code.  Codes are case insensitive.
 If a station code in the BLQ file consists of multiple words it may be 
-matched by just the first word.
+matched by just the first word if $matchword is true.
 
 =cut
 
-sub codeBLQ
+sub loadingForCode
 {
-    my ($self,$code)=@_;
+    my ($self,$code,$matchword)=@_;
     $code=uc($code);
+    $code =~ s/^\s+//;
+    $code =~ s/\s+$//;
     my $floc=$self->codeIndex->{$code};
+    if( ! $floc && $code =~ /\s/ )
+    {
+        $code =~ s/\s+/ /g;
+        $floc=$self->codeIndex->{$code};
+        if( ! $floc && $matchword )
+        {
+            $code=~ s/\s.*//;
+            $floc=$self->codeIndex->{$code};
+        }
+    }
     return if ! $floc;
     return $self->readBlqData($floc);
 }
@@ -328,7 +340,7 @@ sub gridIndex
     return $self->{grid_index};
 }
 
-=head2 $data=$blqf->calcLoadingFromGrid( $code, $lat, $lon )
+=head2 $data=$blqf->calcLoadingFromGrid( $code, $lon, $lat )
 
 If the BLQ file contains data on a regular grid then this function can calculate
 points within the grid cells.  The grid does not need to be complete, but does need to be 
@@ -485,6 +497,14 @@ to retrieve data elements as follows
 
 =back
 
+Setter function for code:
+
+=over
+
+=item $data->setCode( $code ) resets the mark code
+
+=back
+
 =cut
 
 sub new
@@ -495,6 +515,7 @@ sub new
 }
 
 sub code { return $_[0]->{code}; }
+sub setCode { $_[0]->{code}=$_[1]; return $_[0]; }
 sub location { return $_[0]->{loc}; }
 sub lon { return $_[0]->{loc}->[0]; }
 sub lat { return $_[0]->{loc}->[1]; }

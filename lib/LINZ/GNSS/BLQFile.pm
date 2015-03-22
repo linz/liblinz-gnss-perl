@@ -19,14 +19,14 @@ use strict;
 use POSIX;
 use Carp;
 
-=head2 my $blqf=LINZ::GNSS::BLQFile->open($filename)
+=head2 my $blqf=new LINZ::GNSS::BLQFile($filename)
 
 Open an existing BLQ file for reading data. Opens the file and reads the file
 header
 
 =cut
 
-sub open
+sub new
 {
     my( $class, $blq_file) = @_;
     my $self=bless {filename=>$blq_file}, $class;
@@ -34,21 +34,14 @@ sub open
     return $self;
 }
 
-=head2 my $blqf=new LINZ::GNSS::BLQFile($filename)
-
-Alternative syntax for opening and existing file.
-
-=cut 
-
-sub new { return LINZ::GNSS::BLQFile::open(@_); }
 
 sub fh
 {
     my($self)=@_;
-    if( ! $self->{fh} )
+    if( ! exists $self->{fh} )
     {
         my $blq_file=$self->{filename};
-        ::open( my $blqf, "<", $blq_file ) || croak("Cannot open BLQ data file ".$blq_file."\n");
+        open( my $blqf, "<", $blq_file ) || croak("Cannot open BLQ data file ".$blq_file."\n");
         binmode($blqf);
         $self->{fh}=$blqf;
     }
@@ -153,6 +146,7 @@ sub readBlqData
     croak("BLQ codes not matched \"$code\":\"$hcode\"\n") if $codetest ne $hcodetest;
     croak("BLQ data doesn't define model\n") if ! defined($model);
     croak("BLQ data missing\n") if scalar(@data) != 6;
+    $self->{model} ||= $self->{model};
     return LINZ::GNSS::BLQFile::Data->new(
         code=>$code,
         model=>$model,

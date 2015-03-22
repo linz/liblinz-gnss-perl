@@ -302,14 +302,15 @@ sub _scanStationXYZ
 
     my $fcvr=[[]];
     $self->{xyzcovar}=$fcvr;
+    my $prmoffset=0;
+    foreach my $sstn (sort {_cmpstn($a) cmp _cmpstn($b)} @solnstns)
+    {
+        $sstn->{prmoffset}=$prmoffset;
+        $prmoffset += 3;
+    }
+
     if( $fullcovar )
     {
-        my $prmoffset=0;
-        foreach my $sstn (sort {_cmpstn($a) cmp _cmpstn($b)} @solnstns)
-        {
-            $sstn->{prmoffset}=$prmoffset;
-            $prmoffset += 3;
-        }
         foreach my $iprm (0..$prmoffset-1)
         {
             $fcvr->[$iprm]=[(0)x($iprm+1)]
@@ -484,6 +485,7 @@ sub filterStationsOnly
                     /x;
                 my ($p0,$p1,$cvc)=($1+0,$2+0,[$3,$4,$5]);
                 next if ! exists $prmmap->{$p0};
+
                 my $rc0=$prmmap->{$p0}-1;
                 foreach my $ip (0,1,2)
                 {

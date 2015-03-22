@@ -1,3 +1,13 @@
+liblinz-gnss-perl (1.16.0-1) trusty; urgency=medium
+
+  * Better specification of maximum runtime, logging to directory
+  * Adding BLQFile module
+  * BLQFile.pm
+  * Fixing error in sinex file output missing end of covariance blocks
+  * Fixing BLQFile new
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 23 Mar 2015 09:30:44 +1300
+
 liblinz-gnss-perl (1.15.1-1) trusty; urgency=medium
 
   * Fixing bug in skipping failed jobs

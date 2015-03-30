@@ -100,13 +100,13 @@ sub LoadConfig
             $logcfg =~ s/\[logfilename\]/$logfile/eg;
             Log::Log4perl->init(\$logcfg);
         }
-        elsif( exists $ENV{DEBUG_LINZGNSS} )
-        {
-            Log::Log4perl->easy_init($DEBUG);
-        }
         else
         {
             Log::Log4perl->easy_init($WARN);
+        }
+        if( exists $ENV{DEBUG_LINZGNSS} )
+        {
+            Log::Log4perl->easy_init($DEBUG);
         }
     };
     LINZ::GNSS::FileCompression::LoadCompressionTypes( $config );

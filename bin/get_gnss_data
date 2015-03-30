@@ -89,7 +89,7 @@ eval
 
         my $request = join(' ',$type,$date,$stations[0]);
         $request = LINZ::GNSS::DataRequest::Parse($request);
-        @stations=('') if ! $request->use_station;
+        @stations=('NONE') if ! $request->use_station;
         while (my $s=shift @stations)
         {
             $request = join(' ',$type,$date,$s);

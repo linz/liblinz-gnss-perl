@@ -77,12 +77,12 @@ __DATA__
 
 =head1 Name
 
-gpsdate - Convert between GPS date formats
+gnssdate - Convert between GPS date formats
 
 =head1 Synopsis
 
-    gpsdate [-f format] date
-    gpsdate -h
+    gnssdate [-f format] date
+    gnssdate -h
 
 =head1 Description
 

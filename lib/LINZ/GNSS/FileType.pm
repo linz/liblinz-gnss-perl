@@ -38,6 +38,7 @@ use fields qw(
     frequencysecs
     priority
     retention
+    expires
     use_station
     compression
     latency
@@ -144,8 +145,18 @@ sub new
 
     my $retention = $cfgft->{retention} || '';
     croak "Invalid retention $retention for file type $type:$subtype\n"
-        if $retention !~ /^(?:(\d+)\s+days?)?$/;
-    $retention=$1+1;
+        if $retention !~ /^(?:\-?(\d+)\s+days?)?$/;
+    $retention=$1 ? $1+1 : 0;
+
+    my $expires = $cfgft->{expires} || '';
+    croak "Invalid expires $expires for file type $type:$subtype\n"
+        if $expires !~ /^(?:(\d+)\s+days?)?$/;
+    $expires=0;
+    if( $1 )
+    {
+        $expires=$1+0;
+        $retention=$expires if $expires && $expires < $retention;
+    }
 
     my $compression=$cfgft->{compression} || $default->{compression} || '';
     $compression=lc($compression);
@@ -161,7 +172,7 @@ sub new
     my $latency=$cfgft->{latency} || $default->{latency} || '';
     $latency=lc($latency);
     croak "Invalid latency $latency for $type:$subtype\n" if 
-        $latency !~ /^(?:(\d+(?:\.\d+)?)\s+(minutes?|hours?|days?))?$/x;
+        $latency !~ /^(?:(\-?\d+(?:\.\d+)?)\s+(minutes?|hours?|days?))?$/x;
     my $latencysecs=($1+0)*60;
     my $units=$2;
     $latencysecs *= 60 if $units !~ /^m/;
@@ -192,6 +203,7 @@ sub new
     $self->{frequencysecs}=$frequencysecs;
     $self->{priority}=$priority;
     $self->{retention}=$retention;
+    $self->{expires}=$expires;
     $self->{use_station}=$use_station;
     $self->{compression}=$compression;
     $self->{latency}=$latency;
@@ -265,6 +277,11 @@ The latency of the data (as a code)
 =item $type->retention
 The preferred retentation period for the data in days
 
+=item $type->expires
+The maximum age for which a file is considered valid. (Used for 
+rapid products for which the filename is overwritten with each
+new version of the product).
+
 =item $type->retry
 The suggested time for retrying a download after it is delayed
 
@@ -292,6 +309,7 @@ sub priority{ return $_[0]->{priority}; }
 sub frequency{ return $_[0]->{frequency}; }
 sub latency{ return $_[0]->{latency}; }
 sub retention{ return $_[0]->{retention}; }
+sub expires{ return $_[0]->{expires}; }
 sub retry { return $_[0]->{retry}; }
 sub max_delay { return $_[0]->{max_delay }; }
 sub use_station{ return $_[0]->{use_station}; }
@@ -371,7 +389,9 @@ Returns three values:
 
 =item $availableTime 
 
-the time the data is expected to be avaialable (timestamp in seconds)
+the time the data is expected to be available (timestamp in seconds).
+Returns 0 if the file expires and will never be available for the requested
+time.
 
 =item $retry
 
@@ -379,7 +399,7 @@ the suggested interval for retrying if it is late
 
 =item failTime
 
-the time after which missing data is deemed to be unavaiable
+the time after which missing data is deemed to be unavailable
 
 =back
 
@@ -394,8 +414,18 @@ sub availableTime
 
     # Find the beginning of the next supply period (end of this one)
     my $seconds = (int(($timestamp-$GNSSTIME0)/$increment)+1)*$increment+$GNSSTIME0;
-
     $seconds += $self->{latencysecs};
+
+    # Has the file expired...
+    if( $self->expires )
+    {
+        my $failtime=$request->start_epoch+$self->expires*$SECS_PER_DAY;
+        if( $failtime < time() )
+        {
+            return 0,0,$failtime;
+        }
+    }
+
     return $seconds, $self->{retrysecs}, $seconds+$self->{max_delaysecs};
 }
 

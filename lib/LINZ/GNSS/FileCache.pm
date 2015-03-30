@@ -329,7 +329,7 @@ sub fillRequests
 =head2 my $jobids = $cache->fillPendingRequests($time)
 
 Attempts to fill the pending requests queued for downloading.
-Can take an optional parameter defining the availability date to test - the defuault
+Can take an optional parameter defining the availability date to test - the default
 is the current date/time.
 
 Returns a list of jobids of jobs for which all pending requests have now been completed.

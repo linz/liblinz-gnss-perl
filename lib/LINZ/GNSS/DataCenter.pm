@@ -663,9 +663,10 @@ sub _getfile
     {
         my $ftp = $self->{ftp};
         my $host=$self->{host};
+        $self->_logger->debug("Retrieving file $path/$file");
         if( ! $ftp || ! $ftp->cwd($path) || ! $ftp->get($file,$target) )
         {
-            $self->_logger->warn("Cannot retrieve file $file from $host");
+            $self->_logger->warn("Cannot retrieve file $path/$file from $host");
             croak "Cannot retrieve $file from $host\n";
         }
         $self->_logger->info("Retrieved $file from $host");

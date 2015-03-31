@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.17.0-1) trusty; urgency=medium
+
+  * Adding support for expiring files, adding more Bernese rapid files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 31 Mar 2015 13:29:04 +1300
+
 liblinz-gnss-perl (1.16.1-1) trusty; urgency=medium
 
   * Fix error copying SINEX file when not reading full covariance

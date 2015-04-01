@@ -271,6 +271,9 @@ The priority of the subtype
 =item $type->frequency
 The frequency the data is generated (as a code)
 
+=item $type->frequencysecs
+The frequency the data is generated in seconds
+
 =item $type->latency
 The latency of the data (as a code)
 
@@ -307,6 +310,7 @@ sub compression{ return $_[0]->{compression}; }
 sub setCompression{ $_[0]->{compression} = $_[1]; }
 sub priority{ return $_[0]->{priority}; }
 sub frequency{ return $_[0]->{frequency}; }
+sub frequencysecs{ return $_[0]->{frequencysecs}; }
 sub latency{ return $_[0]->{latency}; }
 sub retention{ return $_[0]->{retention}; }
 sub expires{ return $_[0]->{expires}; }

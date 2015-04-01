@@ -187,13 +187,29 @@ this is not enforced.  Rash use can result in overwriting files and losing data.
 For example using a filename for ULTRA orbits which does not include hours will
 cause the four daily ULTRA files to map to the same output name.
 
+The filename can also refer to another subtype, for example 'final'.  For example
+
+   $list->setFilename( 'ORB', 'RAPID', 'FINAL' );
+
+will use the FINAL name for RAPID orbits.  This will only be used if the subtypes
+have the same data frequency (eg daily), otherwise the renaming will be ignored 
+for these types.
+
 =cut
 
 sub setFilename
 {
     my( $self, $type, $subtype, $filename ) = @_;
+    my $srctype=$self->{uc($type)}->{uc($filename)};
+    my $freq;
+    if( $srctype )
+    {
+        $filename=$srctype->filename;
+        $freq=$srctype->frequencysecs;
+    }
     foreach my $type ($self->getTypes($type,$subtype))
     {
+        next if defined($freq) && $freq != $type->frequencysecs;
         $type->setFilename($filename);
     }
 }

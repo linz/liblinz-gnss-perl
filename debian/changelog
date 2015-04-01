@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.18.0-1) trusty; urgency=medium
+
+  * Improved support for renaming downloaded files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 01 Apr 2015 15:01:30 +1300
+
 liblinz-gnss-perl (1.17.0-1) trusty; urgency=medium
 
   * Adding support for expiring files, adding more Bernese rapid files

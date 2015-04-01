@@ -179,6 +179,25 @@ sub getTypes
     return wantarray ? @result : \@result;
 }
 
+=head2 $typelist->setFilename( $type, $subtype, $filename );
+
+Reset the filename for a type and subtype(s) in a list. The new filename should 
+contain date and or station substitution strings matching the original name, though
+this is not enforced.  Rash use can result in overwriting files and losing data. 
+For example using a filename for ULTRA orbits which does not include hours will
+cause the four daily ULTRA files to map to the same output name.
+
+=cut
+
+sub setFilename
+{
+    my( $self, $type, $subtype, $filename ) = @_;
+    foreach my $type ($self->getTypes($type,$subtype))
+    {
+        $type->setFilename($filename);
+    }
+}
+
 =head2 @types=$typelist->types()
 
 Return an array of all types provided by the data source

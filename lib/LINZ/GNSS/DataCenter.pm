@@ -537,6 +537,17 @@ sub description
     return $dsc;
 }
 
+=head2 $center->setFilename($type,$subtype,$filename)
+
+Resets the name for a file type (or set of filetypes if subtype include +).
+
+=cut
+
+sub setFilename
+{
+    my($self,$type,$subtype,$filename) = @_;
+    $self->filetypes->setFilename($type,$subtype,$filename);
+}
 
 =head2 $when,$files = $center->checkRequest($request, $matchstation)
 

@@ -93,9 +93,9 @@ eval
         while (my $s=shift @stations)
         {
             $request = join(' ',$type,$date,$s);
-            my $reqstr=$type;
-            $reqstr .= " for $s" if $s;
             $request = LINZ::GNSS::DataRequest::Parse($request);
+            my $reqstr=$type;
+            $reqstr .= " for $s" if $s && $request->use_station;
             my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
             if( $status eq COMPLETED )
             {
@@ -107,7 +107,7 @@ eval
             }
             elsif( $status eq PENDING )
             {
-                print "Data $reqstr available until ",seconds_datetime($when),"\n";
+                print "Data $reqstr not available until ",seconds_datetime($when),"\n";
             }
             elsif( $status eq DELAYED )
             {

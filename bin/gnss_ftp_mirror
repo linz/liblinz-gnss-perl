@@ -63,6 +63,7 @@ use Net::FTP;
 use File::Path;
 use File::Copy;
 use Config::General;
+use POSIX qw/strftime/;
 use LINZ::GNSS::Time qw/parse_gnss_date seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
 
 my $syntax=<<EOD;
@@ -252,6 +253,12 @@ $ftp->binary();
 $ftp->cwd($basedir) || die "Cannot cd to $basedir on $host\n";
 downloadDir( $ftp, $basedir, \@valid_dates, \@dirparts );
 $ftp->quit();
+
+if( $verbose )
+{
+    print "\nFinished ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
+    print "------------------------------------------\n";
+}
 
 #  filteredOptions:
 #

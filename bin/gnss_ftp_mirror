@@ -1,21 +1,54 @@
 #!/usr/bin/perl
 
-=head1 gnss_ftp_mirror.pl
+=head1 gnss_ftp_mirror
 
-Simple ftp mirror script to recursely mirror files from a remote ftp site to a local 
-directory.  In each directory creates a file .ftpmirror which is a listing of that directory
+Simple ftp mirror script to recursely mirror files from a remote ftp site 
+to a local directory.  
 
-Anything which changes gets downloaded.  Also anything which appears to have changed because 
-the format of its directory listing is changed.
+The script is designed to interrogate a GNSS archive type file system with 
+directories and files named after year, day, station code etc.  
 
-This is written for synchronising the Bernese GEN directory.  Unlike wget it downloads files
-to a temporary file then renames the final destination.  This ensures that there is never an 
-incomplete version of the file.
+The configuration file defines the structure of the file name and path in
+terms of these components.  As the files are downloaded they can be renamed
+using these fields.  
 
-WARNING:  This version assumes that all file and directory names do not include spaces.
-Any that do will fail to be downloaded.
+The script looks for a range of files based on their age in days (actually
+the age of the data, not the file).  For example it can download files 
+with dates matching the last 30 days.
 
+=head2 Synopsis:
 
+ gnss_ftp_mirror.pl [options] config_file
+
+Options are:
+
+=over
+
+=item  -v            
+
+Verbose mode - lists information about downloads etc
+
+=item -s ###        
+
+Specify the start date for downloads as days before the current date.  eg -s 30
+
+=item -e ###        
+
+Specify the end date for downloads as days before the current date.  eg -s 30
+
+=item -p ##
+
+Specifies a pause in seconds between successive downloads.  This is to be kind
+to the server!  Default is 1 second unless defined otherwise in the configuration
+file
+
+=item -i
+
+Ignore file size. If present then all matching files are downloaded.  
+Otherwise files will not be downloaded if there is already an existing file
+of the same size.
+
+=back
 
 =cut
 
@@ -112,7 +145,8 @@ my $enddate=parse_gnss_date("now-$endage");
 
 if( $verbose )
 {
-    print "Mirroring options:\n"; 
+    print "------------------------------------------\n";
+    print "Mirror GNSS data  ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
     print "Remote host:      $host\n";
     print "Remote user:      $user\n";
     print "Remote base dir:  $basedir\n";
@@ -405,55 +439,57 @@ sub parseDir
 
 __END__
 
-# Example configuration file:
-
-# RemoteUri is the the base of the remote directory
-
-RemoteUri=ftp://ftp.geonet.org.nz/rawgps
-
-RemoteUser=anonymous
-
-RemotePassword=positionz@linz.govt.nz
-
-TimeOut 30
-
-# Delay added after each successful download to be polite to server
-
-DownloadWait 0.5
-
-# RemotePath is the path to the files to download.
-#
-# Can include {yyyy},{yy},{mmm},{mm},{ddd},{dd} which will map to 
-# the corresponding date strings (mmm is 3 letter month name. Will
-# also accept Mmm, MMM for different capitalisation)
-# 
-# These will be replaced with values corresponding to the maximum number
-# of days before the current date to process.  Can also include ? for any
-# character, and * for any set of characters.
-
-RemoteDir=/{ddd}
-
-# RemoteFileRe.  Remote file names are matched against this regular expression.
-# Files that match are candidates for downloading.  Regular expression 
-# capture groups (?<xxx>...) capture names that can be used in the target
-# path.  The special name (?<code>) must match a target code if a list
-# of codes is defined.  Similarly groups with the same name as date 
-# components must match that component.
-
-RemoteFileRe={code}{yyyy}\d{8}[a-z].T02
-
-# Target directory.  This can be based absolute, or relative to the location
-# of the configuration file (defined as ~).  Can include time components
-# as for RemovePath.  Can also include {filename} to use the source filename.
-
-TargetPath=~/{yyyy}/{ddd}/{filename}
-
-# Codes to download
-
-Codes KAIK RGRE
-Codes SCTB
-
-# Number of days before current date to start and end download
-
-StartAge 30
-EndAge 0
+=head2 Example configuration file
+ 
+ # Example configuration file:
+ 
+ # RemoteUri is the the base of the remote directory
+ 
+ RemoteUri=ftp://ftp.geonet.org.nz/rawgps
+ 
+ RemoteUser=anonymous
+ 
+ RemotePassword=positionz@linz.govt.nz
+ 
+ TimeOut 30
+ 
+ # Delay added after each successful download to be polite to server
+ 
+ DownloadWait 0.5
+ 
+ # RemotePath is the path to the files to download.
+ #
+ # Can include {yyyy},{yy},{mmm},{mm},{ddd},{dd} which will map to 
+ # the corresponding date strings (mmm is 3 letter month name. Will
+ # also accept Mmm, MMM for different capitalisation)
+ # 
+ # These will be replaced with values corresponding to the maximum number
+ # of days before the current date to process.  Can also include ? for any
+ # character, and * for any set of characters.
+ 
+ RemoteDir=/{ddd}
+ 
+ # RemoteFileRe.  Remote file names are matched against this regular expression.
+ # Files that match are candidates for downloading.  Regular expression 
+ # capture groups (?<xxx>...) capture names that can be used in the target
+ # path.  The special name (?<code>) must match a target code if a list
+ # of codes is defined.  Similarly groups with the same name as date 
+ # components must match that component.
+ 
+ RemoteFileRe={code}{yyyy}\d{8}[a-z].T02
+ 
+ # Target directory.  This can be based absolute, or relative to the location
+ # of the configuration file (defined as ~).  Can include time components
+ # as for RemovePath.  Can also include {filename} to use the source filename.
+ 
+ TargetPath=~/{yyyy}/{ddd}/{filename}
+ 
+ # Codes to download
+ 
+ Codes KAIK RGRE
+ Codes SCTB
+ 
+ # Number of days before current date to start and end download
+ 
+ StartAge 30
+ EndAge 0

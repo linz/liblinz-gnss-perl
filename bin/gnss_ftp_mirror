@@ -28,6 +28,10 @@ Options are:
 
 Verbose mode - lists information about downloads etc
 
+=item  -V            
+
+More verbose mode - additional information only messages
+
 =item -s ###        
 
 Specify the start date for downloads as days before the current date.  eg -s 30
@@ -41,6 +45,11 @@ Specify the end date for downloads as days before the current date.  eg -s 30
 Specifies a pause in seconds between successive downloads.  This is to be kind
 to the server!  Default is 1 second unless defined otherwise in the configuration
 file
+
+=item -r ##
+
+Specifies the maximum runtime for in minutes.  Downloads will be aborted after this 
+time.
 
 =item -i
 
@@ -72,10 +81,12 @@ Syntax: gnss_ftp_mirror.pl [-v] config_file
 
 Options are:
    -v            Verbose mode
+   -V            Even more verbose
    -s ###        Start date to download (days before now)
    -e ###        End date to download (days before now)
-   -i            Ignore file size - download matching files
    -p ##         Reset pause between downloads
+   -r ###        Maximum run time in minutes
+   -i            Ignore file size - download all matching files
    -c            Print an example configuration file
 
 EOD
@@ -84,7 +95,7 @@ EOD
 # Get options
 
 my %opts;
-getopts('vcis:e:p:',\%opts);
+getopts('Vvcis:e:p:r:',\%opts);
 
 if( $opts{c} )
 {
@@ -92,8 +103,8 @@ if( $opts{c} )
     exit();
 }
 
-my $verbose=$opts{v};
-my $ignoresize=$opts{s};
+my $verbose=$opts{V} ? 2 : $opts{v} ? 1 : 0;
+my $ignoresize=$opts{i};
 
 @ARGV == 1 || die $syntax;
 
@@ -109,17 +120,13 @@ my %config=Config::General->new(
     -ConfigFile=>$conffile,
     -LowerCaseNames=>1,)->getall();
 
-my $remoteuri=$config{remoteuri};
-my $user=$config{remoteuser};
-my $password=$config{remotepassword};
-
-my $remotedir=$config{remotedir};
-my $remotefilere=$config{remotefilere};
-my $targetpath=$config{targetpath};
-my $timeout=$config{timeout}+0 || 30;
-my $pause=($opts{p} // $config{downloadwait})+0 || 1; 
 my $startage=($opts{s} // $config{startage})+0;
 my $endage=($opts{e} // $config{endage})+0;
+
+$config{maxruntime} = ($opts{r}+0) if $opts{r};
+$config{pause} = $opts{p} if exists $opts{p};
+$config{verbose} = 1 if $verbose;
+
 my $codes=$config{codes};
 $codes = join(' ',@$codes) if ref($codes) eq 'ARRAY';
 my $validcodes={};
@@ -131,43 +138,35 @@ foreach my $c (split(' ',$codes))
 }
 $allcodes = 1 if ! %$validcodes;
 
-
-my $uri=URI->new($remoteuri);
-
-die "$remoteuri is not a valid FTP URI.\nMust be an ftp:// URI" if $uri->scheme != 'ftp';
-
-my $host=$uri->host;
-my $basedir=$uri->path;
-my ($uri_user,$uri_pwd) = split(/\:/,$uri->userinfo,2);
-
-my $remotere;
-eval
-{
-    my $remotere=qr/$remotefilere/;
-};
-if( $@ )
-{
-    die "RemoteFileRe $remotefilere is not a valid regular expression.\n";
-}
-
-$user //= $uri_user || 'anonymous';
-$password //= $uri_pwd || $ENV{USER}.'@nowhere.net';
+my $remotedir=$config{remotedir};
+my $remotefilere=$config{remotefilere};
+my $targetpath=$config{targetpath};
 
 my $startdate=parse_gnss_date("now-$startage");
 my $enddate=parse_gnss_date("now-$endage");
 
+my $maxruntime=$config{maxruntime}+0;
+my $jobexpirytime = $maxruntime > 0 ? time()+$maxruntime*60 : 0;
+
+my $ftp=new FtpConnection( %config );
+
 if( $verbose )
 {
     print "------------------------------------------\n";
-    print "Mirror GNSS data  ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
-    print "Remote host:      $host\n";
-    print "Remote user:      $user\n";
-    print "Remote base dir:  $basedir\n";
-    print "Remote directory: $remotedir\n";
-    print "Remote file RE:   $remotefilere\n";
-    print "Target file path: $targetpath\n";
+    print  "Mirror GNSS data  ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
+    print  "Configuration:    $conffile\n";
+    printf "Remote host:      %s\n",$ftp->host;
+    printf "Remote user:      %s\n",$ftp->user;
+    printf "Remote base dir:  %s\n",$ftp->basedir;
+    print  "Remote directory: $remotedir\n";
+    print  "Remote file RE:   $remotefilere\n";
+    print  "Target file path: $targetpath\n";
     printf "Start date:       %04d:%03d\n",seconds_yearday($startdate);
     printf "End date:         %04d:%03d\n",seconds_yearday($enddate);
+    if( $maxruntime > 0 )
+    {
+        printf "Max run time:     %.1f minutes\n",$maxruntime/60;
+    }
     if( $allcodes )
     {
         print "Downloading:      all codes\n";
@@ -176,8 +175,14 @@ if( $verbose )
     {
         printf "Downloading:      %d codes\n",scalar(keys %$validcodes);
     }
-    printf "FTP timeout:     $timeout\n";
+    printf "FTP timeout:     %s\n",$ftp->timeout;
 }
+
+# Ensure outputs are flushed to make it easy to monitor progress..
+select(STDERR);
+$|=1;
+select(STDOUT);
+$|=1;
 
 $targetpath =~ s/^\~/$confdir/;
 
@@ -246,12 +251,7 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
 }
 
 
-print "Connecting to $host\n" if $verbose;
-my $ftp=Net::FTP->new($host, Timeout=>$timeout) || die "Cannot connect to $host\n";
-$ftp->login($user,$password) || die "Cannot login as $user to $host\n";
-$ftp->binary();
-$ftp->cwd($basedir) || die "Cannot cd to $basedir on $host\n";
-downloadDir( $ftp, $basedir, \@valid_dates, \@dirparts );
+downloadDir( $ftp, $ftp->basedir, \@valid_dates, \@dirparts );
 $ftp->quit();
 
 if( $verbose )
@@ -310,25 +310,34 @@ sub filteredOptions
 sub downloadDir
 {
     my( $ftp, $dirname, $options, $dirparts ) = @_;
+    return if $jobexpirytime && time > $jobexpirytime;
     print "Processing $dirname\n" if $verbose;
-    $ftp->cwd($dirname) || print "** Cannot access remote directory $dirname\n";
-    my ($dirs, $files) = parseDir( $ftp->dir() );
+    if( ! $ftp->cwd($dirname) )
+    {
+        print "** Cannot access remote directory $dirname\n";
+        return;
+    }
+    my ($dirs, $files) = $ftp->dirList();
     my @parts=@$dirparts;
     my $dirpart=shift(@parts);
 
     # If we are not at the list part of $dirparts, then we are matching against directories.
     # Recursively call this routine for valid directories.
 
+    my $expired=0;
     if( @parts )
     {
         return if ! ref $dirs;
         foreach my $dir (@$dirs)
         {
+            $expired=1;
+            last if $jobexpirytime && time > $jobexpirytime;
+            $expired=0;
             my $opts=filteredOptions($options,$dir,$dirpart);
             next if ! @$opts;
             downloadDir( $ftp, "$dirname/$dir", $opts, \@parts );
-            sleep($pause);
         }
+        print "** Job terminated - maximum run time expired\n" if $expired;
         return;
     }
 
@@ -338,6 +347,9 @@ sub downloadDir
     return if ! ref $files;
     foreach my $file (sort keys %$files)
     {
+        $expired=1;
+        last if $jobexpirytime && time > $jobexpirytime;
+        $expired=0;
         # Does it match the current filtered options
         my $opts=filteredOptions($options,$file,$dirpart);
         next if ! @$opts;
@@ -377,9 +389,9 @@ sub downloadDir
                 next;
             }
             # Check the size - if it matches then assume the file is up to date.
-            if( ! $ignoresize && $ftp->size($file) == -s $target )
+            if( (! $ignoresize) && ($files->{$file}->{size} == -s $target) )
             {
-                print "$target is already available and of the correct size\n" if $verbose;
+                print "$target is already available and of the correct size\n" if $verbose > 1;
                 next;
             }
         }
@@ -418,8 +430,8 @@ sub downloadDir
         {
             print "Successfully downloaded $target\n" if $verbose;
         }
-        sleep($pause);
     }
+    print "** Job terminated - maximum run time expired\n" if $expired;
 }
 
 # Simplistic parsing of a directory listing.
@@ -429,9 +441,178 @@ sub downloadDir
 # Returns a list of direcories, and a hash of files keyed on the filename and
 # having value the same as the directory entry
 
+sub printExampleConfig
+{
+    my $started = 0;
+    while( my $l = <DATA> )
+    {
+        $started=1 if $l =~ /^\s*\#/;
+        next if ! $started;
+        $l =~ s/^\s+//;
+        $l = "\n" if $l eq '';
+        print $l;
+    }
+}
+
+#========================================================================
+
+package FtpConnection;
+
+sub new
+{
+    my ($class, %config) = @_;
+
+    my $self={};
+    $self->{verbose}=$config{verbose};
+    $self->{remoteuri}=$config{remoteuri};
+    $self->{user}=$config{remoteuser};
+    $self->{password}=$config{remotepassword};
+    $self->{timeout}=$config{timeout}+0 || 30;
+    $self->{pause}=$config{downloadwait}+0 || 1; 
+    $self->{reconnectwait}=$config{reconnectwait}+0 || 5;
+    $self->{maxreconnect}=$config{maxreconnectiontries}+0 || 5;
+    $self->{maxdownloads}=$config{maxdownloadsperconnection}+0 || 5;
+
+    my $remoteuri=$self->{remoteuri};
+    my $uri=URI->new($remoteuri);
+    die "$remoteuri is not a valid FTP URI.\nMust be an ftp:// URI" if $uri->scheme != 'ftp';
+
+    my $host=$uri->host;
+    my $basedir=$uri->path;
+    my ($uri_user,$uri_pwd) = split(/\:/,$uri->userinfo,2);
+
+    $self->{host}=$host;
+    $self->{user}=$uri_user if $uri_user;
+    $self->{password}=$uri_pwd if $uri_pwd;
+    $self->{basedir}=$basedir;
+
+    $self->{_ftp} = undef;
+    $self->{_dir} = $basedir;
+    $self->{_ndownload} = 0;
+
+    return $self=bless $self, $class;
+}
+
+sub verbose { return $_[0]->{verbose}; }
+sub remoteuri { return $_[0]->{remoteuri}; }
+sub host { return $_[0]->{host}; }
+sub user { return $_[0]->{user}; }
+sub password { return $_[0]->{password}; }
+sub timeout { return $_[0]->{timeout}; }
+sub pause { return $_[0]->{pause}; }
+sub reconnectwait { return $_[0]->{reconnectwait}; }
+sub maxreconnect { return $_[0]->{maxreconnect}; }
+sub maxdownloads { return $_[0]->{maxdownloads}; }
+sub basedir { return $_[0]->{basedir}; }
+
+sub ftp
+{
+    my( $self, $force ) = @_;
+    return $self->{_ftp} if $self->{_ftp} && ! $force;
+    $self->quit;
+    my $trying=$self->maxreconnect;
+    $trying=1 if $trying < 1;
+    my $host=$self->host;
+    my $ftp;
+    while( $trying-- )
+    {
+        print "Connecting to $host\n" if $self->verbose;
+        $ftp=Net::FTP->new($host, Timeout=>$self->timeout);
+        last if $ftp;
+        sleep( $self->reconnectwait) if $trying;
+    }
+
+    if( ! $ftp )
+    {
+        die "Cannot make FTP connection to $host\n";
+    }
+
+    my $user=$self->user;
+    my $password=$self->password;
+    my $basedir=$self->basedir;
+
+    $ftp->login($user,$password) || die "Cannot login to $host as $user to $host\n";
+    $ftp->binary();
+    $ftp->cwd($self->{_dir}) || die "Cannot cd to $basedir on $host\n";
+    $self->{_ftp} = $ftp;
+    return $ftp;
+}
+
+sub quit
+{
+    my( $self)=@_;
+    $self->{_ftp}->quit() if $self->{_ftp};
+    $self->{_ftp} = undef;
+}
+
+sub reconnect
+{
+    my( $self)=@_;
+    $self->quit;
+    sleep( $self->reconnectwait );
+}
+
+sub run
+{
+    my( $self, $sub )=@_;
+}
+
+sub cwd
+{
+    my( $self, $dir) = @_;
+    $self->{_dir} = $dir;
+    return $self->ftp->cwd($dir);
+}
+
+sub dirList
+{
+    my ($self) = @_;
+    return $self->parseDir( $self->ftp->dir() );
+}
+
+sub size
+{
+    my ($self,$file) = @_;
+    return $self->ftp->size($file);
+}
+
+sub get
+{
+    my ($self,$file,$target) = @_;
+    if( $self->maxdownloads > 0 && $self->{_ndownload} >= $self->maxdownloads )
+    {
+        $self->reconnect;
+        $self->{_ndownload} = 0;
+    }
+    sleep( $self->pause ) if $self->{_ndownload};
+    my $ntries=0;
+    my $success=0;
+    while( 1 )
+    {
+
+        $success=$self->ftp->get($file,$target);
+        last if $success;
+        last if $ntries++ >= $self->maxreconnect;
+        print "** Download of $file failed - reconnecting\n" if $self->verbose;
+        $self->reconnect;
+    }
+    if( $success )
+    {
+        $self->{_ndownload}++;
+        my $mtime=$self->ftp->mdtm( $file );
+        utime $mtime,$mtime,$target if $mtime;
+    }
+    else
+    {
+        print "** Download of $file failed\n".$self->ftp->message."\n" 
+            if $self->verbose && ! $success;
+    }
+    return $success;
+}
+
 sub parseDir
 {
-    my(@listing)=@_;
+    my($self,@listing)=@_;
     my $dirs=[];
     my $files={};
     @listing=@{$listing[0]} if ref $listing[0];
@@ -450,25 +631,14 @@ sub parseDir
         }
         else
         {
-            $files->{$name}=$l;
+            my $size=(split(' ',$l))[4];
+            $files->{$name}={size=>$size, dir=>$l };
         }
     }
     return $dirs,$files;
 }
 
-sub printExampleConfig
-{
-    my $started = 0;
-    while( my $l = <DATA> )
-    {
-        $started=1 if $l =~ /^\s*\#/;
-        next if ! $started;
-        $l =~ s/^\s+//;
-        $l = "\n" if $l eq '';
-        print $l;
-    }
-}
-
+#========================================================================
 __END__
 
 =head2 Example configuration file
@@ -485,9 +655,26 @@ __END__
  
  TimeOut 30
  
- # Delay added after each successful download to be polite to server
+ # Delay in seconds added after each successful download to be polite to server
  
- DownloadWait 0.5
+ DownloadWait 1
+
+ # If a download fails the script will try to reconnect to the server
+ # The following options control the reconnection 
+ 
+ MaxReconnectionTries 5
+
+ # Time delay in seconds between reconnection attempts
+
+ ReconnectionWait 5
+
+ # Auto reconnect after specified number of downloads
+ 
+ MaxDownloadsPerConnection 100
+
+ # Maximum runtime in minutes - once this time has expired the job will finish
+ 
+ MaxRunTime 120
  
  # RemotePath is the path to the files to download.
  #
@@ -516,7 +703,8 @@ __END__
  
  TargetPath=~/{yyyy}/{ddd}/{filename}
  
- # Codes to download
+ # Codes to download.  Use Codes * (or omit codes altogether), to download
+ # all available codes.
  
  Codes KAIK RGRE
  Codes SCTB

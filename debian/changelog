@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.22.0-1) trusty; urgency=medium
+
+  * Fixing file size detection plus numerous improvements in gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 16 Apr 2015 10:35:49 +1200
+
 liblinz-gnss-perl (1.21.1-1) trusty; urgency=medium
 
   * Improved log output and bug fix

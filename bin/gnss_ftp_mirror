@@ -48,6 +48,10 @@ Ignore file size. If present then all matching files are downloaded.
 Otherwise files will not be downloaded if there is already an existing file
 of the same size.
 
+=item -c
+
+Print an example configuration file
+
 =back
 
 =cut
@@ -66,11 +70,12 @@ my $syntax=<<EOD;
 Syntax: gnss_ftp_mirror.pl [-v] config_file
 
 Options are:
-   -v            verbose
-   -s ###        start date to download (days before now)
-   -e ###        end date to download (days before now)
-   -i            ignore file size - download matching files
-   -p ##         reset pause between downloads
+   -v            Verbose mode
+   -s ###        Start date to download (days before now)
+   -e ###        End date to download (days before now)
+   -i            Ignore file size - download matching files
+   -p ##         Reset pause between downloads
+   -c            Print an example configuration file
 
 EOD
 
@@ -78,7 +83,14 @@ EOD
 # Get options
 
 my %opts;
-getopts('vis:e:p:',\%opts);
+getopts('vcis:e:p:',\%opts);
+
+if( $opts{c} )
+{
+    printExampleConfig();
+    exit();
+}
+
 my $verbose=$opts{v};
 my $ignoresize=$opts{s};
 
@@ -437,6 +449,19 @@ sub parseDir
     return $dirs,$files;
 }
 
+sub printExampleConfig
+{
+    my $started = 0;
+    while( my $l = <DATA> )
+    {
+        $started=1 if $l =~ /^\s*\#/;
+        next if ! $started;
+        $l =~ s/^\s+//;
+        $l = "\n" if $l eq '';
+        print $l;
+    }
+}
+
 __END__
 
 =head2 Example configuration file
@@ -461,20 +486,20 @@ __END__
  #
  # Can include {yyyy},{yy},{mmm},{mm},{ddd},{dd} which will map to 
  # the corresponding date strings (mmm is 3 letter month name. Will
- # also accept Mmm, MMM for different capitalisation)
+ # also accept Mmm, MMM for different capitalisation).  Also {code} 
+ # which will match a valid code (or all four character codes if selected)
  # 
  # These will be replaced with values corresponding to the maximum number
  # of days before the current date to process.  Can also include ? for any
  # character, and * for any set of characters.
  
- RemoteDir=/{ddd}
+ RemoteDir=/{yyyy}/{ddd}
  
  # RemoteFileRe.  Remote file names are matched against this regular expression.
- # Files that match are candidates for downloading.  Regular expression 
- # capture groups (?<xxx>...) capture names that can be used in the target
- # path.  The special name (?<code>) must match a target code if a list
- # of codes is defined.  Similarly groups with the same name as date 
- # components must match that component.
+ # Files that match are candidates for downloading.  
+ # This can include any of the time and code components, eg {ddd}. Also it
+ # can include regular expression # capture groups (?<xxx>...) to capture 
+ # fields that can be used in the target path.  
  
  RemoteFileRe={code}{yyyy}\d{8}[a-z].T02
  

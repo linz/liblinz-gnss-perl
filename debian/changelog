@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.21.1-1) trusty; urgency=medium
+
+  * Improved log output and bug fix
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 15 Apr 2015 16:15:27 +1200
+
 liblinz-gnss-perl (1.21.0-1) trusty; urgency=medium
 
   * Improving documentation

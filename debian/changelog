@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.19.0-1) trusty; urgency=medium
+
+  * Allow setting filename to match other versions of product
+  * Adding gnss_ftp_mirror.pl script for mirroring eg GNS perl archives
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 15 Apr 2015 14:34:25 +1200
+
 liblinz-gnss-perl (1.18.0-1) trusty; urgency=medium
 
   * Improved support for renaming downloaded files

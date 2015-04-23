@@ -1,0 +1,209 @@
+#!/usr/bin/perl
+#
+# Script to catalog rinex files in a directory tree
+#
+use strict;
+use Archive::Zip;
+use File::Find;
+use LINZ::GNSS::SinexFile;
+use Getopt::Std;
+
+my $opts={};
+getopts('rha',$opts);
+my $recursive=$opts->{r};
+my $append=$opts->{a};
+
+help(! $opts->{h}) if $opts->{h} || ! @ARGV;
+
+my $rinex_re=qr/\.\d\d[od](?:\.(?:z|gz(?:ip)?))?/i;
+my $zip_re=qr/\.zip$/i;
+
+sub format_time
+{
+    my($sec,$min,$hour,$mday,$mon,$year)=gmtime($_[0]);
+    return sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+
+}
+
+sub scanSinex
+{
+    my($filename,$source,$filesize,$filedate)=@_;
+    my $basename=$source;
+    $basename=~s/.*[^\\\/\:]//;
+    my $is_sinex=0;
+    eval
+    {
+        open(my $tf,"<$filename") || die;
+        my $line=<$tf>;
+        close($tf);
+        die if $line !~ /^%=SNX/;
+
+        $is_sinex=1;
+        my $sf=LINZ::GNSS::SinexFile->new($filename);
+        foreach my $stn ($sf->stations)
+        {
+            my $xyz=$stn->{xyz};
+            print join("\t",
+            $basename,
+            $filesize,
+            format_time($filedate),
+            $stn->{code},
+            format_time($stn->{epoch}),
+            $xyz->[0],
+            $xyz->[1],
+            $xyz->[2],
+            $source
+           ),"\n";
+       }
+    };
+    if( $@ )
+    {
+        print STDERR "$source: $@\n" if $is_sinex;
+    }
+}
+
+sub scanFile
+{
+    my ($file,$source)=@_;
+    if( ! -f $file )
+    {
+        print STDERR "Cannot open file: $file (from $source)\n" if ! -e $file;
+        return;
+    }
+    eval
+    {
+        my ($filesize,$filedate)=(stat($file))[7,9];
+        my $command='';
+        my $s1=$source;
+        if( $s1 =~ /\.z$/i )
+        {
+            $command="compress -d < \"$file\"";
+            $s1=~ $`;
+        }
+        elsif( $s1 =~ /\.gz(ip)?$/i )
+        {
+            $command="gzip -d < \"$file\"";
+            $s1=~ $`;
+        }
+        if( $s1=~ /\.\d\dd$/i )
+        {
+            $command = $command ? $command . ' | CRX2RNX' : "CRX2RNX < \"$file\"";
+        }
+        # print "$command\n";
+        my $localfile=$file;
+        if( $command )
+        {
+            $localfile ='lrtmpzdc';
+            $command=$command." > $localfile";
+            system($command);
+        }
+        scanSinex($localfile,$source,$filesize,$filedate);
+        unlink($localfile) if $localfile ne $file;
+
+    };
+    if( $@ )
+    {
+        print STDERR "Error processing $file from $source: $@\n";
+    }
+}
+
+sub scanZip
+{
+    my($zipfile)=@_;
+    eval
+    {
+        # print "Processing zip $zipfile\n";
+        my $zf=new Archive::Zip($zipfile);
+        foreach my $f ($zf->members())
+        {
+            my $fn=$f->fileName;
+            my $localname='lrtmpzz';
+            $f->extractToFileNamed($localname);
+            scanFile($localname,"$zipfile:$fn");
+            unlink $localname if -e $localname;
+        }
+    };
+    if( $@ )
+    {
+        print STDERR "zipfile $zipfile: $@\n";
+    }
+}
+
+sub scanZipOrFile
+{
+    my ($file)=@_;
+    if( $file=~/$zip_re/ )
+    {
+        scanZip($file);
+    }
+    elsif( $file =~ /$rinex_re/ )
+    {
+        scanFile($file,$file);
+    }
+}
+
+sub scan
+{
+    my($file)=@_;
+    if( -d $file )
+    {
+        return if ! $recursive;
+        find(  {
+            wanted=>sub {scanZipOrFile($_) if -f $_},
+            no_chdir=>1,
+            },
+            $file
+            );
+    }
+    else
+    {
+        scanZipOrFile($file);
+    }
+
+}
+
+
+
+print "file\tsize\tdate\tmark\tdate\tX\tY\tZ\tsourcefile\n" if ! $append;
+
+foreach my $f (@ARGV)
+{
+    scan($f);
+}
+
+sub help
+{
+    my ($brief)=@_;
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
+    {
+        -verbose=>$brief ? 99 : 2,
+        -sections=>'Synopsis',
+        -exitval=>2,
+    });
+}
+
+__DATA__
+
+=head1 Name
+
+scan_sinex_files - Summarises the contents of SINEX files.
+
+=head1 Synopsis
+
+    scan_sinex_files [-r] [-a] file_or_dir ... > files.csv
+    scan_sinex_files -h
+
+=head1 Description
+
+The scan_sinex_files command scans a specified list of files, identifying SINEX files 
+summarising their content in CSV format.  The SINEX files can be Hatanaka compressed, 
+gzipped or unix compressed, and inside zip files.
+
+If the -r (recursive) option is specified then the list of files can include
+directories that will be scanned recursively.
+
+If the -a (append) option is specified then the file header is omitted from the output.
+
+=cut
+

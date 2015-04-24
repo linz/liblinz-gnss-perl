@@ -9,13 +9,13 @@ use LINZ::GNSS::SinexFile;
 use Getopt::Std;
 
 my $opts={};
-getopts('rha',$opts);
+getopts('vrha',$opts);
 my $recursive=$opts->{r};
 my $append=$opts->{a};
+my $verbose=$opts->{v};
 
-help(! $opts->{h}) if $opts->{h} || ! @ARGV;
+help(! $opts->{h}) if $opts->{h} || @ARGV < 2;
 
-my $rinex_re=qr/\.\d\d[od](?:\.(?:z|gz(?:ip)?))?/i;
 my $zip_re=qr/\.zip$/i;
 
 sub format_time
@@ -27,23 +27,22 @@ sub format_time
 
 sub scanSinex
 {
-    my($filename,$source,$filesize,$filedate)=@_;
+    my($of,$filename,$source,$filesize,$filedate)=@_;
     my $basename=$source;
     $basename=~s/.*[^\\\/\:]//;
-    my $is_sinex=0;
     eval
     {
         open(my $tf,"<$filename") || die;
-        my $line=<$tf>;
+        my $sig;
+        read($tf,$sig,5,0);
         close($tf);
-        die if $line !~ /^%=SNX/;
+        return if $sig ne "%=SNX";
 
-        $is_sinex=1;
         my $sf=LINZ::GNSS::SinexFile->new($filename);
         foreach my $stn ($sf->stations)
         {
             my $xyz=$stn->{xyz};
-            print join("\t",
+            print $of join("\t",
             $basename,
             $filesize,
             format_time($filedate),
@@ -58,13 +57,14 @@ sub scanSinex
     };
     if( $@ )
     {
-        print STDERR "$source: $@\n" if $is_sinex;
+        print STDERR "$source: $@\n";
     }
 }
 
 sub scanFile
 {
-    my ($file,$source)=@_;
+    my ($of,$file,$source)=@_;
+    print "Processing $source\n" if $verbose;
     if( ! -f $file )
     {
         print STDERR "Cannot open file: $file (from $source)\n" if ! -e $file;
@@ -75,7 +75,8 @@ sub scanFile
         my ($filesize,$filedate)=(stat($file))[7,9];
         my $command='';
         my $s1=$source;
-        if( $s1 =~ /\.z$/i )
+        if(0){}
+        elsif( $s1 =~ /\.z$/i )
         {
             $command="compress -d < \"$file\"";
             $s1=~ $`;
@@ -85,10 +86,6 @@ sub scanFile
             $command="gzip -d < \"$file\"";
             $s1=~ $`;
         }
-        if( $s1=~ /\.\d\dd$/i )
-        {
-            $command = $command ? $command . ' | CRX2RNX' : "CRX2RNX < \"$file\"";
-        }
         # print "$command\n";
         my $localfile=$file;
         if( $command )
@@ -97,7 +94,7 @@ sub scanFile
             $command=$command." > $localfile";
             system($command);
         }
-        scanSinex($localfile,$source,$filesize,$filedate);
+        scanSinex($of,$localfile,$source,$filesize,$filedate);
         unlink($localfile) if $localfile ne $file;
 
     };
@@ -109,17 +106,18 @@ sub scanFile
 
 sub scanZip
 {
-    my($zipfile)=@_;
+    my($of,$zipfile)=@_;
     eval
     {
-        # print "Processing zip $zipfile\n";
+        print "Processing zip $zipfile\n" if $verbose;
         my $zf=new Archive::Zip($zipfile);
         foreach my $f ($zf->members())
         {
+            next if ! $f->isTextFile;
             my $fn=$f->fileName;
             my $localname='lrtmpzz';
             $f->extractToFileNamed($localname);
-            scanFile($localname,"$zipfile:$fn");
+            scanFile($of,$localname,"$zipfile:$fn");
             unlink $localname if -e $localname;
         }
     };
@@ -131,25 +129,26 @@ sub scanZip
 
 sub scanZipOrFile
 {
-    my ($file)=@_;
+    my ($of,$file)=@_;
     if( $file=~/$zip_re/ )
     {
-        scanZip($file);
+        scanZip($of,$file);
     }
-    elsif( $file =~ /$rinex_re/ )
+    else
     {
-        scanFile($file,$file);
+        scanFile($of,$file,$file);
     }
 }
 
 sub scan
 {
-    my($file)=@_;
+    my($of,$file)=@_;
     if( -d $file )
     {
         return if ! $recursive;
+        print "Scanning directory $file\n" if $verbose;
         find(  {
-            wanted=>sub {scanZipOrFile($_) if -f $_},
+            wanted=>sub {scanZipOrFile($of,$_) if -f $_},
             no_chdir=>1,
             },
             $file
@@ -164,11 +163,16 @@ sub scan
 
 
 
-print "file\tsize\tdate\tmark\tdate\tX\tY\tZ\tsourcefile\n" if ! $append;
 
+
+my $ofile=shift(@ARGV);
+open( my $of, $append ? '>>' : '>',  $ofile ) || die "Cannot open output file $ofile\n";
+{my $h=select($of); $|=1; select($h)}
+
+print $of "file\tsize\tdate\tmark\tdate\tX\tY\tZ\tsourcefile\n" if ! $append;
 foreach my $f (@ARGV)
 {
-    scan($f);
+    scan($of,$f);
 }
 
 sub help
@@ -191,7 +195,7 @@ scan_sinex_files - Summarises the contents of SINEX files.
 
 =head1 Synopsis
 
-    scan_sinex_files [-r] [-a] file_or_dir ... > files.csv
+    scan_sinex_files [-r] [-a] output_file file_or_dir ... 
     scan_sinex_files -h
 
 =head1 Description

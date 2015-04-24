@@ -29,7 +29,7 @@ sub scanSinex
 {
     my($of,$filename,$source,$filesize,$filedate)=@_;
     my $basename=$source;
-    $basename=~s/.*[^\\\/\:]//;
+    $basename=~s/.*[\\\/\:]//;
     eval
     {
         open(my $tf,"<$filename") || die;

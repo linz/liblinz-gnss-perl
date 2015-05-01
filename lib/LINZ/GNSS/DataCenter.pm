@@ -414,47 +414,55 @@ sub FillRequest
     my $status = UNAVAILABLE;
     my $downloaded = [];
 
-    # Find potential centers to supply the data, based on centers priority,
-    # but favouring exact station match over wildcard match
-    my @centers=();
-    my @unmatch_centers=();
-    foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+    # Try each valid subtype in order of priority...
+   
+    foreach my $typeoption (LINZ::GNSS::FileTypeList->getTypes($request))
     {
-        # Try matching exact station
-        my ($when) = $center->checkRequest($request,1);
-        if( $when )
-        {
-            push(@centers,$center);
-            next;
-        }
-        # Try matching inexactly
-        ($when) = $center->checkRequest($request,0);
-        if( $when )
-        {
-            push(@unmatch_centers,$center);
-        }
-    }
+        my $subtype=$typeoption->subtype;
 
-    foreach my $center (@centers, @unmatch_centers)
-    {
-        my ($result, $when, $files) = $center->getData($request,$target);
-        next if $result eq UNAVAILABLE;
-        $available=$when if ! $available || $when < $available;
+        # Find potential centers to supply the data, based on centers priority,
+        # but favouring exact station match over wildcard match
+        my @centers=();
+        my @unmatch_centers=();
+        foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+        {
+            # Try matching exact station
+            my ($when) = $center->checkRequest($request,1,$subtype);
+            if( $when )
+            {
+                push(@centers,$center);
+                next;
+            }
+            # Try matching inexactly
+            ($when) = $center->checkRequest($request,0,$subtype);
+            if( $when )
+            {
+                push(@unmatch_centers,$center);
+            }
+        }
 
-        if( $result eq COMPLETED )
+        foreach my $center (@centers, @unmatch_centers)
         {
-            push(@$downloaded,@$files);
-            $status = $result;
-            last;
+            my ($result, $when, $files) = $center->getData($request,$target,$subtype);
+            next if $result eq UNAVAILABLE;
+            $available=$when if ! $available || $when < $available;
+
+            if( $result eq COMPLETED )
+            {
+                push(@$downloaded,@$files);
+                $status = $result;
+                last;
+            }
+            elsif( $result eq DELAYED )
+            {
+                $status = $result;
+            }
+            elsif( $result eq PENDING && $status ne DELAYED )
+            {
+                $status = $result;
+            }
         }
-        elsif( $result eq DELAYED )
-        {
-            $status = $result;
-        }
-        elsif( $result eq PENDING && $status ne DELAYED )
-        {
-            $status = $result;
-        }
+        last if $status eq COMPLETED;
     }
     # If status not completed then set the status based on the best option
 
@@ -549,7 +557,7 @@ sub setFilename
     $self->filetypes->setFilename($type,$subtype,$filename);
 }
 
-=head2 $when,$files = $center->checkRequest($request, $matchstation)
+=head2 $when,$files = $center->checkRequest($request, $matchstation, $subtype)
 
 Checks whether a data centre should be able to supply a request. Returns when 
 the request should be able to be filled, and the list of files the it will 
@@ -564,6 +572,8 @@ station for the data centre.  Otherwise if the data center supports "all station
 (ie wildcard station code *), then it may return a value even if the station
 code is not matched explicitly.
 
+If $subtype is defined then only that subtype will be checked.
+
 Returns $when=0 if the request cannot be filled from this list.
 Return $files undefined when the request cannot be filled now
 
@@ -571,12 +581,12 @@ Return $files undefined when the request cannot be filled now
 
 sub checkRequest 
 {
-    my( $self, $request, $matchstation ) = @_;
+    my( $self, $request, $matchstation, $subtype ) = @_;
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     return 0,undef if 
         $request->use_station && 
         ! (($self->{allstations} && ! $matchstation) || exists $self->{stncodes}->{uc($request->station)});
-    return $self->filetypes->checkRequest($request);
+    return $self->filetypes->checkRequest($request,undef,$subtype);
 }
 
 
@@ -725,7 +735,7 @@ sub _putfile
 }
 
 
-=head2 $status, $when, $files = $center->getData( $request, $target )
+=head2 $status, $when, $files = $center->getData( $request, $target, $subtype )
 
 Retrieves a set of files defined by a LINZ::GNSS::DataRequest.
 
@@ -736,6 +746,8 @@ target location.  This way it should only install complete files in the target l
 
 The target location can be either another data center object, or the name of a data center,
 or the name of a directory.
+
+The subtype can be defined to restrict the search to a specific subtype.
 
 Returns a status and an array ref of downloaded file specs, or already downloaded specs.
 
@@ -766,7 +778,7 @@ May also be because of an error encountered storing the data.
 
 sub getData
 {
-    my($self,$request,$target) = @_;
+    my($self,$request,$target,$subtype) = @_;
 
     # If target is not an object then try first a directory, then a named data center
     if( ! ref($target) )
@@ -783,7 +795,7 @@ sub getData
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
 
     $self->_logger->debug("Running getData on ".$self->name." to ".$target->name." for request ".$request->reqid);
-    my ($when, $files)=$self->checkRequest($request);
+    my ($when, $files)=$self->checkRequest($request,0,$subtype);
     my $downloaded=[];
 
     # If the files are not expected to be available at the moment, 
@@ -824,7 +836,7 @@ sub getData
     my $canconnect=1;
     my $delayed=0;
     my $error=0;
-    my $subtype='';
+    my $supsubtype='';
     $when=0;
 
     foreach my $spec (@$files)
@@ -839,7 +851,7 @@ sub getData
                 croak "Datastore ".$target->name." cannot store ".$spec->{type}.'/'.$spec->{subtype}." files\n";
             }
             
-            $subtype=$spec->{subtype};
+            $supsubtype=$spec->{subtype};
 
             # If already available, then there's nothing to do
             # Just add it to the list of downloaded files (so that it is treated as part
@@ -931,7 +943,7 @@ sub getData
 
     if( $status eq COMPLETED )
     {
-        $request->setCompleted($subtype,"Filled from data center ".$self->name);
+        $request->setCompleted($supsubtype,"Filled from data center ".$self->name);
     }
     else
     {

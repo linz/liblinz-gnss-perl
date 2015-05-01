@@ -7,8 +7,9 @@ use strict;
 use Getopt::Std;
 use LINZ::GNSS;
 use LINZ::GNSS::FileCache;
-use LINZ::GNSS::Time qw/seconds_datetime/;
+use LINZ::GNSS::Time qw/seconds_datetime parse_gnss_date seconds_yearday/;
 use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED INVALID);
+use LINZ::GNSS::DataCenter;
 eval
 {
     require LINZ::BERN::BernUtil;
@@ -20,7 +21,7 @@ if( $@ )
 }
 
 my %opts;
-getopts('d:f:ilhc',\%opts);
+getopts('d:f:ilshc',\%opts);
 my $dir=$opts{d} || '.';
 $dir='' if $opts{c};
 
@@ -33,9 +34,22 @@ if( $opts{l} )
     exit();
 }
 
+if( $opts{s} )
+{
+    print "Data may be retrieved from the following sources:\n";
+    print LINZ::GNSS::DataCenter::SourceDescriptions;
+    exit();
+}
+
 help(!$opts{h}) if $opts{h} || ! @ARGV;
 
 my $date=shift(@ARGV);
+
+if($date =~ /^now(:?-\d+)?$/i)
+{
+    my($year,$dayno)=seconds_yearday(parse_gnss_date($date));
+    $date=sprintf("%04d:%03d",$year,$dayno);
+}
 
 die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n" 
    if $date !~ /^[12]\d\d\d\:\d\d\d(?:\-(?:[12]\d\d\d\:)?\d\d\d)?$/;
@@ -99,6 +113,9 @@ eval
             my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
             if( $status eq COMPLETED )
             {
+                my $reqstr=$request->type.':'.$request->supplied_subtype;
+                $reqstr .= " for $s" if $s && $request->use_station;
+
                 # print $request->status_message,"\n";
                 foreach my $f (@$files)
                 {
@@ -163,6 +180,7 @@ get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in 
     get_gnss_data [-d dirname | -c] -f filename date
     get_gnss_data [-d dirname | -c] -i date
     get_gnss_data -l
+    get_gnss_data -s
     get_gnss_data -h
 
 =head1 Description
@@ -224,6 +242,10 @@ set of arguments (type station ...)
 =item -l
 
 Just list the available file types and exit
+
+=item -s
+
+Just list the data centres from which files may be retrieved
 
 =back
 

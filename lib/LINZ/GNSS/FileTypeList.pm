@@ -234,7 +234,7 @@ sub types
     return wantarray ? @result : \@result;
 }
 
-=head2 $when, $files = $typelist->checkRequest($request,$stncodes,$now)
+=head2 $when, $files = $typelist->checkRequest($request,$stncodes,$subtype,$now)
 
 Checks a file type list for potential availability of files.  Returns the best
 potentially available files, and when the should be available, or an empty
@@ -242,6 +242,8 @@ list of files and when they should be available.
 
 $stncodes is an optional hash defining the mapping from uppercase station name
 to the case in the repository.
+
+$subtype if defined limits the search to the specific subtype
 
 $now is an alternative to the current time, used only really for testing.
 
@@ -251,12 +253,13 @@ Returns $when=0 if the request cannot be filled from this list.
 
 sub checkRequest
 {
-    my($self,$request,$stncodes,$now) = @_;
+    my($self,$request,$stncodes,$subtype,$now) = @_;
     my $files = undef;
     my $available=0;
     $now ||= time();
     foreach my $type ( $self->getTypes($request) )
     {
+        next if $subtype && $type->subtype ne $subtype;
         my ($time)=$type->availableTime($request);
         next if ! $time;
         $available=$time if  ! $available || $time < $available;

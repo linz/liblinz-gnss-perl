@@ -1,3 +1,14 @@
+liblinz-gnss-perl (1.23.0-1) trusty; urgency=medium
+
+  * Adding scan_sinex_files
+  * Tidying up of scan_sinex script
+  * Tidying up scan_sinex_files
+  * Fix daily processor to recognize bernese failure
+  * Adding pcf_test_success_file option
+  * Enabling retrieval of lower quality types when higher are delayed
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 01 May 2015 14:31:06 +1200
+
 liblinz-gnss-perl (1.22.0-1) trusty; urgency=medium
 
   * Fixing file size detection plus numerous improvements in gnss_ftp_mirror

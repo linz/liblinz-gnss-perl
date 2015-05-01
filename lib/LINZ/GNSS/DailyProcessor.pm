@@ -254,23 +254,10 @@ sub runBernesePcf
     my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
     $self->{pcfstatus}=$status;
     my $return=1;
-    if( $status->{status} eq 'OK' )
-    {
-        $self->info('Bernese PCF $pcf successfully run');
-        my $copyfiles=$self->get('pcf_save_files','');
-        if( $copyfiles )
-        {
-            foreach my $file (split(' ',$copyfiles))
-            {
-                my $src="$campdir/$file";
-                my $target=$file;
-                $target =~ s/.*[\\\/]//;
-                $target="$targetdir/$target";
-                File::Copy::copy($src,$target) if -e $src;
-            }
-        }
-    }
-    else
+
+    my $testfile=$self->get('pcf_test_success_file','');
+
+    if( $status->{status} ne 'OK' )
     {
         $self->warn(join(': ',"Bernese PCF $pcf failed",
             $status->{fail_pid},
@@ -290,6 +277,28 @@ sub runBernesePcf
         }
     
         $return=0;
+    }
+    elsif( $testfile && ! -e "$campdir/$testfile" )
+    {
+        $status->{status} = 'FAIL';
+        $self->warn("PCF required output file $testfile not built - run failed");
+        $return=0;
+    }
+    else
+    {
+        $self->info('Bernese PCF $pcf successfully run');
+        my $copyfiles=$self->get('pcf_save_files','');
+        if( $copyfiles )
+        {
+            foreach my $file (split(' ',$copyfiles))
+            {
+                my $src="$campdir/$file";
+                my $target=$file;
+                $target =~ s/.*[\\\/]//;
+                $target="$targetdir/$target";
+                File::Copy::copy($src,$target) if -e $src;
+            }
+        }
     }
     my $save_campaign=$self->get('pcf_save_campaign_dir','');
     if( ! $save_campaign )
@@ -929,6 +938,10 @@ __END__
  
  pcf_params         V_ORBTYP=FINAL V_O=s
  pcf_params-rapid   V_ORBTYP=RAPID V_O=r
+
+ # File used to confirm success of BPE run
+ 
+ pcf_test_success_file
 
  # Files that will be copied to the target directory if the PCF succeeds
  

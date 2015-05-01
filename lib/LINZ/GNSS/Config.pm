@@ -246,12 +246,15 @@ The log settings are defined by variables
 
 =item logfile: the name of the logfile
 
-=item logsettings: the Log4perl logger definition
+=item logsettings: the Log::Log4perl logger definition
 
 =back
 
 The logsettings can include the string [logfilename] which will be substituted
 with the name built from logdir and logfile.
+
+Instead of a full Log::Log4perl definition logsettings can simply be the log level,
+one of trace, debug, info, warn, error, or fatal.
 
 The logger is initiallized with an id specified by the $loggerid parameter,
 which defaults to 'LINZ::GNSS'.
@@ -263,16 +266,28 @@ sub logger
     my ($self, $loggerid) = @_;
     if( ! $self->{_logger_init} )
     {
-        my $logcfg=$self->get('logsettings','');
-        if(  $logcfg )
+        my $logcfg=$self->get('logsettings','WARN');
+        my $logfile=$self->get('logdir','');
+        $logfile .= '/' if $logfile;
+        $logfile .= $self->get('logfile','');
+
+        if( $logcfg =~ /^(trace|debug|info|warn|error|fatal|)$/i )
         {
-            my $logfile=$self->get('logdir').'/'.$self->get('logfile');
+            my $options={};
+            if( $logfile ne '' ){ $options->{file}=$logfile; }
+            $logcfg = uc($logcfg) || 'WARN';
+            if( $logcfg eq 'TRACE') { $options->{level}=$TRACE; }
+            if( $logcfg eq 'DEBUG') { $options->{level}=$DEBUG; }
+            if( $logcfg eq 'INFO') { $options->{level}=$INFO; }
+            if( $logcfg eq 'WARN') { $options->{level}=$WARN; }
+            if( $logcfg eq 'ERROR') { $options->{level}=$ERROR; }
+            if( $logcfg eq 'FATAL') { $options->{level}=$FATAL; }
+            Log::Log4perl->easy_init($options);
+        }
+        elsif(  $logcfg )
+        {
             $logcfg =~ s/\[logfilename\]/$logfile/eg;
             Log::Log4perl->init(\$logcfg);
-        }
-        else
-        {
-            Log::Log4perl->easy_init($WARN);
         }
     }
     $loggerid ||= 'LINZ::GNSS';

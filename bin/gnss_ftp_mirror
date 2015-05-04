@@ -620,7 +620,8 @@ sub parseDir
     {
         $l =~ s/^\s+//;
         $l =~ s/\s+$//;
-        my $isdir=$l=~/^d/;
+        # <DIR> is Microsoft server test
+        my $isdir=$l=~/^d/ || $l =~ /\<DIR\>/;
         my $name=(split(' ',$l))[-1];
         # Skip names starting with '.";
         next if $name eq '';
@@ -631,7 +632,9 @@ sub parseDir
         }
         else
         {
-            my $size=(split(' ',$l))[4];
+            # Select column based on unix or MS format listing
+            my $sizecol =  $l =~ /^\d\d/ ? -2 : 4;
+            my $size=(split(' ',$l))[$sizecol];
             $files->{$name}={size=>$size, dir=>$l };
         }
     }

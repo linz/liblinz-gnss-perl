@@ -40,6 +40,8 @@ The following variables are defined:
 
 =item ${configname} - the name of the configuration file
 
+=item ${user} - the logged in user id
+
 =item ${yyyy} - the currently set year
 
 =item ${ddd} - the currently set day of year
@@ -100,6 +102,7 @@ sub new
     $configname=~ s/.*[\\\/]//;
     $configname=~ s/\..*//;
     $args{configname}=$configname;
+    $args{user} = getlogin if ! $args{user};
 
 
     croak("Configuration file $cfgfile is missing\n") if ! -f $cfgfile;

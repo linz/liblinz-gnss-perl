@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.24.0-1) trusty; urgency=medium
+
+  * Adding ${user} option to Config.pm
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 04 May 2015 14:34:34 +1200
+
 liblinz-gnss-perl (1.23.1-1) trusty; urgency=medium
 
   * Improving config options

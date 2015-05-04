@@ -811,6 +811,7 @@ __END__
  # Configuration file for the daily processing code
  #
  # This is read and processed using the LINZ::GNSS::Config module.
+ # See 'man LINZ::GNSS::Config' for information about string substitution
  #
  # Configuration items may include ${xxx} that are replaced by (in order of
  # preference) 
@@ -820,10 +821,10 @@ __END__
  #
  # ${configdir} is defined as the directory of this configuration file unless
  # overridden by another option
- # ${pid_#} expands to the process id padded with 0or left trimmed to # 
+ # ${pid_#} expands to the process id padded with 0 or left trimmed to # 
  # characters 
  # ${yyyy} and ${ddd} expand to the currently processing day and year, and
- # otherwise are invalid.
+ # otherwise are invalid. Also {mm} and {dd} for month and day number.
  
  # Parameters can have alternative configuration specified by suffix -cfg.
  #
@@ -924,6 +925,9 @@ __END__
  
  # =======================================================================
  # The following items are used by the runBernesePcf function
+ #
+ # Note that when a PCF is run the SAVEDISK environment variable ($S) is set
+ # to point to the daily processor target directory.
  #
  # The name of the Bernese PCF to run (use NONE to skip bernese processing)
  

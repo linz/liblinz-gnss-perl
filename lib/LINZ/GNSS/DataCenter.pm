@@ -557,6 +557,18 @@ sub setFilename
     $self->filetypes->setFilename($type,$subtype,$filename);
 }
 
+=head2 $center->canSetFilename($type,$subtype,$filename)
+
+Tests whether setFilename is valid for a specific subtype.  
+
+=cut
+
+sub canSetFilename
+{
+    my($self,$type,$subtype,$filename) = @_;
+    $self->filetypes->canSetFilename($type,$subtype,$filename);
+}
+
 =head2 $when,$files = $center->checkRequest($request, $matchstation, $subtype)
 
 Checks whether a data centre should be able to supply a request. Returns when 
@@ -690,7 +702,8 @@ sub _getfile
             $self->_logger->warn("Cannot retrieve file $path/$file from $host");
             croak "Cannot retrieve $file from $host\n";
         }
-        $self->_logger->info("Retrieved $file from $host");
+        my $size= -s $target;
+        $self->_logger->info("Retrieved $file ($size bytes) from $host");
     }
     elsif( $self->scheme eq 'http' )
     {

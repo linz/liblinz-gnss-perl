@@ -235,8 +235,9 @@ sub compressFile
         rename($filename,$infile);
         my $result = system(@cmdline);
         unlink $infile if $infile ne $outfile;
+        unlink $outfile if $result;
+        croak "Cannot apply $self->{name} compression to $filename\n" if $result || ! -f $outfile;
         rename($outfile,$filename);
-        croak "Cannot apply $self->{name} compression to $filename\n" if $result;
     };
 }
 

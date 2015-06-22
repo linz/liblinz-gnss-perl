@@ -195,11 +195,14 @@ will use the FINAL name for RAPID orbits.  This will only be used if the subtype
 have the same data frequency (eg daily), otherwise the renaming will be ignored 
 for these types.
 
+Returns a list of FileType objects which have been renamed.
+
 =cut
 
 sub setFilename
 {
     my( $self, $type, $subtype, $filename ) = @_;
+    return [] if $filename eq '';
     my $srctype=$self->{uc($type)}->{uc($filename)};
     my $freq;
     if( $srctype )
@@ -207,11 +210,36 @@ sub setFilename
         $filename=$srctype->filename;
         $freq=$srctype->frequencysecs;
     }
+    my $renamed_types=[];
     foreach my $type ($self->getTypes($type,$subtype))
     {
         next if defined($freq) && $freq != $type->frequencysecs;
         $type->setFilename($filename);
+        push(@$renamed_types,$type);
     }
+    return $renamed_types;
+}
+
+=head2 $typelist->canSetFilename($type,$subtypefrom,$subtypeto)
+
+Determines whether it is possible to rename between two different subtypes 
+using the setFilename function
+
+=cut
+
+sub canSetFilename
+{
+    my ( $self, $type, $subtype, $filename ) = @_;
+    # If new name is blank then nothing to do, so result is always success!
+    return 1 if $filename eq '';
+    my $type1 = $self->getType($type,$subtype);
+    # If not a valid subtype then cannot rename...
+    return 0 if ! $type1;
+    my $type2 = $self->getType($type,$filename);
+    # If new filename is not a subtype then it is just a straight renaming
+    return 1 if ! $type2;
+    # Otherwise can rename if their have the same frequency
+    return $type1->frequencysecs == $type2->frequencysecs ? 1 : 0;
 }
 
 =head2 @types=$typelist->types()

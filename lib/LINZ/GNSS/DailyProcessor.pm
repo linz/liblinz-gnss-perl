@@ -74,6 +74,8 @@ sub runProcessor
     my $endtime=$runtime+$maxruntime;
 
     my $completefile=$self->get('complete_file');
+    my @skipfiles=split(' ',$self->get('skip_files',''));
+
     my $failfile=$self->get('fail_file');
     my $retry_max_age=$self->get('retry_max_age_days')*$SECS_PER_DAY;
     $retry_max_age=$runtime-$retry_max_age if $retry_max_age;
@@ -115,6 +117,17 @@ sub runProcessor
         $ENV{PROCESSOR_TARGET_DIR}=$targetdir;
         $ENV{PROCESSOR_YEAR}=$year;
         $ENV{PROCESSOR_DOY}=$day;
+
+        # Are we skipping this directory?
+
+        my $skipping=0;
+        foreach my $skipfile (@skipfiles)
+        {
+            next if ! $self->markerFileExists($skipfile);
+            $skipping=1;
+            last;
+        }
+        next if $skipping;
 
         $self->deleteMarkerFiles($completefile,$failfile) if $rerun;
 
@@ -850,7 +863,7 @@ __END__
  lock_expiry_days 0.9
  
  # Completed file - used to flag that the daily processing has run for 
- # the directory successfully
+ # the directory successfully.
  # The script will not run on a directory containing this flag.
  
  complete_file daily_processing.complete
@@ -860,6 +873,11 @@ __END__
  # to the retry parameters.
  
  fail_file daily_processing.failed
+
+ # Skip files - names of one or more files which signal that the script is not
+ # to run.
+ 
+ skip_files
  
  # Failed jobs may be retried after retry_interval, but will never rerun 
  # for jobs greater than retry_max_age days.  (Assume that nothing will
@@ -900,10 +918,10 @@ __END__
  
  max_consecutive_fails 0
  
- # Pre-requesite file(s).  If specified then days will be skipped if their 
+ # Prerequisite file(s).  If specified then days will be skipped if their 
  # directory does not include this specified file(s)
  
- prerequesite_files
+ prerequisite_files
 
  # Clean on start setting controls which files are removed from the
  # result directory when the jobs starts.  The default is just to remove

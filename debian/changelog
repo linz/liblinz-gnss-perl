@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.25.0-1) trusty; urgency=medium
+
+  * Fixing compression of CODE rapid files and default directories of same
+  * Various updates to improve error handling
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 22 Jun 2015 13:47:41 +1200
+
 liblinz-gnss-perl (1.24.0-1) trusty; urgency=medium
 
   * Adding ${user} option to Config.pm

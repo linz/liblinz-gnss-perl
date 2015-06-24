@@ -165,6 +165,17 @@ sub stats
     return $self->{stats};
 }
 
+=head2 $startdate,$enddate=$sf->obsDates()
+
+Returns the start and end date of observations in the SinexFile (as timestamps)
+
+=cut
+
+sub obsDates
+{
+    my($self)=@_;
+    return $self->{obs_start_date},$self->{obs_end_date};
+}
 
 sub _open
 {
@@ -189,7 +200,6 @@ sub _scan
     my($self,%options) = @_;
     my $sf=$self->_open();
     return if ! $sf;
-
     
     $self->{stats}={};
     $self->{solnprms}={};
@@ -198,6 +208,8 @@ sub _scan
     my $header=<$sf>;
     croak($self->{filename}." is not a valid SINEX file\n") if $header !~ /^\%\=SNX\s(\d\.\d\d)\s+/;
     my $version=$1;
+    $self->{obs_start_date}=$self->_sinexDateToTimestamp(substr($header,32,12));
+    $self->{obs_end_date}=$self->_sinexDateToTimestamp(substr($header,45,12));
 
     my $blocks={
         'SOLUTION/STATISTICS'=>0,
@@ -429,6 +441,15 @@ sub _scanCovar
     return 1;
 }
 
+sub _sinexDateToTimestamp
+{
+    my($self,$datestr)=@_;
+    my($y,$doy,$sec)=split(/\:/,$datestr);
+    $y += 1900;
+    $y += 100 if $y < 1980;
+    return yearday_seconds($y,$doy)+$sec;
+}
+
 sub _scanEpochs
 {
     my ($self,$sf)=@_;
@@ -453,11 +474,7 @@ sub _scanEpochs
             \s(\d\d\:\d\d\d\:\d\d\d\d\d) # mean epoch
             /x;
         my ($code,$solnid,$meanepoch)=(_trim($1),_trim($2).':'._trim($3),$7);
-        my ($y,$doy,$sec)=split(/\:/,$meanepoch);
-        $y += 1900;
-        $y += 100 if $y < 1980;
-        my $epoch=yearday_seconds($y,$doy)+$sec;
-        $self->_getStation($code,$solnid)->{epoch}=$epoch;
+        $self->_getStation($code,$solnid)->{epoch}=$self->_sinexDateToTimestamp($meanepoch);
     }
     return 1;
 }

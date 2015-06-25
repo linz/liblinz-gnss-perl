@@ -6,6 +6,48 @@ scripts relate to selecting and retrieving GNSS reference data (orbits, ERP, ref
 station RINEX files).  The module also provides components for handling RINEX and SINEX
 files and managing GNSS time formats.
 
+=head2 Scripts 
+
+The module is packed with a number of utility scripts including:
+
+=over
+
+=item get_gnss_data
+
+Script to retrieve GNSS data of various types (orbits, RINEX, etc) using the LINZ::GNSS::FileCache 
+module.  
+
+=item gnssdate
+
+Utility to convert date and time between formats used for GNSS data
+
+=item gnss_ftp_mirror 
+
+Script to mirror GNSS data from a remote ftp site. Uses a configuration file to identify 
+directories and files to retrieve based on the date.  Handles some automatic renaming of
+files as they are downloaded
+
+=item run_daily_processor
+
+Script to manage running daily processing using a configuration file to manage which
+days are to be processed.  Processing is run against a directory structure with directories
+named according to the day being processed.
+
+=item scan_rinex_files
+
+Scans RINEX files in a directory tree and writes a CSV file summarizing the files found
+
+=item scan_sinex_files
+
+Scans SINEX files in a directory tree and writes a CSV file summarizing the files found.
+
+=item sinex_to_db
+
+Scans one or more SINEX files (including in directory trees) and writes station information
+to an SQLite database.
+
+=back
+
 =head2 See Also
 
 =over

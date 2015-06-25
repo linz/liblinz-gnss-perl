@@ -44,6 +44,8 @@ The following variables are defined:
 
 =item ${yyyy} - the currently set year
 
+=item ${yy} - the currently set year (two digits)
+
 =item ${ddd} - the currently set day of year
 
 =item ${mm} - the currently set month
@@ -152,7 +154,9 @@ sub setTime
 {
     my($self,$timestamp)=@_;
     my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
-    $self->_set('yyyy',sprintf("%04d",$year+1900));
+    my $yyyy=sprintf("%04d",$year+1900);
+    $self->_set('yyyy',$yyyy);
+    $self->_set('yy',substr($yyyy,2));
     $self->_set('mm',sprintf("%02d",$mon+1));
     $self->_set('dd',sprintf("%02d",$day));
     $self->_set('ddd',sprintf("%03d",$yday+1));

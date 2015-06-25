@@ -56,11 +56,14 @@ The processor main routine.  Runs the processing for each year as
 specified by the configuration, calling the supplied function to 
 implement the process.
 
+If $func is not defined then runs the defaultProcessor function.
+
 =cut
 
 sub runProcessor
 {
     my ($self,$func) = @_;
+    $func ||= \&defaultProcess;
     my $start_date=$self->getDate('start_date');
     my $end_date=$self->getDate('end_date');
     my $increment=int($self->get('date_increment',1)+0);
@@ -167,6 +170,7 @@ sub runProcessor
 
         next if ! $self->lock();
         $self->cleanTarget();
+        $self->clearLogBuffers();
         $self->info("Processing $year $day");
         eval
         {
@@ -453,6 +457,171 @@ sub runScripts
     return $result;
 }
 
+=head2 $processor->sendNotification( $success, $text )
+
+Sends an email notification reporting the status of the daily processing.  Generally
+will be sent at the end of completed days processing.  Depending on the configuration
+settings may be sent on success, failure, or both (The message will be sent if there
+is a corresponding subject line defined).  
+
+=cut
+
+sub sendNotification
+{
+    my($self,$success,$text) = @_;
+
+    my $server=$self->get('notification_smtp_server','');
+    my $auth_file=$self->get('notification_auth_file','');
+    my $timeout=$self->get('notification_smtp_timeout','30');
+    my $email=$self->get('notification_email_address','');
+    my $from=$self->get('notification_from_address','daily_processor@linz.govt.nz');
+    my $subject=$self->get('notification_subject_'.($success ? 'success' : 'fail'),
+                $self->get('notification_subject',''));
+    my $emailtext= $self->get('notification_text_'.($success ? 'success' : 'fail'),
+                $self->get('notification_text',''));
+
+    return if $subject eq '';
+
+    # Read authentication..
+    my $user='';
+    my $pwd='';
+    if( $auth_file )
+    {
+        my $af;
+        if( ! open($af,"<",$auth_file) )
+        {
+            $self->warn("Cannot open notification_auth_file $auth_file");
+        }
+        else
+        {
+            while( my $line=<$af> )
+            {
+                my @parts=split(' ',$line);
+                my $item=lc($parts[0]);
+                $server=$parts[1] if $item eq 'server';
+                $user=$parts[1] if $item eq 'user';
+                $pwd=$parts[1] if $item eq 'password';
+                last if $user ne '' && $pwd ne '';
+            }
+            close($af);
+        }
+    }
+
+    # Split out the port from the server name
+
+    my $port;
+    ($server,$port)=split(/\:/,$server);
+    $port //= '25';
+
+    # Have we got a server defined ...
+
+    if( ! $server )
+    {
+        $self->error("Cannot send notification as notification_smtp_server is not defined\n");
+        return;
+    }
+
+    # Split out recipients
+    
+    my @recipients=split(/\,/,$email);
+    foreach my $r (@recipients) { $r =~ s/^\s+//; $r =~ s/\s+$//; }
+
+    # Construct the email message
+
+    my $emailheader="To: $email\nFrom: $from\nSubject: $subject\n\n";
+
+    $emailtext =~ s/\[text\]/$text/;
+    my $info=join("\n",@{$self->{info_buffer}});
+    my $warn=join("\n",@{$self->{warn_buffer}});
+    my $error=join("\n",@{$self->{error_buffer}});
+
+    $emailtext =~ s/\[info\]/$info/;
+    $emailtext =~ s/\[warning\]/$warn/;
+    $emailtext =~ s/\[error\]/$error/;
+
+    # Attempt to connect to the server
+
+    eval
+    {
+        require Net::SMTP;
+        my $smtp=Net::SMTP->new(
+            Host=>$server,
+            Port=>$port,
+            Timeout=>$timeout,
+            );
+        die "Cannot connect to SMTP server $server: $@\n" if ! $smtp;
+        $smtp->auth($user,$pwd) if $user ne '';
+
+        # Set the recipient(s)
+        
+        $smtp->mail($from);
+        $smtp->to(@recipients,{SkipBad=>1});
+        $smtp->data();
+        $smtp->datasend($emailheader);
+        $smtp->datasend($emailtext);
+        $smtp->dataend();
+        $smtp->quit();
+    };
+    if( $@ )
+    {
+        $self->error("Error in sendNotification: $@\n");
+    }
+}
+
+=head2 $processor->defaultProcess
+
+Default routine run when the runProcessor function is called without specifying
+a subroutine.  Carries out the following steps:
+
+=over
+
+=item Run prescripts
+
+=item Run bernese PCF
+
+=item Run post scripts
+
+=item Send notifications
+
+=back
+
+If the prescripts fail then the PCF and post scripts are not run.
+
+=cut
+
+sub defaultProcess
+{
+    my($processor)=@_;
+    my $ok=0;
+    eval
+    {
+        $ok=1;
+        my $prescripts=$processor->get('prerun_script','none');
+        $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
+
+        if( $ok )
+        {
+            my $bernok=1;
+            if( $processor->get('pcf'))
+            {
+                $bernok=$processor->runBernesePcf();
+            }
+            my $status=$bernok ? '_success' : '_fail';
+            my $postscripts=$processor->get("postrun_script$status",
+                $processor->get("postrun_script","none"));
+            $ok=$processor->runScripts($postscripts) if $postscripts !~ /^\s*(none\s*)?$/i;
+            $ok = $bernok && $ok;
+        }
+    };
+    if( $@ )
+    {
+        $ok=0;
+    }
+    $processor->sendNotification( $ok );
+
+    return $ok;
+}
+
 =head2 $processor->cfg
 
 Returns the processor configuration file used by the script
@@ -475,9 +644,11 @@ one from the configuration
 sub get
 {
     my( $self, $key, $default ) = @_;
-    return exists $self->{vars}->{$key} ?
+    my $result=exists $self->{vars}->{$key} ?
            $self->{vars}->{$key} :
            $self->cfg->get($key,$default);
+    $result //= '';
+    return $result;
 }
 
 =head2 $processor->set($key,$value)
@@ -710,6 +881,21 @@ sub cleanTarget
     }
 }
 
+=head2 $processor->clearLogBuffers
+
+Clears log message buffers which record messages for including in
+emails, etc.
+
+=cut
+
+sub clearLogBuffers
+{
+    my($self)=@_;
+    $self->{info_buffer}=[];
+    $self->{warn_buffer}=[];
+    $self->{error_buffer}=[];
+}
+
 sub _logMessage
 {
     my($self,$message)=@_;
@@ -725,7 +911,9 @@ Writes an info message to the log
 sub info
 {
     my($self,$message)=@_;
-    $self->logger->info($self->_logMessage($message));
+    $message=$self->_logMessage($message);
+    $self->logger->info($message);
+    push(@{$self->{info_buffer}},$message);
 }
 
 =head2 $processor->warn( $message )
@@ -737,7 +925,9 @@ Writes an warning message to the log
 sub warn
 {
     my($self,$message)=@_;
-    $self->logger->warn($self->_logMessage($message));
+    $message=$self->_logMessage($message);
+    $self->logger->warn($message);
+    push(@{$self->{warn_buffer}},$message);
 }
 
 =head2 $processor->error( $message )
@@ -749,7 +939,9 @@ Writes an error message to the log
 sub error
 {
     my($self,$message)=@_;
-    $self->logger->error($self->_logMessage($message));
+    $message=$self->_logMessage($message);
+    $self->logger->error($message);
+    push(@{$self->{error_buffer}},$message);
 }
 
 =head2 $processor->year
@@ -995,6 +1187,9 @@ __END__
  #
  # If a directory is not specified these are assumed to be in the same directory
  # as the configuration file
+ 
+ # =======================================================================
+ # The following items may be run by the runScripts function
  #
  # If "none" then no script is run.
  # If more than one script is to be run these can included using a <<EOD heredoc.
@@ -1002,9 +1197,62 @@ __END__
  # If the script name is prefixed with perl: then it will be run as a perl script 
  # in the context of the processor using the perl "do" function, otherwise it 
  # will run as a normal command.
+ # The postrun_script has success or failure options.  If these are not explicitly
+ # defined for the actual status then the generic postrun_script will be used.
  
  prerun_script  none
  postrun_script none
+ postrun_script_success none
+ postrun_script_fail none
+
+ # =======================================================================
+ # The following items may be used by the sendNotification function
+ #
+ # Email configuration.  Defines how messages are sent
+ # 
+ # SMTP server to use (can include :port)
+ 
+ notification_smtp_server
+
+ # File from which server credentials are read.  If not specified then the
+ # script will assume that none is required.  The server name/port may also
+ # be read from this file if it is defined and exists.
+ # The file is formatted as:
+ #
+ # server the_server
+ # user the_user
+ # password xxxxxxx
+
+ notification_auth_file
+
+ # Address to send notifications to.  May include multiple address separated
+ # by commas
+
+ notification_email_address
+
+ # Address from which the notification is sent
+
+ notification_from_address
+
+ # Notification subject line. Notifications may be sent on success or failure.  The
+ # subject will be taken from the status specific message if it is defined, otherwise
+ # the generic message.  If both are blank then no message is sent for the status
+
+ notification_subject
+ notification_success_subject
+ notification_fail_subject
+
+ # Notification message text. Notifications may be sent on success or failure.  The
+ # text will be taken from the status specific message if it is defined, otherwise
+ # the generic message.  If both are blank then no message is sent for the status
+ #
+ # The text can include [text] for text included in the sendNotification function
+ # call, [info], [warning], and [error] for corresponding information recorded when
+ # processing the current day
+
+ notification_text
+ notification_success_text
+ notification_fail_text
 
  #end_config
  

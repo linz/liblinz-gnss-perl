@@ -87,20 +87,7 @@ eval
         print "Processor not started because stop file $stop_file is present\n".
         print "Use -S option to restart.\n";
     }
-    $processor->runProcessor( sub {
-        my $prescripts=$processor->get('prerun_script');
-        my $ok=1;
-        $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
-        return $ok if ! $ok;
-        my $bernok=1;
-        if( $processor->get('pcf'))
-        {
-            $bernok=$processor->runBernesePcf();
-        }
-        my $postscripts=$processor->get('postrun_script');
-        $ok=$processor->runScripts($postscripts) if $postscripts !~ /^\s*none\s*$/i;
-        return $bernok && $ok;
-        });
+    $processor->runProcessor();
 };
 if( $@ )
 {

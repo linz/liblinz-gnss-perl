@@ -54,6 +54,8 @@ if( $pattern )
 {
     $pattern =~ s/\./\\./g;
     $pattern =~ s/\#/\\d/g;
+    $pattern =~ s/\?/./g;
+    $pattern =~ s/\*/.*/g;
     $pattern='(^|[\\\\\\/])'.$pattern;
     $pattern = '('.$pattern.')$';
 }
@@ -230,7 +232,8 @@ over-ridden.
 
 Defines a pattern identifying the SINEX file to process (only 
 applies if the directory option is specified).  The pattern 
-can include # to represent any digit.  If not specified then
+can include # to represent any digit, ? to represent any character,
+and * to represent any sequence of characters.  If not specified then
 any file ending .SNX or .SNX.gz will be processed.
 
 =item -x

@@ -1,3 +1,14 @@
+liblinz-gnss-perl (1.26.0-1) trusty; urgency=medium
+
+  * Updating SinexFile to scan more efficiently and to read .gz files directly
+  * Adding start and end obs dates to SinexFile
+  * Adding new script sinex_to_db
+  * Updating GNSS module documentation
+  * Improving filename pattern
+  * Improving processing scripts
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 26 Jun 2015 10:46:00 +1200
+
 liblinz-gnss-perl (1.25.0-1) trusty; urgency=medium
 
   * Fixing compression of CODE rapid files and default directories of same

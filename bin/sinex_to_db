@@ -1,0 +1,243 @@
+#!/usr/bin/perl
+#
+#  Script to extract data from SINEX file into an Sqlite database
+#  Records the station coords and (station only) covariance for each
+#  station in the SINEX file.  
+
+use strict;
+use Getopt::Std;
+use DBI;
+use File::Find;
+use LINZ::GNSS::SinexFile;
+use LINZ::GNSS::Time qw/seconds_datetime/;
+
+my $create_sql=<<END_SQL;
+create table mark_coordinate
+(
+    code varchar(4) not null,
+    solution_type varchar(20) not null,
+    epoch datetime not null,
+    X double not null,
+    Y double not null,
+    Z double not null,
+    CXX double not null,
+    CXY double not null,
+    CYY double not null,
+    CXZ double not null,
+    CYZ double not null,
+    CZZ double not null,
+    primary key (code, solution_type, epoch )
+)
+END_SQL
+
+my $insert_sql=<<END_SQL;
+insert or replace into mark_coordinate (
+    code, solution_type, epoch,
+    X, Y, Z, CXX, CXY, CYY, CXZ, CYZ, CZZ
+    ) values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+END_SQL
+
+my $count_sql='select count(*) from mark_coordinate';
+
+my %opts;
+getopts('p:xhv',\%opts);
+
+help(!$opts{h}) if $opts{h} || ! @ARGV;
+
+my $verbose=$opts{v};
+my $pattern=$opts{p};
+my $needcvr= ! $opts{x};
+
+my ($dbfile,$solntype,@snxfiles)=@ARGV;
+
+if( $pattern )
+{
+    $pattern =~ s/\./\\./g;
+    $pattern =~ s/\#/\\d/g;
+    $pattern='(^|[\\\\\\/])'.$pattern;
+    $pattern = '('.$pattern.')$';
+}
+else
+{ 
+    $pattern='\\.snx(?:\\.gz)?$';
+}
+my $filere;
+eval
+{
+    $filere=qr/$pattern/i;
+};
+if( $@ )
+{
+    print "Invalid file pattern $pattern\n";
+}
+
+my $dbh=openDb($dbfile);
+
+print "Loading mark coordinate data into $dbfile\n" if $verbose;
+
+foreach my $snxfile (@snxfiles)
+{
+    if( ! -e $snxfile )
+    {
+        print "Sinex file $snxfile does not exist\n";
+        next;
+    }
+    elsif( -d $snxfile )
+    {
+        loadDir($dbh,$snxfile,$filere,$solntype,$needcvr);
+        next;
+    }
+    else
+    {
+        loadFile($dbh,$snxfile,$solntype,$needcvr);
+    }
+}
+
+$dbh->disconnect();
+
+sub openDb
+{
+    my( $dbfile ) = @_;
+    my $newfile= ! -f $dbfile;
+    my $dbh=DBI->connect("dbi:SQLite:dbname=$dbfile","","",{AutoCommit=>0})
+        || die "Cannot open $dbfile as an SQLite database\n";
+    if( $newfile )
+    {
+        $dbh->do($create_sql) || die "Cannot create mark_coordinate table in $dbfile\n" ;
+        $dbh->commit();
+    }
+    my $sth=$dbh->prepare($insert_sql) || die "Cannot insert data into $dbfile - invalid database\n";
+    $sth->finish;
+    return $dbh;
+}
+
+sub loadDir
+{
+    my($dbh,$dirname,$filere,$solntype,$needcvr) = @_;
+    my $nfile=0;
+    my @files=();
+    find( {
+            wanted=> sub { 
+                push(@files,$_) if -f $_ && /$filere/;
+            },
+            no_chdir=>1,
+        }, $dirname );
+    foreach my $file (sort @files)
+    {
+        $nfile++ if loadFile($dbh,$file,$solntype,$needcvr); 
+    }
+    print "\n$nfile files loaded from directory $dirname\n" if $verbose;
+}
+
+sub countData
+{
+    my ($dbh)=@_;
+    my ($count)=$dbh->selectrow_array($count_sql);
+    return $count;
+}
+
+sub loadFile
+{
+    my( $dbh, $sinexfile, $solntype, $needcvr ) = @_;
+    print "Loading $sinexfile\n" if $verbose;
+
+    my $snx;
+    eval
+    {
+        $snx=LINZ::GNSS::SinexFile->new( $sinexfile, need_covariance=>$needcvr );
+    };
+    if( $@ )
+    {
+        print "Cannot load $sinexfile\n  $@\n";
+        return 0;
+    }
+    my $count=countData($dbh);
+    my $nstn=0;
+    my $sth=$dbh->prepare($insert_sql);
+    foreach my $stn ($snx->stations())
+    {
+        $nstn++;
+        my $xyz=$stn->{xyz};
+        my $cvr=$stn->{covar};
+        my $epoch=seconds_datetime($stn->{epoch});
+        $sth->execute(
+            $stn->{code}, 
+            $solntype, 
+            $epoch,
+            $xyz->[0], 
+            $xyz->[1], 
+            $xyz->[2],
+            $cvr->[0]->[0], 
+            $cvr->[1]->[0], 
+            $cvr->[1]->[1], 
+            $cvr->[2]->[0],
+            $cvr->[2]->[1],
+            $cvr->[2]->[2],
+        );
+    }
+    $sth->finish;
+    $dbh->commit;
+    if( $verbose )
+    {
+        $count = countData($dbh) - $count;
+        print "    Loaded $nstn stations";
+        print " ($count new records)" if $count < $nstn;
+        print "\n";
+    }
+    return $nstn;
+}
+
+sub help
+{
+    my ($brief)=@_;
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
+    {
+        -verbose=>$brief ? 99 : 2,
+        -sections=>'Synopsis',
+        -exitval=>2,
+    });
+}
+
+__DATA__
+
+=head1 Name
+
+sinex_to_db - extract coordinate information from SINEX into database
+
+=head1 Synopsis
+
+    sinex_to_db [-x] database solution_type sinex_file ...
+    sinex_to_db [-p pattern] [-x] database solution_type directory
+    sinex_to_db -h
+
+=head1 Description
+
+Extracts the coordinate and covariance information from a SINEX
+file into an Sqlite database.  If a directory is specified then 
+tries to identify all the SINEX files in the directory.
+
+Each coordinate is associated with a station code, solution epoch,
+and solution type (the solution type is specified on the command
+line).  This defines a unique key, and existing solutions will be
+over-ridden.
+
+=head1 Options
+
+=over
+
+=item -p pattern
+
+Defines a pattern identifying the SINEX file to process (only 
+applies if the directory option is specified).  The pattern 
+can include # to represent any digit.  If not specified then
+any file ending .SNX or .SNX.gz will be processed.
+
+=item -x
+
+Accept SINEX files without covariance information
+
+=back
+
+=cut
+

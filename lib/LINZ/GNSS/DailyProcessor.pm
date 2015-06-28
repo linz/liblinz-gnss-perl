@@ -482,6 +482,20 @@ sub sendNotification
 
     return if $subject eq '';
 
+
+    # Construct the email message
+
+    my $emailheader="To: $email\nFrom: $from\nSubject: $subject\n\n";
+
+    $emailtext =~ s/\[text\]/$text/;
+    my $info=join("\n",@{$self->{info_buffer}});
+    my $warn=join("\n",@{$self->{warn_buffer}});
+    my $error=join("\n",@{$self->{error_buffer}});
+
+    $emailtext =~ s/\[info\]/$info/;
+    $emailtext =~ s/\[warning\]/$warn/;
+    $emailtext =~ s/\[error\]/$error/;
+
     # Read authentication..
     my $user='';
     my $pwd='';
@@ -515,9 +529,10 @@ sub sendNotification
 
     # Have we got a server defined ...
 
-    if( ! $server )
+    if( ! $server || lc($server) eq 'none' )
     {
-        $self->error("Cannot send notification as notification_smtp_server is not defined\n");
+        $self->error("Cannot send notification as notification_smtp_server is not defined\n".
+            "$emailheader$emailtext");
         return;
     }
 
@@ -525,19 +540,6 @@ sub sendNotification
     
     my @recipients=split(/\,/,$email);
     foreach my $r (@recipients) { $r =~ s/^\s+//; $r =~ s/\s+$//; }
-
-    # Construct the email message
-
-    my $emailheader="To: $email\nFrom: $from\nSubject: $subject\n\n";
-
-    $emailtext =~ s/\[text\]/$text/;
-    my $info=join("\n",@{$self->{info_buffer}});
-    my $warn=join("\n",@{$self->{warn_buffer}});
-    my $error=join("\n",@{$self->{error_buffer}});
-
-    $emailtext =~ s/\[info\]/$info/;
-    $emailtext =~ s/\[warning\]/$warn/;
-    $emailtext =~ s/\[error\]/$error/;
 
     # Attempt to connect to the server
 
@@ -565,6 +567,7 @@ sub sendNotification
     if( $@ )
     {
         $self->error("Error in sendNotification: $@\n");
+        $self->error("Failed to send:\n$emailheader$emailtext");
     }
 }
 

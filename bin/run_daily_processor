@@ -87,7 +87,10 @@ eval
         print "Processor not started because stop file $stop_file is present\n".
         print "Use -S option to restart.\n";
     }
-    $processor->runProcessor();
+    else
+    {
+        $processor->runProcessor();
+    }
 };
 if( $@ )
 {

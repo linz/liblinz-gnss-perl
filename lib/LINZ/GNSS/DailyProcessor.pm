@@ -362,7 +362,7 @@ sub runProcessorScript
         $self->info("Running script $script\n");
         my @cmd=($exe,@params);
         IPC::Run::run(\@cmd,\$in,\$out,\$err);
-        $self->info($out) if $in;
+        $self->info($out) if $out;
         $self->error($err) if $err;
         $result=1;
     }

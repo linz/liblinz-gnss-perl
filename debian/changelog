@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.26.3-1) trusty; urgency=medium
+
+  * Fixing logging of output from script runs
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 30 Jun 2015 07:36:54 +1200
+
 liblinz-gnss-perl (1.26.2-1) trusty; urgency=medium
 
   * More diagnostics

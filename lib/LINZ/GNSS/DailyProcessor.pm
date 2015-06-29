@@ -269,6 +269,7 @@ sub runBernesePcf
     $self->info("Target dir: $ENV{S}");
     my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
     my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
+    $self->info("Bernese result status: $status");
     $self->{pcfstatus}=$status;
     my $return=1;
 
@@ -303,7 +304,7 @@ sub runBernesePcf
     }
     else
     {
-        $self->info('Bernese PCF $pcf successfully run');
+        $self->info("Bernese PCF $pcf successfully run");
         my $copyfiles=$self->get('pcf_save_files','');
         if( $copyfiles )
         {
@@ -442,6 +443,7 @@ sub runScripts
     {
         my($scriptname,@params)=split(' ',$scriptdef);
         next if ! $scriptname;
+        $self->info("Running script: $scriptdef");
         if( $scriptname =~ /^perl\:/ )
         {
             $scriptname=$';
@@ -594,25 +596,25 @@ If the prescripts fail then the PCF and post scripts are not run.
 
 sub defaultProcess
 {
-    my($processor)=@_;
+    my($self)=@_;
     my $ok=0;
     eval
     {
         $ok=1;
-        my $prescripts=$processor->get('prerun_script','none');
-        $ok=$processor->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
+        my $prescripts=$self->get('prerun_script','none');
+        $ok=$self->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
 
         if( $ok )
         {
             my $bernok=1;
-            if( $processor->get('pcf'))
+            if( $self->get('pcf'))
             {
-                $bernok=$processor->runBernesePcf();
+                $bernok=$self->runBernesePcf();
             }
             my $status=$bernok ? '_success' : '_fail';
-            my $postscripts=$processor->get("postrun_script$status",
-                $processor->get("postrun_script","none"));
-            $ok=$processor->runScripts($postscripts) if $postscripts !~ /^\s*(none\s*)?$/i;
+            my $postscripts=$self->get("postrun_script$status",
+                $self->get("postrun_script","none"));
+            $ok=$self->runScripts($postscripts) if $postscripts !~ /^\s*(none\s*)?$/i;
             $ok = $bernok && $ok;
         }
     };
@@ -620,7 +622,7 @@ sub defaultProcess
     {
         $ok=0;
     }
-    $processor->sendNotification( $ok );
+    $self->sendNotification( $ok );
 
     return $ok;
 }

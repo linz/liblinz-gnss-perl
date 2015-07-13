@@ -33,6 +33,10 @@ Options can include
 
 Obtain the full coordinate covariance matrix.
 
+=item need_covariance
+
+Set to 0 if covariance information is not required
+
 =back
 
 =cut 
@@ -63,6 +67,14 @@ The four character code of the station (the SINEX site code)
 =item solnid
 
 The solution id for the site - each site can have multiple soutions
+
+=item name
+
+The monument id from the site/id section
+
+=item description
+
+The description of the station from the site/id section
 
 =item epoch 
 
@@ -157,6 +169,8 @@ The standard error of unit weight
 
 =back
 
+This will be empty if the SINEX file does not contain a SOLUTION/STATISTICS block.
+
 =cut
 
 sub stats
@@ -211,19 +225,24 @@ sub _scan
     $self->{obs_start_date}=$self->_sinexDateToTimestamp(substr($header,32,12));
     $self->{obs_end_date}=$self->_sinexDateToTimestamp(substr($header,45,12));
 
+    my $needcvr=exists $options{need_covariance} && ! $options{need_covariance};
+
     my $blocks={
-        'SOLUTION/STATISTICS'=>0,
+        'SITE/ID'=>0, 
+        'SOLUTION/STATISTICS'=>1, # Statistics are treated as optional
         'SOLUTION/EPOCHS'=>0,
         'SOLUTION/ESTIMATE'=>0,
-        'SOLUTION/MATRIX_ESTIMATE L COVA'=>exists $options{need_covariance} && ! $options{need_covariance},
+        'SOLUTION/MATRIX_ESTIMATE L COVA'=>$needcvr,
     };
     while( my $block=$self->_findNextBlock($sf) )
     {
         $blocks->{$block}=1 if
+            ($block eq 'SITE/ID' && $self->_scanSiteId($sf)) ||
             ($block eq 'SOLUTION/STATISTICS' && $self->_scanStats($sf)) ||
             ($block eq 'SOLUTION/EPOCHS' && $self->_scanEpochs($sf)) ||
             ($block eq 'SOLUTION/ESTIMATE' && $self->_scanSolutionEstimate($sf)) ||
-            ($block eq 'SOLUTION/MATRIX_ESTIMATE L COVA' && $self->_scanCovar($sf,$options{full_covariance}));
+            ($block eq 'SOLUTION/MATRIX_ESTIMATE L COVA' &&
+                ($options{skip_covariance} || $self->_scanCovar($sf,$options{full_covariance})));
     }
 
     foreach my $block (sort keys %$blocks)
@@ -258,6 +277,42 @@ sub _trim
     $value=~s/\s+$//;
     $value=~s/^\s+//;
     return $value;
+}
+
+sub _scanSiteId
+{
+    my ($self,$sf)=@_;
+    my $siteids={};
+    $self->{siteids}=$siteids;
+    my $prms=$self->{solnprms};
+    while( my $line=<$sf> )
+    {
+        my $ctl=substr($line,0,1);
+        last if $ctl eq '-';
+        next if $ctl eq '*';
+        if( $ctl eq '+' )
+        {
+            carp("Invalid SINEX file - SITE/ID not terminated\n");
+            last;
+        }
+        croak("Invalid SITE/ID line $line in ".$self->{filename}."\n")
+        if $line !~ /^
+             \s([\s\w]{4})  # point id
+             \s([\s\w]{2})  # point code
+             \s([\s\w]{9})  # monument id
+             \s\w           # Observation techniques
+             \s(.{22})      # description
+             \s([\s\-\d]{3}\s[\s\d]{2}\s[\s\d\.]{4}) # longitude DMS
+             \s([\s\-\d]{3}\s[\s\d]{2}\s[\s\d\.]{4}) # latitude DMS
+             \s([\s\d\.\-]{7})                       # height
+             \s*$/ix;
+
+        my ($mcode,$ptid,$name,$description)=
+           (_trim($1),_trim($2),_trim($3),_trim($4));
+
+        $siteids->{$mcode}->{$ptid}={name=>$name,description=>$description};
+    }
+    return 1;
 }
 
 sub _scanStats
@@ -316,7 +371,25 @@ sub _compileStationList
 {
     my($self)=@_;
     my $stations=$self->{stations};
-    my @solnstns=();
+    # Copy across information from site ids
+    my $siteids=$self->{siteids};
+    foreach my $stn (values %$stations)
+    {
+        foreach my $stn (values %$stn)
+        {
+            my $code=$stn->{code};
+            my $solnid=$stn->{solnid};
+            $solnid =~ s/\:.*//;
+            my $siteid=$siteids->{$code}->{$solnid};
+            if( $siteid )
+            {
+                while(my ($k,$v)=each %$siteid){ $stn->{$k}=$v; }
+            }
+        }
+    }
+
+    # Form a list of stations with estimated coordinates
+    my @solnstns;
     foreach my $k (%$stations)
     {
         push(@solnstns,grep {$_->{estimated}} values %{$stations->{$k}});
@@ -351,15 +424,15 @@ sub _scanSolutionEstimate
         if $line !~ /^
              \s([\s\d]{5})  # param id
              \s([\s\w]{6})  # param type
-             \s([\s\w]{4})  # point id
-             \s([\s\w]{2})  # point code
+             \s([\s\w]{4}|\-\-\-\-)  # point id
+             \s([\s\w]{2}|\-\-)  # point code
              \s([\s\w]{4})  # solution id
              \s(\d\d\:\d\d\d\:\d\d\d\d\d) #parameter epoch
-             \s([\s\w]{4})  # param units
+             \s([\s\w\/]{4})  # param units
              \s([\s\w]{1})  # param cnstraints
              \s([\s\dE\+\-\.]{21})  # param value
              \s([\s\dE\+\-\.]{11})  # param stddev
-             \s*$/x;
+             \s*$/ix;
 
         my ($id,$ptype,$mcode,$solnid,$epoch,$value)=
            (_trim($1)+0,_trim($2),_trim($3),_trim($4).':'._trim($5),_trim($6),_trim($9)+0);
@@ -410,7 +483,7 @@ sub _scanCovar
             \s([\s\dE\+\-\.]{21})
             (?:\s([\s\dE\+\-\.]{21}))?
             (?:\s([\s\dE\+\-\.]{21}))?
-            /x;
+            /ix;
         my ($p0,$p1,$cvc)=($1+0,$2+0,[_trim($3),_trim($4),_trim($5)]);
         next if ! exists $prms->{$p0};
         my $prm=$prms->{$p0};

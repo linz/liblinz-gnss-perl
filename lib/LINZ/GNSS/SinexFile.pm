@@ -426,7 +426,7 @@ sub _scanSolutionEstimate
              \s([\s\w]{6})  # param type
              \s([\s\w]{4}|\-\-\-\-)  # point id
              \s([\s\w]{2}|\-\-)  # point code
-             \s([\s\w]{4})  # solution id
+             \s([\s\w]{4}|\-\-\-\-)  # solution id
              \s(\d\d\:\d\d\d\:\d\d\d\d\d) #parameter epoch
              \s([\s\w\/]{4})  # param units
              \s([\s\w]{1})  # param cnstraints

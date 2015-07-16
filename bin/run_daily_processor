@@ -57,7 +57,7 @@ if( $opts{f} )
 }
 push(@params,'start_date='.$opts{s}) if $opts{s};
 push(@params,'end_date='.$opts{e}) if $opts{e};
-push(@params,'max_days_per_run='.$opts{m}) if $opts{m};
+push(@params,'max_days_processed_per_run='.$opts{m}) if $opts{m};
 
 eval
 {

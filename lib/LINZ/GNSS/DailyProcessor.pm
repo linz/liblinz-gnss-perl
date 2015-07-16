@@ -73,7 +73,7 @@ sub runProcessor
     $increment > 0 || die "date_increment must be greater than 0\n";
     my $runtime=time();
     my $maxruntime=$self->get('max_runtime');
-    my $maxdaysperrun=$self->get('max_days_per_run','0');
+    my $maxdaysprocperrun=$self->get('max_days_processed_per_run','0');
     $maxruntime=($1*60+$2)*60 if $maxruntime=~ /^(\d\d?)\:(\d\d)$/;
     # Set max run time to 1000 days if not specified or 0
     $maxruntime=1000*$SECS_PER_DAY if $maxruntime==0;
@@ -116,7 +116,6 @@ sub runProcessor
         my($year,$day)= $self->setYearDay($date);
 
         my $targetdir=$self->get('target_directory');
-        $self->makePath($targetdir);
         $self->set('target',$targetdir);
 
         # Set up the processor enviromnent
@@ -167,12 +166,13 @@ sub runProcessor
         
         next if $self->locked();
         $runno++;
-        if( $maxdaysperrun > 0 && $runno > $maxdaysperrun )
+        if( $maxdaysprocperrun > 0 && $runno > $maxdaysprocperrun )
         {
-            $self->warn("Daily processor cancelled: max_days_per_run exceeded");
+            $self->warn("Daily processor cancelled: max_days_processed_per_run exceeded");
             last;
         }
 
+        $self->makePath($targetdir);
         next if ! $self->lock();
         $self->cleanTarget();
         $self->clearLogBuffers();
@@ -189,7 +189,7 @@ sub runProcessor
             {
                 die "Test file $successfile not created\n";
             }
-            $self->createMarkerFile($completefile);
+            $self->createMarkerFile($completefile,1);
             $self->info("Processing completed");
             $faillist=[];
         };
@@ -197,7 +197,7 @@ sub runProcessor
         {
             my $message=$@;
             $self->warn("Processing failed: $message");
-            push(@$faillist,$self->createMarkerFile($failfile));
+            push(@$faillist,$self->createMarkerFile($failfile,1));
             if( $maxconsecutivefails && scalar(@$faillist) >= $maxconsecutivefails )
             {
                 unlink(@$faillist);
@@ -359,7 +359,7 @@ sub runBernesePcf
     {
         my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
         my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
-        $self->info("Bernese result status: $status");
+        $self->info("Bernese result status: ".$status->{status});
         $self->{pcfstatus}=$status;
 
         my $testfile=$self->get('pcf_test_success_file','');
@@ -831,18 +831,40 @@ sub makePath
     return -d $path ? 1 : 0;
 }
 
-=head2 $processor->createMarkerFile($file,$message)
+=head2 $processor->createMarkerFile($file)
 
 Creates a marker file in the current target directory
+Writes any messages from the message buffers to the file
 
 =cut
 
 sub createMarkerFile
 {
-    my($self,$file,$message)=@_;
+    my($self,$file)=@_;
     my $marker=$self->target.'/'.$file;
     open(my $mf,">",$marker);
-    print $mf $message;
+
+    if( scalar(@{$self->{error_buffer}}))
+    {
+        print $mf "\nErrors:\n  ";
+        print $mf join("\n  ",@{$self->{error_buffer}});
+        print $mf "\n";
+    }
+
+    if( scalar(@{$self->{warn_buffer}}))
+    {
+        print $mf "\nWarnings:\n  ";
+        print $mf join("\n  ",@{$self->{warn_buffer}});
+        print $mf "\n";
+    }
+
+    if( scalar(@{$self->{info_buffer}}))
+    {
+        print $mf "\nProcessing notes:\n  ";
+        print $mf join("\n  ",@{$self->{info_buffer}});
+        print $mf "\n";
+    }
+
     close($mf);
     return $marker;
 }
@@ -1205,7 +1227,7 @@ __END__
  # Maximum run time defines the latest time after the script is initiated that
  # it will start a new job. It is formatted as hh:mm
  
- max_days_per_run 0
+ max_days_processed_per_run 0
  max_runtime 0:00
 
  # Maximum consecutive failures.  If this number of consecutive failures occurs then

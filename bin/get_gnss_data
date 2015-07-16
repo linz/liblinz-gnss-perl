@@ -24,6 +24,7 @@ my %opts;
 getopts('d:f:ilshc',\%opts);
 my $dir=$opts{d} || '.';
 $dir='' if $opts{c};
+my $listonly=$opts{s};
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
@@ -34,7 +35,7 @@ if( $opts{l} )
     exit();
 }
 
-if( $opts{s} )
+if( $listonly && ! @ARGV )
 {
     print "Data may be retrieved from the following sources:\n";
     print LINZ::GNSS::DataCenter::SourceDescriptions;
@@ -75,6 +76,7 @@ eval
 {
     my $cache=LINZ::GNSS::FileCache::Cache();
 
+    my $nrequest=0;
     foreach my $argdata (@input)
     {
         my @args=split(' ',$argdata);
@@ -106,10 +108,19 @@ eval
         @stations=('NONE') if ! $request->use_station;
         while (my $s=shift @stations)
         {
+            $nrequest++;
             $request = join(' ',$type,$date,$s);
             $request = LINZ::GNSS::DataRequest::Parse($request);
             my $reqstr=$type;
             $reqstr .= " for $s" if $s && $request->use_station;
+            if( $listonly )
+            {
+                print "\n",'-'x40,"\n" if $nrequest > 1;
+                print "Request: $reqstr\n\n";
+                print LINZ::GNSS::DataCenter::SourceDescriptions($request);
+                print "\n";
+                next;
+            }
             my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
             if( $status eq COMPLETED )
             {
@@ -176,9 +187,9 @@ get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in 
 
 =head1 Synopsis
 
-    get_gnss_data [-d dirname | -c] date type [station ...]
-    get_gnss_data [-d dirname | -c] -f filename date
-    get_gnss_data [-d dirname | -c] -i date
+    get_gnss_data [-s] [-d dirname | -c] date type [station ...]
+    get_gnss_data [-s] [-d dirname | -c] -f filename date
+    get_gnss_data [-s] [-d dirname | -c] -i date
     get_gnss_data -l
     get_gnss_data -s
     get_gnss_data -h
@@ -245,7 +256,8 @@ Just list the available file types and exit
 
 =item -s
 
-Just list the data centres from which files may be retrieved
+List the data centres and file types that ahve been configured if no data is requested.  If data has
+been requested then list the files that could be downloaded to fill the request.
 
 =back
 

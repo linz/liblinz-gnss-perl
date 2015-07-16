@@ -343,20 +343,55 @@ sub AvailableStations
     return wantarray ? @stncodes : \@stncodes;
 }
 
-=head2 LINZ::GNSS::DataCenter::SourceDescriptions
+=head2 LINZ::GNSS::DataCenter::SourceDescriptions( $request )
 
 Returns a string listing the priorities data centres.
+
+If $request is not defined then returns a list of data centres and 
+what they can provide.  If $request is defined then returns the 
+data centres and URLs from which they can be retrieved
 
 =cut
 
 sub SourceDescriptions
 {
+    my ($request)=@_;
+
     my $dsc='';
     my $prefix="";
-    foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+
+    # If no request, just list the descriptions of the centres
+    if( ! defined($request) )
     {
-        $dsc .= $prefix.$center->description;
-        $prefix="\n";
+        foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+        {
+            $prefix="\n";
+            $dsc .= $prefix.$center->description();
+        }
+    }
+
+    # Otherwise find the files from each centre that will provide the data
+    else
+    {
+
+        my $uris={};
+        foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
+        {
+            my($when,$files)=$center->checkRequest($request);
+            next if ! $when;
+            my $ctrdsc .= $prefix.$center->description(1);
+            $prefix="\n";
+            foreach my $spec (@$files)
+            {
+                my $uri=$center->{uri};
+                $uri .= $spec->{path}.'/' if $spec->{path};
+                $uri .= $spec->{filename};
+                next if exists($uris->{$uri});
+                $uris->{$uri}=1;
+                $dsc .= $ctrdsc."  ".$uri."\n";
+                $ctrdsc='';
+            }
+        }
     }
     return $dsc;
 }
@@ -515,8 +550,9 @@ Returns a text description of the data center and the file types it provides
 
 sub description
 {
-    my($self)=@_;
+    my($self,$brief)=@_;
     my $dsc='Data center: '.$self->name.' ('.$self->{scheme}.'://'.$self->{host}.")\n";
+    return $dsc if $brief;
     my $usestn=0;
     my $prefix="    Data types: ";
     foreach my $ft (@{$self->filetypes->types})

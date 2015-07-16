@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.28.0-1) trusty; urgency=medium
+
+  * Fixing up using custom user files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 16 Jul 2015 21:03:54 +1200
+
 liblinz-gnss-perl (1.27.1-1) trusty; urgency=medium
 
   * Tidying up daily processor

@@ -12,6 +12,7 @@ Package: liblinz-gnss-perl
 Architecture: all
 Depends: ${misc:Depends} liblinz-geodetic-perl,
     libconfig-general-perl,
+    libarchive-zip-perl,
     libdbd-sqlite3-perl,
     libdbi-perl,
     libipc-run-perl,

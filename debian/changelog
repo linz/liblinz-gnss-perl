@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.30.0-1) trusty; urgency=medium
+
+  * Adding listing files that can be used to fill a request
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 17 Jul 2015 11:59:32 +1200
+
 liblinz-gnss-perl (1.29.2-1) trusty; urgency=medium
 
   * Fixing regex for SOLUTION/ESTIMATE section

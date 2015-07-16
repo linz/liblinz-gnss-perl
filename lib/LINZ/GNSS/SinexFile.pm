@@ -302,8 +302,8 @@ sub _scanSiteId
              \s([\s\w]{9})  # monument id
              \s\w           # Observation techniques
              \s(.{22})      # description
-             \s([\s\-\d]{3}\s[\s\d]{2}\s[\s\d\.]{4}) # longitude DMS
-             \s([\s\-\d]{3}\s[\s\d]{2}\s[\s\d\.]{4}) # latitude DMS
+             \s([\s\-\d]{3}[\-\s\d]{3}[\-\s\d\.]{5}) # longitude DMS
+             \s([\s\-\d]{3}[\-\s\d]{3}[\-\s\d\.]{5}) # latitude DMS
              \s([\s\d\.\-]{7})                       # height
              \s*$/ix;
 

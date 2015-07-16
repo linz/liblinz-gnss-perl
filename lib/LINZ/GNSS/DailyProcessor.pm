@@ -15,6 +15,8 @@ use strict;
 
 package LINZ::GNSS::DailyProcessor;
 use Carp;
+use Archive::Zip qw/ :ERROR_CODES /;
+use Cwd qw/abs_path/;
 use File::Path qw/make_path remove_tree/;
 use File::Which;
 use File::Copy;
@@ -45,6 +47,7 @@ may be used to identify an alternative configuration (see LINZ::GNSS::Config)
 sub new
 {
     my($class,$cfgfile,@args)=@_;
+    $cfgfile=abs_path($cfgfile);
     my $cfg=LINZ::GNSS::Config->new($cfgfile,@args);
     my $self={cfg=>$cfg,vars=>{},loggers=>{}};
     return bless $self,$class;
@@ -149,7 +152,9 @@ sub runProcessor
         my $skip=0;
         foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
         {
-            if(! -e $targetdir.'/'.$prerequisite )
+            my $pfile=$prerequisite;
+            $pfile=$targetdir.'/'.$pfile if $pfile !~ /^[\/\\]/;
+            if(! -e $pfile )
             {
                 $self->info("Skipping $year $day as $prerequisite not found");
                 $skip=1;
@@ -217,7 +222,7 @@ sub setPcfParams
 
 =head2 $self->runBernesePcf($pcf,$pcf_params)
 
-Utility routine for running a Bernese PCF .  Accepts the name of a PCF file 
+UtilGity routine for running a Bernese PCF .  Accepts the name of a PCF file 
 and PCF parameters (formatted as a string "var=value var=value ..."). If
 either is not supplied then values are taken from the processor configuration.
 
@@ -238,6 +243,7 @@ sub runBernesePcf
     # If params is defined then use (which allows overriding default params with none)
     $pcf_params //= $self->get('pcf_params');
     my $pcf_cpu=$self->get('pcf_cpufile','UNIX'); 
+    my $return=1;
 
     require LINZ::BERN::BernUtil;
 
@@ -251,70 +257,187 @@ sub runBernesePcf
         CpuFile=>$pcf_cpu,
         );
 
-    my $start=$self->timestamp;
-    my $end=$start+$SECS_PER_DAY-1;
-    my $campaign=LINZ::BERN::BernUtil::CreateCampaign(
-        $pcf,
-        CanOverwrite=>1,
-        SetSession=>[$start,$end],
-        MakeSessionFile=>1,  # Daily session file
-        UseStandardSessions=>1,
-        );
-    $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
-    my $campdir=$campaign->{CAMPAIGN};
-    $campdir =~ s/\$\{(\w+)\}/$ENV{$1}/eg;
-    $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
-    $self->setPcfParams($pcf_params,$campaign->{variables});
-    $self->info("Campaign dir: $campdir");
-    $self->info("Target dir: $ENV{S}");
-    my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
-    my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
-    $self->info("Bernese result status: $status");
-    $self->{pcfstatus}=$status;
-    my $return=1;
-
-    my $testfile=$self->get('pcf_test_success_file','');
-
-    if( $status->{status} ne 'OK' )
+    # Has the script requested any user files to be installed..
+    # More than one file can be specified
+    
+    my $zipfiles=$self->get('pcf_user_zip_file','');
+    foreach my $zipfile (split(' ',$zipfiles))
     {
-        $self->warn(join(': ',"Bernese PCF $pcf failed",
-            $status->{fail_pid},
-            $status->{fail_script},
-            $status->{fail_prog},
-            $status->{fail_message}
-        ));
-        my $copydir=$self->get('pcf_fail_copy_dir','');
-        if( $copydir )
+        my $userdir=$ENV{U};
+        my $zip=Archive::Zip->new();
+        if( $zip->read($zipfile) != AZ_OK )
         {
-            my $copytarget=$targetdir.'/'.$copydir;
-            my $copysource=$campdir;
-            if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
+            $self->error("Cannot open GPSUSER zip file $zipfile");
+            $return=0;
+            last;
+        }
+
+        foreach my $m ($zip->members())
+        {
+            if( $m->isTextFile() || $m->isBinaryFile() )
             {
-                $self->error("Failed to copy $copysource to $copytarget");
+                my $filename=$m->fileName();
+                my $extname = $userdir;
+                $extname .= '/' if $filename !~ /^\//;
+                $extname .= $filename;
+                if( $m->extractToFileNamed($extname) != AZ_OK )
+                {
+                    $self->error("Cannot extract $filename from $zipfile");
+                    $return=0;
+                }
             }
         }
-    
-        $return=0;
+        last if ! $return;
+        $self->info("Installed $zipfile into user directory");
     }
-    elsif( $testfile && ! -e "$campdir/$testfile" )
+
+    # If OK, then create a campaign and run the PCF
+
+    my( $start,$end,$campaign,$campdir);
+    if( $return )
     {
-        $status->{status} = 'FAIL';
-        $self->warn("PCF required output file $testfile not built - run failed");
-        $return=0;
+        $start=$self->timestamp;
+        $end=$start+$SECS_PER_DAY-1;
+        $campaign=LINZ::BERN::BernUtil::CreateCampaign(
+            $pcf,
+            CanOverwrite=>1,
+            SetSession=>[$start,$end],
+            MakeSessionFile=>1,  # Daily session file
+            UseStandardSessions=>1,
+            );
+        $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
+        $campdir=$campaign->{CAMPAIGN};
+        $campdir =~ s/\$\{(\w+)\}/$ENV{$1}/eg;
+        $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
+        $self->setPcfParams($pcf_params,$campaign->{variables});
+        $self->info("Campaign dir: $campdir");
+        $self->info("Target dir: $ENV{S}");
     }
-    else
+
+    if( $return )
     {
-        $self->info("Bernese PCF $pcf successfully run");
-        my $copyfiles=$self->get('pcf_save_files','');
-        if( $copyfiles )
+        # Install campaign files
+        foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files')))
         {
-            foreach my $file (split(' ',$copyfiles))
+            next if $cfdef =~ /^\s*$/;
+            if( $cfdef !~ /^\s*(\w.*?)\s+(\w+)(?:\s+(uncompress))?\s*$/i )
             {
-                my $src="$campdir/$file";
-                my $target=$file;
-                $target =~ s/.*[\\\/]//;
-                $target="$targetdir/$target";
-                File::Copy::copy($src,$target) if -e $src;
+                $self->error("Invalid pcf_campaign_file definition: $cfdef");
+                $return=0;
+                last;
+            }
+            my($filename,$dir,$uncompress) = ($1,$2);
+            my $filedir=$campdir.'/'.$dir;
+            if( ! -d $filedir )
+            {
+                $self->error("Invalid target directory $dir in pcf_campaign_file definition: $cfdef");
+                $return=0;
+            }
+            my @files=($filename);
+            @files=glob($filename) if $filename =~ /[\*\?]/;
+            foreach my $file (@files)
+            {
+                if( ! -f $file )
+                {
+                    $self->error("Cannot find pcf_campaign_file $file");
+                    $return=0;
+                    next;
+                }
+                my $copy=$file;
+                $copy=~ s/.*[\\\/]//;
+                $copy=$filedir.'/'.$copy;
+                if( ! copy($file,$copy) )
+                {
+                    $self->error("Cannot copy pcf_campaign_file $file to $dir");
+                    $return=0;
+                }
+                if( $uncompress && $copy =~ /^(.*)\.(gz|Z)$/ )
+                {
+                    my ($uncompfile,$type)=($1,$2);
+                    my $prog=$type eq 'gz' ? 'gzip' : 'compress';
+                    my $progexe=File::Which::which($prog);
+                    if( ! $prog )
+                    {
+                        $self->error("Cannot find compression program $prog");
+                        $return=0;
+                        next;
+                    }
+                    system($progexe,'-d',$copy);
+                    $copy=$uncompfile;
+                    if( ! -f $copy )
+                    {
+                        $self->error("Failed to uncompress $file");
+                        $return=0;
+                        next;
+                    }
+                }
+                $copy =~ s/.*[\\\/]//;
+                $self->info("Installed $copy into campaign $dir directory"); 
+            }
+        }
+     }
+
+    if( $return )
+    {
+        my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
+        my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
+        $self->info("Bernese result status: $status");
+        $self->{pcfstatus}=$status;
+
+        my $testfile=$self->get('pcf_test_success_file','');
+
+        if( $status->{status} ne 'OK' )
+        {
+            $self->warn(join(': ',"Bernese PCF $pcf failed",
+                $status->{fail_pid},
+                $status->{fail_script},
+                $status->{fail_prog},
+                $status->{fail_message}
+            ));
+            my $copydir=$self->get('pcf_fail_copy_dir','');
+            if( $copydir )
+            {
+                my $copytarget=$targetdir.'/'.$copydir;
+                my $copysource=$campdir;
+                if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
+                {
+                    $self->error("Failed to copy $copysource to $copytarget");
+                }
+            }
+        
+            $return=0;
+        }
+        elsif( $testfile && ! -e "$campdir/$testfile" )
+        {
+            $status->{status} = 'FAIL';
+            $self->warn("PCF required output file $testfile not built - run failed");
+            $return=0;
+        }
+        else
+        {
+            $self->info("Bernese PCF $pcf successfully run");
+            my $copyfiles=$self->get('pcf_save_files','');
+            if( $copyfiles )
+            {
+                foreach my $file (split(' ',$copyfiles))
+                {
+                    $file =~ /(.*)(?:\:(gzip|compress))?$/i;
+                    my ($filename,$compress)=($1,$2);
+                    my $src="$campdir/$filename";
+                    my $target=$filename;
+                    $target =~ s/.*[\\\/]//;
+                    $target="$targetdir/$target";
+                    File::Copy::copy($src,$target) if -e $src;
+                    if( $compress )
+                    {
+                        my $prog=lc($compress) eq 'gzip' ? 'gzip' : 'compress';
+                        my $progexe=File::Which::which($prog);
+                        if( $progexe )
+                        {
+                            system($progexe,$target);
+                        }
+                    }
+                }
             }
         }
     }
@@ -1148,6 +1271,20 @@ __END__
  
  pcf          PNZDAILY
 
+ # ZIP file(s) containing files to unpack into user directory of the 
+ # bernese environment of the job.  (eg compiled with get_pcf_files -z)
+ 
+ pcf_user_zip_file 
+
+ # Campaign files copied before the PCF is run.  These are formatted as
+ # one file per line (use << EOD for multiple lines).  Each line consists
+ # of the name of the file to copy, and the campaign directory it goes to
+ # eg: TEST${ddd}0.${yy}O RAW.  Use * and ? wildcards to copy multiple files.
+ # Follow with "uncompress" to uncompress gzipped (.gz) 
+ # or compress (.Z) files. (Assumes the file names are terminated .gz or .Z)
+ 
+ pcf_campaign_files
+
  # The name of the CPU file that will be used (default is UNIX.CPU)
  
  pcf_cpufile  UNIX
@@ -1163,6 +1300,7 @@ __END__
  pcf_test_success_file
 
  # Files that will be copied to the target directory if the PCF succeeds
+ # File can be suffixed ':gzip' or ':compress' to compress them after copying.
  
  pcf_save_files   BPE/PNZDAILY.OUT
 
@@ -1209,6 +1347,20 @@ __END__
  postrun_script none
  postrun_script_success none
  postrun_script_fail none
+
+ # =======================================================================
+ # Log settings are managed by the LINZ::GNSS::Config module. 
+ 
+ logdir
+ logfile
+ logsettings info
+
+ # The logsettings can include the string [logfilename] which will be substituted with the name built from
+ # logdir and logfile.
+ #
+ # Instead of a full Log::Log4perl definition logsettings can simply be the log level, one of trace, debug,
+ # info, warn, error, or fatal.
+
 
  # =======================================================================
  # The following items may be used by the sendNotification function

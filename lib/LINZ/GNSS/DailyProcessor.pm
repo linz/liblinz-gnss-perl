@@ -250,45 +250,23 @@ sub runBernesePcf
     # Create a Bernese environment.  Ensrue that the SAVEDISK area is redirected
     # to the target directory for the daily processing.
 
-    my $targetdir=File::Spec->rel2abs($self->target);
-    my $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
-        CanOverwrite=>1,
-        EnvironmentVariables=>{S=>$targetdir},
-        CpuFile=>$pcf_cpu,
-        );
-
-    # Has the script requested any user files to be installed..
-    # More than one file can be specified
-    
-    my $zipfiles=$self->get('pcf_user_zip_file','');
-    foreach my $zipfile (split(' ',$zipfiles))
+    my ($targetdir,$environment);
+    eval
     {
-        my $userdir=$ENV{U};
-        my $zip=Archive::Zip->new();
-        if( $zip->read($zipfile) != AZ_OK )
-        {
-            $self->error("Cannot open GPSUSER zip file $zipfile");
-            $return=0;
-            last;
-        }
+        my $zipfiles=$self->get('pcf_user_zip_file','');
+        $targetdir=File::Spec->rel2abs($self->target);
+        $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
+            CanOverwrite=>1,
+            EnvironmentVariables=>{S=>$targetdir},
+            CustomUserFiles=>$zipfiles,
+            CpuFile=>$pcf_cpu,
+            );
+    };
 
-        foreach my $m ($zip->members())
-        {
-            if( $m->isTextFile() || $m->isBinaryFile() )
-            {
-                my $filename=$m->fileName();
-                my $extname = $userdir;
-                $extname .= '/' if $filename !~ /^\//;
-                $extname .= $filename;
-                if( $m->extractToFileNamed($extname) != AZ_OK )
-                {
-                    $self->error("Cannot extract $filename from $zipfile");
-                    $return=0;
-                }
-            }
-        }
-        last if ! $return;
-        $self->info("Installed $zipfile into user directory");
+    if( $@ )
+    {
+        $self->fail($@);
+        $return=0;
     }
 
     # If OK, then create a campaign and run the PCF
@@ -320,13 +298,13 @@ sub runBernesePcf
         foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files')))
         {
             next if $cfdef =~ /^\s*$/;
-            if( $cfdef !~ /^\s*(\w.*?)\s+(\w+)(?:\s+(uncompress))?\s*$/i )
+            if( $cfdef !~ /^\s*(\S.*?)\s+(\w+)(?:\s+(uncompress))?\s*$/i )
             {
                 $self->error("Invalid pcf_campaign_file definition: $cfdef");
                 $return=0;
                 last;
             }
-            my($filename,$dir,$uncompress) = ($1,$2);
+            my($filename,$dir,$uncompress) = ($1,$2,$3);
             my $filedir=$campdir.'/'.$dir;
             if( ! -d $filedir )
             {
@@ -421,7 +399,7 @@ sub runBernesePcf
             {
                 foreach my $file (split(' ',$copyfiles))
                 {
-                    $file =~ /(.*)(?:\:(gzip|compress))?$/i;
+                    $file =~ /(.*?)(?:\:(gzip|compress))?$/i;
                     my ($filename,$compress)=($1,$2);
                     my $src="$campdir/$filename";
                     my $target=$filename;

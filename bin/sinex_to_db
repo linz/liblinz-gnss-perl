@@ -209,8 +209,8 @@ sinex_to_db - extract coordinate information from SINEX into database
 
 =head1 Synopsis
 
-    sinex_to_db [-x] database solution_type sinex_file ...
-    sinex_to_db [-p pattern] [-x] database solution_type directory
+    sinex_to_db [-v] [-x] database solution_type sinex_file ...
+    sinex_to_db [-p pattern] [-v] [-x] database solution_type directory
     sinex_to_db -h
 
 =head1 Description
@@ -241,6 +241,10 @@ any file ending .SNX or .SNX.gz will be processed.
 Accept SINEX files without covariance information
 
 =back
+
+=item -v
+
+Verbose mode
 
 =cut
 

@@ -424,9 +424,9 @@ sub _scanSolutionEstimate
         if $line !~ /^
              \s([\s\d]{5})  # param id
              \s([\s\w]{6})  # param type
-             \s([\s\w]{4}|\-\-\-\-)  # point id
-             \s([\s\w]{2}|\-\-)  # point code
-             \s([\s\w]{4}|\-\-\-\-)  # solution id
+             \s([\s\w]{4}|[\s\-]{4})  # point id
+             \s([\s\w]{2}|[\s\-]{2})  # point code
+             \s([\s\w]{4}|[\s\-]{4})  # solution id
              \s(\d\d\:\d\d\d\:\d\d\d\d\d) #parameter epoch
              \s([\s\w\/]{4})  # param units
              \s([\s\w]{1})  # param cnstraints

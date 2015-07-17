@@ -540,7 +540,7 @@ sub _scanEpochs
         if $line !~ /^
             \s([\s\w]{4})  # point id
             \s([\s\w]{2})  # point code
-            \s([\s\w]{4})  # solution id
+            \s([\s\w\-]{4})  # solution id
             \s(\w)           # to be determined!
             \s(\d\d\:\d\d\d\:\d\d\d\d\d) # start epoch
             \s(\d\d\:\d\d\d\:\d\d\d\d\d) # end epoch

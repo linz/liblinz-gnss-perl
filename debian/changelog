@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.30.2-1) trusty; urgency=medium
+
+  * More loosening of Sinex regex
+  * Updating sinex_to_db documentation
+  * Allow pcf_campaign_files setting in daily processor to be optional
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 20 Jul 2015 10:02:26 +1200
+
 liblinz-gnss-perl (1.30.1-1) trusty; urgency=medium
 
   * More generality in SOLUTION/ESTIMATE regex

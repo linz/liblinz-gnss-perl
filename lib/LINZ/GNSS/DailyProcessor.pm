@@ -295,7 +295,7 @@ sub runBernesePcf
     if( $return )
     {
         # Install campaign files
-        foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files')))
+        foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
         {
             next if $cfdef =~ /^\s*$/;
             if( $cfdef !~ /^\s*(\S.*?)\s+(\w+)(?:\s+(uncompress))?\s*$/i )

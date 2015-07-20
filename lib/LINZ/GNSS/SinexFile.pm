@@ -17,6 +17,7 @@ package LINZ::GNSS::SinexFile;
 
 use LINZ::GNSS::Time qw/yearday_seconds/;
 use LINZ::Geodetic::Ellipsoid;
+use File::Which;
 use PerlIO::gzip;
 use Carp;
 
@@ -200,12 +201,23 @@ sub _open
     my $stats={};
     my $station={};
 
-    my $mode="<";
-    if( $filename =~ /\.gz$/ )
+    my $sf;
+    if( $filename =~ /\.Z$/ )
     {
-        $mode="<:gzip";
+        my $compress=which('compress');
+        croak("Cannot find compress program to open SINEX file\n") if ! $compress;
+        my $cmd="$compress -c -d \"$filename\" |";
+        open( $sf, $cmd ) || croak("Cannot open SINEX file $filename\n");
     }
-    open( my $sf, $mode, $filename ) || croak("Cannot open SINEX file $filename\n");
+    else
+    {
+        my $mode="<";
+        if( $filename =~ /\.gz$/ )
+        {
+            $mode="<:gzip";
+        }
+        open( $sf, $mode, $filename ) || croak("Cannot open SINEX file $filename\n");
+    }
     return $sf;
 }
 

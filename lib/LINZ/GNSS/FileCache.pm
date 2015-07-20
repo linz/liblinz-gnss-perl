@@ -404,7 +404,7 @@ sub retrieveRequest
         ($status, $when, $downloaded) = $self->datacenter->getData( $request, $target );
         if( $status ne COMPLETED )
         {
-            croak("LINZ::GNSS:FileCache: failed to retrieve completed request\n");
+            $self->_logger->warn("Failed to retrieve completed request");
         }
         $self->deleteRequest( $request );
     }

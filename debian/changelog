@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.31.0-1) trusty; urgency=medium
+
+  * Adding Compress format to those handled by SinexFile
+  * Changing FileCache to not die for errors in downloaded file (eg corrupt compressed files)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 21 Jul 2015 10:44:16 +1200
+
 liblinz-gnss-perl (1.30.2-1) trusty; urgency=medium
 
   * More loosening of Sinex regex

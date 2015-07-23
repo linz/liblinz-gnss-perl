@@ -100,10 +100,8 @@ An array hash of array hashes defining the 3x3 covariance matrix
 sub stations
 {
     my($self)=@_;
-    my @codes=sort {$a->{code} cmp $b->{code}} values %{$self->{stations}};
-    my @stations  = map {sort {$a->{solnid} cmp $b->{solnid}} values %$_} @codes;
-    @stations = sort {_cmpstn($a) cmp _cmpstn($b)} @stations;
-    return wantarray ? @stations : \@stations;
+    my $stations=$self->{solnstns};
+    return wantarray ? @$stations : $stations;
 }
 
 =head2 $stn=$sf->station($code,$solnid)
@@ -406,12 +404,21 @@ sub _compileStationList
     {
         push(@solnstns,grep {$_->{estimated}} values %{$stations->{$k}});
     }
+
+
+    # Form parameter numbers for solution coordinates in covariance matrix
+    # and copy back to stations
+
+    $stations={};
     my $prmoffset=0;
-    foreach my $sstn (sort {_cmpstn($a) cmp _cmpstn($b)} @solnstns)
+    @solnstns=sort {_cmpstn($a) cmp _cmpstn($b)} @solnstns;
+    foreach my $sstn (@solnstns)
     {
         $sstn->{prmoffset}=$prmoffset;
         $prmoffset += 3;
+        $stations->{$sstn->{code}}->{$sstn->{solnid}}=$sstn;
     }
+    $self->{stations}=$stations;
     $self->{solnstns}=\@solnstns;
     $self->{nparam}=$prmoffset;
 }
@@ -455,6 +462,7 @@ sub _scanSolutionEstimate
         my $pno=index('XYZ',$1);
         $stn->{xyz}->[$pno]=$value;
         $stn->{estimated}=1;
+        $stn->{epoch}=$self->_sinexDateToTimestamp($epoch);
         $prms->{$id}={stn=>$stn,pno=>$pno};
     }
     $self->_compileStationList();

@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.31.1-1) trusty; urgency=medium
+
+  * Updating to use solution/estimate timestamp and remove extraneous solutions from solution/epoch
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 23 Jul 2015 12:51:09 +1200
+
 liblinz-gnss-perl (1.31.0-1) trusty; urgency=medium
 
   * Adding Compress format to those handled by SinexFile

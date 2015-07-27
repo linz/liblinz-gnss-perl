@@ -1,4 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/perl 
+
+eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
+    if 0; # not running under some shell
 
 =head1 gnss_ftp_mirror
 
@@ -69,6 +72,7 @@ use strict;
 use Getopt::Std;
 use URI;
 use Net::FTP;
+use Cwd;
 use File::Path;
 use File::Copy;
 use Config::General;
@@ -141,6 +145,7 @@ $allcodes = 1 if ! %$validcodes;
 my $remotedir=$config{remotedir};
 my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
+my $postdownloadcommand=$config{postdownloadcommand};
 
 my $startdate=parse_gnss_date("now-$startage");
 my $enddate=parse_gnss_date("now-$endage");
@@ -153,16 +158,17 @@ my $ftp=new FtpConnection( %config );
 if( $verbose )
 {
     print "------------------------------------------\n";
-    print  "Mirror GNSS data  ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
-    print  "Configuration:    $conffile\n";
-    printf "Remote host:      %s\n",$ftp->host;
-    printf "Remote user:      %s\n",$ftp->user;
-    printf "Remote base dir:  %s\n",$ftp->basedir;
-    print  "Remote directory: $remotedir\n";
-    print  "Remote file RE:   $remotefilere\n";
-    print  "Target file path: $targetpath\n";
-    printf "Start date:       %04d:%03d\n",seconds_yearday($startdate);
-    printf "End date:         %04d:%03d\n",seconds_yearday($enddate);
+    print  "Mirror GNSS data       ",strftime("%Y:%m:%d %H:%M:%S",localtime),"\n"; 
+    print  "Configuration:         $conffile\n";
+    printf "Remote host:           %s\n",$ftp->host;
+    printf "Remote user:           %s\n",$ftp->user;
+    printf "Remote base dir:       %s\n",$ftp->basedir;
+    print  "Remote directory:      $remotedir\n";
+    print  "Remote file RE:        $remotefilere\n";
+    print  "Target file path:      $targetpath\n";
+    print  "Post download command: $postdownloadcommand\n";
+    printf "Start date:            %04d:%03d\n",seconds_yearday($startdate);
+    printf "End date:              %04d:%03d\n",seconds_yearday($enddate);
     if( $maxruntime > 0 )
     {
         printf "Max run time:     %.1f minutes\n",$maxruntime/60;
@@ -189,12 +195,24 @@ $targetpath =~ s/^\~/$confdir/;
 my @months=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
 my @umonths=();
 my @ccmonths=();
+my @fullmonths=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
+my @ufmonths=();
+my @cfmonths=();
+
 foreach my $mon (@months) 
 {
     push(@umonths,uc($mon));
     my $ccmon=$mon;
     substr($ccmon,0,1)=uc(substr($ccmon,0,1));
     push(@ccmonths,uc($mon));
+}
+
+foreach my $mon (@fullmonths) 
+{
+    push(@ufmonths,uc($mon));
+    my $ccmon=$mon;
+    substr($ccmon,0,1)=uc(substr($ccmon,0,1));
+    push(@cfmonths,uc($mon));
 }
 
 # @valid_dates is a list of possible date options that can be matched against fields directory/filenames.
@@ -214,6 +232,9 @@ for( my $i = $startdate; $i <= $enddate; $i += $SECS_PER_DAY )
             mmm=>$months[$mm-1],
             MMM=>$umonths[$mm-1],
             Mmm=>$ccmonths[$mm-1],
+            mmmm=>$fullmonths[$mm-1],
+            MMMM=>$ufmonths[$mm-1],
+            Mmmm=>$cfmonths[$mm-1],
         });
 }
 
@@ -229,7 +250,8 @@ my %patterns=(
     'MMM' =>  '('.join('|',@umonths).')',
     'dd'  =>  '\d\d',
     'ddd' =>  '\d\d\d',
-    'code' => '[a-zA-Z0-9]{4}',
+    'code' => '[a-z0-9]{4}',
+    'CODE' => '[A-Z0-9]{4}',
 );
 
 my @dirparts;
@@ -280,13 +302,19 @@ sub filteredOptions
     my $re=$dirpart->{re};
     my %fieldvalues=();
     return [] if $dirname !~ /$re/;
+    my $code;
     foreach my $f (@$fields)
     {
         $fieldvalues{$f}=$+{$f};
+        if(lc($f) eq 'code')
+        {
+            $fieldvalues{CODE}=uc($fieldvalues{$f});
+            $fieldvalues{code}=lc($fieldvalues{$f});
+            $code=$fieldvalues{CODE};
+        }
     }
 
-    my $code=$fieldvalues{code};
-    return [] if $code ne '' && ! $allcodes && ! $validcodes->{uc($code)};
+    return [] if $code ne '' && ! $allcodes && ! $validcodes->{$code};
 
     my @matches=();
 
@@ -295,11 +323,11 @@ sub filteredOptions
         my $ok=1;
         foreach my $k (@$fields)
         {
-            next if exists $opt->{$k} && $opt->{$k} ne $fieldvalues{$k};
+            next if (! exists $opt->{$k}) || ($opt->{$k} eq $fieldvalues{$k});
             $ok = 0;
             last;
         }
-        next if $ok;
+        next if ! $ok;
         my %match=%$opt;
         while ( my ($k,$v) = each %fieldvalues ) { $match{$k}=$v; }
         push( @matches, \%match );
@@ -359,9 +387,12 @@ sub downloadDir
         # If not then fail the download.
 
         my $target='';
+        my $command='';
         foreach my $opt (@$opts)
         {
             my $tgtname=$targetpath;
+            my $cmd=$postdownloadcommand;
+
             $opt->{filename} = $file;
             $tgtname =~ s/\{(\w+)\}/$opt->{$1}/eg;
             if( $tgtname =~ /\{\w+\}/ )
@@ -377,6 +408,21 @@ sub downloadDir
                 last;
             }
             $target = $tgtname;
+
+            $cmd =~ s/\{(\w+)\}/$opt->{$1}/eg;
+            if( $cmd =~ /\{\w+\}/ )
+            {
+                print "** Unresolved postdownload script $cmd for $dirname/$file\n";
+                $target='';
+                last;
+            }
+            if( $command && $command ne $cmd )
+            {
+                print "** Ambiguous target name for $dirname/$file ($cmd,$command)\n";
+                $target='';
+                last;
+            }
+            $command=$cmd
         }
         next if ! $target;
 
@@ -429,6 +475,22 @@ sub downloadDir
         else
         {
             print "Successfully downloaded $target\n" if $verbose;
+            if( $command )
+            {
+                print "Running $command\n" if $verbose;
+                my $cwd=getcwd;
+                chdir($tgtpath);
+                my @command=split(' ',$command);
+                eval
+                {
+                    system(@command);
+                };
+                if( $@ )
+                {
+                    print $@;
+                }
+                chdir($cwd);
+            }
         }
     }
     print "** Job terminated - maximum run time expired\n" if $expired;
@@ -681,10 +743,13 @@ __END__
  
  # RemotePath is the path to the files to download.
  #
- # Can include {yyyy},{yy},{mmm},{mm},{ddd},{dd} which will map to 
- # the corresponding date strings (mmm is 3 letter month name. Will
- # also accept Mmm, MMM for different capitalisation).  Also {code} 
- # which will match a valid code (or all four character codes if selected)
+ # Can include {yyyy},{yy},{mmmm}, {mmm},{mm},{ddd},{dd} which will map to 
+ # the corresponding date strings (mmm is 3 letter month name, mmmm is the 
+ # full month name). Will also accept Mmm, MMM, Mmmm, MMMM for different 
+ # capitalisation.
+
+ # Also can accept {code} or {CODE} for upper or lower case four character
+ # codes which will match a valid code (ignoring case).
  # 
  # These will be replaced with values corresponding to the maximum number
  # of days before the current date to process.  Can also include ? for any
@@ -705,6 +770,12 @@ __END__
  # as for RemovePath.  Can also include {filename} to use the source filename.
  
  TargetPath=~/{yyyy}/{ddd}/{filename}
+
+ # Processing script. Command to run once a file has been downloaded.  The script
+ # is run in the target directory.  The command can include parameters, and can
+ # include the replacement strings for filename, code, etc.
+ 
+ PostDownloadCommand process_downloaded_file.sh {filename}
  
  # Codes to download.  Use Codes * (or omit codes altogether), to download
  # all available codes.

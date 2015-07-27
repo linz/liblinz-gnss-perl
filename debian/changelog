@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.32.0-1) trusty; urgency=medium
+
+  * gnss_ftp_mirror - bug fix and adding post download command option
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 27 Jul 2015 13:07:05 +1200
+
 liblinz-gnss-perl (1.31.1-1) trusty; urgency=medium
 
   * Updating to use solution/estimate timestamp and remove extraneous solutions from solution/epoch

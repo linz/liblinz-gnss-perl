@@ -145,6 +145,7 @@ $allcodes = 1 if ! %$validcodes;
 my $remotedir=$config{remotedir};
 my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
+my $markerpath=$config{markerpath};
 my $postdownloadcommand=$config{postdownloadcommand};
 
 my $startdate=parse_gnss_date("now-$startage");
@@ -166,6 +167,7 @@ if( $verbose )
     print  "Remote directory:      $remotedir\n";
     print  "Remote file RE:        $remotefilere\n";
     print  "Target file path:      $targetpath\n";
+    print  "Marker file path:      $markerpath\n";
     print  "Post download command: $postdownloadcommand\n";
     printf "Start date:            %04d:%03d\n",seconds_yearday($startdate);
     printf "End date:              %04d:%03d\n",seconds_yearday($enddate);
@@ -191,6 +193,7 @@ select(STDOUT);
 $|=1;
 
 $targetpath =~ s/^\~/$confdir/;
+$markerpath =~ s/^\~/$confdir/;
 
 my @months=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
 my @umonths=();
@@ -335,6 +338,30 @@ sub filteredOptions
     return \@matches;
 }
 
+sub expandTarget
+{
+    my ($opts,$file,$template,$variable,$location)=@_;
+    my $result='';
+    foreach my $opt (@$opts)
+    {
+        $opt->{filename} = $file;
+        my $value=$template;
+        $value =~ s/\{(\w+)\}/$opt->{$1}/eg;
+        if( $value =~ /\{\w+\}/ )
+        {
+            print "** Unresolved $variable name $value for $location\n";
+            return;
+        }
+        if( $result && $value ne $result )
+        {
+            print "** Ambiguous $variable for $location ($result,$value)\n";
+            return;
+        }
+        $result = $value;
+    }
+return $result;
+}
+
 sub downloadDir
 {
     my( $ftp, $dirname, $options, $dirparts ) = @_;
@@ -386,45 +413,13 @@ sub downloadDir
         # remaining, so make sure that if so they uniquely define a target name.
         # If not then fail the download.
 
-        my $target='';
-        my $command='';
-        foreach my $opt (@$opts)
-        {
-            my $tgtname=$targetpath;
-            my $cmd=$postdownloadcommand;
+        my $target=expandTarget($opts,$file,$targetpath,'target file name',"$dirname/$file");
+        my $marker=expandTarget($opts,$file,$markerpath,'marker file name',"$dirname/$file");
+        my $command=expandTarget($opts,$file,$postdownloadcommand,'marker file name',"$dirname/$file");
 
-            $opt->{filename} = $file;
-            $tgtname =~ s/\{(\w+)\}/$opt->{$1}/eg;
-            if( $tgtname =~ /\{\w+\}/ )
-            {
-                print "** Unresolved target file name $tgtname for $dirname/$file\n";
-                $target='';
-                last;
-            }
-            if( $target && $tgtname ne $target )
-            {
-                print "** Ambiguous target name for $dirname/$file ($target,$tgtname)\n";
-                $target='';
-                last;
-            }
-            $target = $tgtname;
-
-            $cmd =~ s/\{(\w+)\}/$opt->{$1}/eg;
-            if( $cmd =~ /\{\w+\}/ )
-            {
-                print "** Unresolved postdownload script $cmd for $dirname/$file\n";
-                $target='';
-                last;
-            }
-            if( $command && $command ne $cmd )
-            {
-                print "** Ambiguous target name for $dirname/$file ($cmd,$command)\n";
-                $target='';
-                last;
-            }
-            $command=$cmd
-        }
+        next if ! defined($target) || ! defined($marker) || ! defined($command);
         next if ! $target;
+
 
         # Now try and download the file
         if( -e $target )
@@ -438,6 +433,20 @@ sub downloadDir
             if( (! $ignoresize) && ($files->{$file}->{size} == -s $target) )
             {
                 print "$target is already available and of the correct size\n" if $verbose > 1;
+                next;
+            }
+        }
+        if( ! $ignoresize && $marker && -f $marker )
+        {
+            my $size=0;
+            if( open(my $mf, "<$marker") )
+            {
+                $size=<$mf>+0;
+                close($mf);
+            }
+            if( $files->{$file}->{size} == $size )
+            {
+                print "$target marker file present and shows correct size\n" if $verbose > 1;
                 next;
             }
         }
@@ -480,16 +489,26 @@ sub downloadDir
                 print "Running $command\n" if $verbose;
                 my $cwd=getcwd;
                 chdir($tgtpath);
-                my @command=split(' ',$command);
-                eval
+                foreach my $cmdline (split(/\n/,$command) )
                 {
-                    system(@command);
-                };
-                if( $@ )
-                {
-                    print $@;
+                    my @command=split(' ',$cmdline);
+                    next if ! @command;
+                    eval
+                    {
+                        system(@command);
+                    };
+                    if( $@ )
+                    {
+                        print $@;
+                    }
                 }
                 chdir($cwd);
+            }
+            if( $marker )
+            {
+                open(my $mf, ">$marker" );
+                print $mf $files->{$file}->{size};
+                close($mf);
             }
         }
     }
@@ -770,6 +789,14 @@ __END__
  # as for RemovePath.  Can also include {filename} to use the source filename.
  
  TargetPath=~/{yyyy}/{ddd}/{filename}
+
+ # Marker file.  By default the script checks for the existence of the target 
+ # file.  If it exists and is of the correct size it is downloaded again.  The 
+ # script can instead use a marker file into which the downloaded size is written.
+ # This allows the downloaded file to be removed or otherwise changed without 
+ # being reprocessed.
+ 
+ MarkerPath=~/{yyyy}/{ddd}/{filename}.downloaded
 
  # Processing script. Command to run once a file has been downloaded.  The script
  # is run in the target directory.  The command can include parameters, and can

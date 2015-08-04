@@ -1230,6 +1230,7 @@ __END__
  # characters 
  # ${yyyy} and ${ddd} expand to the currently processing day and year, and
  # otherwise are invalid. Also ${mm} and ${dd} for month and day number.
+ # Date variables can be offset by a number of days, eg ${yyyy+14}
  #
  # A variable can be substituted with results for multiple days by 
  # the syntax

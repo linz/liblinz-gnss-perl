@@ -59,6 +59,9 @@ The following variables are defined:
 The date values are by default based on the current time, but can be reset
 using the setDate function. They are in terms of gmtime.
 
+Each of the time variables can also be offset by a number of days, eg
+${yyyy+14} ${ddd+14}
+
 =back
 
 =cut
@@ -70,7 +73,7 @@ package LINZ::GNSS::Config;
 use Carp;
 use Config::General qw/ParseConfig/;
 use Log::Log4perl qw(:easy);
-use LINZ::GNSS::Time qw/parse_gnss_date/;
+use LINZ::GNSS::Time qw/parse_gnss_date $SECS_PER_DAY/;
 
 =head2 $cfg=LINZ::GNSS::Config->new($cfgfile,@overrides)
 
@@ -144,6 +147,43 @@ sub _set
     $self->{args}->{$key}=$value;
 }
 
+=head2 $cfg->timeVariables( $timestamp, $offset )
+
+Returns a hash with the values used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
+Optionally can take an offset in days.
+
+=cut
+
+sub timeVariables
+{
+    my($self,$timestamp,$offset)=@_;
+    $offset //= 0;
+    $timestamp += $offset * $SECS_PER_DAY;
+    my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
+    my $yyyy=sprintf("%04d",$year+1900);
+    my $vars={};
+    $vars->{'yyyy'}=$yyyy;
+    $vars->{'yy'}=substr($yyyy,2);
+    $vars->{'mm'}=sprintf("%02d",$mon+1);
+    $vars->{'dd'}=sprintf("%02d",$day);
+    $vars->{'ddd'}=sprintf("%03d",$yday+1);
+    return $vars;
+}
+
+=head2 $cfg->getTimeVariable( $key, $offset )
+
+Returns the time variable offset by $offset days
+
+=cut
+
+sub getTimeVariable
+{
+    my($self,$key,$offset)=@_;
+    my $vars=$self->timeVariables($self->get('timestamp'),$offset);
+    return $vars->{$key} if exists $vars->{$key};
+    croak("Invalid time variable $key in configuration ".$self->{configfile});
+}
+
 =head2 $cfg->setTime( $timestamp )
 
 Sets the time used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
@@ -153,14 +193,12 @@ Sets the time used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
 sub setTime
 {
     my($self,$timestamp)=@_;
-    my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
-    my $yyyy=sprintf("%04d",$year+1900);
-    $self->_set('yyyy',$yyyy);
-    $self->_set('yy',substr($yyyy,2));
-    $self->_set('mm',sprintf("%02d",$mon+1));
-    $self->_set('dd',sprintf("%02d",$day));
-    $self->_set('ddd',sprintf("%03d",$yday+1));
-    return $self;
+    my $vars=$self->timeVariables($timestamp);
+    $self->_set('timestamp',$timestamp);
+    while( my ($k,$v) = each %$vars )
+    {
+        $self->_set($k,$v);
+    }
 }
 
 =head2 $cfg->getRaw( $var )
@@ -212,9 +250,10 @@ sub get
     my( $self, $key, $default ) = @_;
     my $value=$self->getRaw($key,$default);
     my $maxexpand=5;
-    while( $value=~ /\$\{\w+\}/ && $maxexpand-- > 0)
+    while( $value=~ /\$\{\w+(?:[+-]\d+)?\}/ && $maxexpand-- > 0)
     {
         $value =~ s/\$\{(\w+)\}/$self->getRaw($1)/eg;
+        $value =~ s/\$\{(\w+)([+-]\d+)\}/$self->getTimeVariable($1,$2)/eg;
     }
     return $value;
 }

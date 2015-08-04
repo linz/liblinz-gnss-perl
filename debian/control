@@ -25,7 +25,7 @@ Depends: ${misc:Depends} liblinz-geodetic-perl,
     libtime-local-perl,
     libfile-which-perl,
     libfile-copy-recursive-perl,
-    libperlio-gzip0-perl,
+    libperlio-gzip-perl,
     linz-rinex-rnxcmp,
     gzip,
     ncompress

@@ -15,6 +15,7 @@ use strict;
 
 package LINZ::GNSS::DailyProcessor;
 use Carp;
+use Cwd;
 use Archive::Zip qw/ :ERROR_CODES /;
 use Cwd qw/abs_path/;
 use File::Path qw/make_path remove_tree/;
@@ -97,7 +98,6 @@ sub runProcessor
     for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY*$increment )
     {
         last if $terminate;
-
         # Test for a stop file ..
        
         if( $stopfile && -e $stopfile )
@@ -118,94 +118,114 @@ sub runProcessor
         my $targetdir=$self->get('target_directory');
         $self->set('target',$targetdir);
 
-        # Set up the processor enviromnent
-        $ENV{PROCESSOR_TARGET_DIR}=$targetdir;
-        $ENV{PROCESSOR_YEAR}=$year;
-        $ENV{PROCESSOR_DOY}=$day;
-
-        # Are we skipping this directory?
-
-        my $skipping=0;
-        foreach my $skipfile (@skipfiles)
-        {
-            next if ! $self->markerFileExists($skipfile);
-            $skipping=1;
-            last;
-        }
-        next if $skipping;
-
-        $self->deleteMarkerFiles($completefile,$failfile) if $rerun;
-
-        # Has this directory already been processed?
-        next if $self->markerFileExists($completefile);
-
-        # Did it fail but is not ready to rerun
-        if( $self->markerFileExists($failfile) )
-        {
-            next if $date < $retry_max_age;
-            next if -M $targetdir.'/'.$failfile < $retry_interval_days;
-            $self->deleteMarkerFiles($failfile);
-        }
-       
-        # Do we have prerequisite files
-        my $skip=0;
-        foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
-        {
-            my $pfile=$prerequisite;
-            $pfile=$targetdir.'/'.$pfile if $pfile !~ /^[\/\\]/;
-            if(! -e $pfile )
-            {
-                $self->info("Skipping $year $day as $prerequisite not found");
-                $skip=1;
-                last;
-            }
-        }
-        next if $skip;
-
-        # Can we get a lock on the file.
-        
-        next if $self->locked();
-        $runno++;
-        if( $maxdaysprocperrun > 0 && $runno > $maxdaysprocperrun )
-        {
-            $self->warn("Daily processor cancelled: max_days_processed_per_run exceeded");
-            last;
-        }
-
-        $self->makePath($targetdir);
-        next if ! $self->lock();
-        $self->cleanTarget();
-        $self->clearLogBuffers();
-        $self->info("Processing $year $day");
         eval
         {
-            my $result=$func->($self);
-            if( ! $result )
+            # Set up the processor enviromnent
+            $ENV{PROCESSOR_TARGET_DIR}=$targetdir;
+            $ENV{PROCESSOR_YEAR}=$year;
+            $ENV{PROCESSOR_DOY}=$day;
+
+            # Are we skipping this directory?
+
+            my $skipping=0;
+            foreach my $skipfile (@skipfiles)
             {
-                die "Daily processing failed\n";
+                next if ! $self->markerFileExists($skipfile);
+                $skipping=1;
+                last;
             }
-            my $successfile=$self->get('test_success_file','');
-            if( $successfile && ! -d $self->target.'/'.$successfile )
+            next if $skipping;
+
+            $self->deleteMarkerFiles($completefile,$failfile) if $rerun;
+
+            # Has this directory already been processed?
+            next if $self->markerFileExists($completefile);
+
+            # Did it fail but is not ready to rerun
+            if( $self->markerFileExists($failfile) )
             {
-                die "Test file $successfile not created\n";
+                next if $date < $retry_max_age;
+                next if -M $targetdir.'/'.$failfile < $retry_interval_days;
+                $self->deleteMarkerFiles($failfile);
             }
-            $self->createMarkerFile($completefile,1);
-            $self->info("Processing completed");
-            $faillist=[];
+           
+            # Do we have prerequisite files
+            my $skip=0;
+            eval
+            {
+                foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
+                {
+                    my $pfile=$prerequisite;
+                    $pfile=$targetdir.'/'.$pfile if $pfile !~ /^[\/\\]/;
+                    if(! -e $pfile )
+                    {
+                        $self->info("Skipping $year $day as $prerequisite not found");
+                        $skip=1;
+                        last;
+                    }
+                }
+            };
+            if( $@ )
+            {
+                my $msg=$@;
+                $msg =~ s/\s*$//;
+                $self->info("Skipping $year $day: $msg");
+                $skip=1;
+            }
+            next if $skip;
+
+            # Can we get a lock on the file.
+            
+            next if $self->locked();
+            $runno++;
+            if( $maxdaysprocperrun > 0 && $runno > $maxdaysprocperrun )
+            {
+                $self->warn("Daily processor cancelled: max_days_processed_per_run exceeded");
+                last;
+            }
+
+            $self->makePath($targetdir);
+            next if ! $self->lock();
+            $self->cleanTarget();
+            $self->clearLogBuffers();
+            $self->info("Processing $year $day");
+            my $homedir=getcwd();
+            eval
+            {
+                chdir($targetdir);
+                my $result=$func->($self);
+                if( ! $result )
+                {
+                    die "Daily processing failed\n";
+                }
+                my $successfile=$self->get('test_success_file','');
+                if( $successfile && ! -d $self->target.'/'.$successfile )
+                {
+                    die "Test file $successfile not created\n";
+                }
+                $self->createMarkerFile($completefile,1);
+                $self->info("Processing completed");
+                $faillist=[];
+            };
+            if( $@ )
+            {
+                my $message=$@;
+                $self->warn("Processing failed: $message");
+                push(@$faillist,$self->createMarkerFile($failfile,1));
+                if( $maxconsecutivefails && scalar(@$faillist) >= $maxconsecutivefails )
+                {
+                    unlink(@$faillist);
+                    $self->warn('Processing stopped as maximum number of consecutive failures reached');
+                    $terminate = 1;
+                }
+            }
+            chdir($homedir);
         };
         if( $@ )
         {
-            my $message=$@;
-            $self->warn("Processing failed: $message");
-            push(@$faillist,$self->createMarkerFile($failfile,1));
-            if( $maxconsecutivefails && scalar(@$faillist) >= $maxconsecutivefails )
-            {
-                unlink(@$faillist);
-                $self->warn('Processing stopped as maximum number of consecutive failures reached');
-                $terminate = 1;
-            }
-
-
+            my $msg=$@;
+            $msg=~s/\s*$//;
+            $self->warn("Failed $year $day: $msg");
         }
         $self->unlock();
     }
@@ -298,21 +318,31 @@ sub runBernesePcf
         foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
         {
             next if $cfdef =~ /^\s*$/;
-            if( $cfdef !~ /^\s*(\S.*?)\s+(\w+)(?:\s+(uncompress))?\s*$/i )
+            if( $cfdef !~ /^\s*(\S.*?)(?:\s+(uncompress))?\s+(\w.*?)\s*$/i )
             {
                 $self->error("Invalid pcf_campaign_file definition: $cfdef");
                 $return=0;
                 last;
             }
-            my($filename,$dir,$uncompress) = ($1,$2,$3);
+            my($dir,$uncompress,$filename) = ($1,$2,$3);
             my $filedir=$campdir.'/'.$dir;
             if( ! -d $filedir )
             {
                 $self->error("Invalid target directory $dir in pcf_campaign_file definition: $cfdef");
                 $return=0;
             }
-            my @files=($filename);
-            @files=glob($filename) if $filename =~ /[\*\?]/;
+            my @files=();
+            foreach my $f (split(' ',$filename))
+            {
+                if( $f =~ /[\*\?]/ )
+                {
+                    push(@files,glob($filename));
+                }
+                else
+                {
+                    push(@files,$f);
+                }
+            }
             foreach my $file (@files)
             {
                 if( ! -f $file )
@@ -745,16 +775,58 @@ sub cfg
 Get a processor variable, either one define using set(), or 
 one from the configuration
 
+Also expands results that evaluate to 
+
+  for ## to ## [step #][if exists][need #] 
+
+to values for the range of date offsets from ## to ##
+
 =cut
 
-sub get
+sub getRaw
 {
     my( $self, $key, $default ) = @_;
     my $result=exists $self->{vars}->{$key} ?
            $self->{vars}->{$key} :
            $self->cfg->get($key,$default);
     $result //= '';
+
+    if( $result =~ /(for\s+(\-?\d+)\s+to\s+(\-?\d+)(?:\s+step\s+(\d+))?(?:\s+if\s+(exists))?(?:\s+need\s+(\d+))?\s+)\S/ )
+    {
+        my($prefix,$start,$end,$step,$check,$need)=($1,$2,$3,$4 // 1, $5 // 0, $6 // 0);
+        my @values=();
+        my $pfxlen=length($prefix);
+        my $timestamp=$self->get('timestamp');
+        $step = 1 if $step < 1;
+        while( $start <= $end )
+        {
+            $self->setYearDay($timestamp+$start*$SECS_PER_DAY);
+            $start += $step;
+            my $value=$self->cfg->get($key);
+            $value=substr($value,$pfxlen);
+            next if $check && ! -f $value;
+            push(@values,$value);
+        }
+        $self->setYearDay($timestamp);
+        if( $need > 0 && scalar(@values) < $need )
+        {
+            die "Not enough files found for $key\n";
+        }
+        $result=join(' ',@values);
+    }
     return $result;
+}
+
+sub get
+{
+    my( $self, $key, $default ) = @_;
+    my $value=$self->getRaw($key,$default);
+    my $maxexpand=5;
+    while( $value=~ /\$\[\w+\]/ && $maxexpand-- > 0)
+    {
+        $value =~ s/\$\[(\w+)\]/$self->getRaw($1)/eg;
+    }
+    return $value;
 }
 
 =head2 $processor->set($key,$value)
@@ -1157,7 +1229,16 @@ __END__
  # ${pid_#} expands to the process id padded with 0 or left trimmed to # 
  # characters 
  # ${yyyy} and ${ddd} expand to the currently processing day and year, and
- # otherwise are invalid. Also {mm} and {dd} for month and day number.
+ # otherwise are invalid. Also ${mm} and ${dd} for month and day number.
+ #
+ # A variable can be substituted with results for multiple days by 
+ # the syntax
+ #
+ # value for -14 to 0 [step #] [if exists] [need #] xxxxxxxxx
+ #
+ # which will return value with expanded values for the current day -14 to the
+ # current day. Note that to use value in another configuration item it must
+ # be specified as $[value] rather than with ${value}
  
  # Parameters can have alternative configuration specified by suffix -cfg.
  #
@@ -1277,11 +1358,15 @@ __END__
  pcf_user_zip_file 
 
  # Campaign files copied before the PCF is run.  These are formatted as
- # one file per line (use << EOD for multiple lines).  Each line consists
- # of the name of the file to copy, and the campaign directory it goes to
- # eg: TEST${ddd}0.${yy}O RAW.  Use * and ? wildcards to copy multiple files.
- # Follow with "uncompress" to uncompress gzipped (.gz) 
+ # one file specification per line (use << EOD for multiple lines).  
+ # Each line consists of the campaign directory (eg STA), the optional
+ # keyword "uncompress", and the name of one or more files separated by 
+ # space characteers.  
+ # Filename can contain the * and ? wildcards to copy multiple files.
+ # Use the "uncompress" keyword to uncompress gzipped (.gz) 
  # or compress (.Z) files. (Assumes the file names are terminated .gz or .Z)
+ # 
+ # eg: RAW uncompress TEST${ddd}0.${yy}O.gz
  
  pcf_campaign_files
 

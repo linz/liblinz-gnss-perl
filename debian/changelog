@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.34.0-2) trusty; urgency=medium
+
+  * Fixing perl lib dependency
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 05 Aug 2015 11:06:38 +1200
+
 liblinz-gnss-perl (1.34.0-1) trusty; urgency=medium
 
   * Adding missing dependency in debian control file

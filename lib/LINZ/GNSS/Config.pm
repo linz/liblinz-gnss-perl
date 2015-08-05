@@ -57,9 +57,9 @@ The following variables are defined:
 =back
 
 The date values are by default based on the current time, but can be reset
-using the setDate function. They are in terms of gmtime.
+using the setTime function. They are in terms of gmtime.
 
-Each of the time variables can also be offset by a number of days, eg
+Each of the variables can also be offset by a number of days, eg
 ${yyyy+14} ${ddd+14}
 
 =back
@@ -147,42 +147,6 @@ sub _set
     $self->{args}->{$key}=$value;
 }
 
-=head2 $cfg->timeVariables( $timestamp, $offset )
-
-Returns a hash with the values used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
-Optionally can take an offset in days.
-
-=cut
-
-sub timeVariables
-{
-    my($self,$timestamp,$offset)=@_;
-    $offset //= 0;
-    $timestamp += $offset * $SECS_PER_DAY;
-    my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
-    my $yyyy=sprintf("%04d",$year+1900);
-    my $vars={};
-    $vars->{'yyyy'}=$yyyy;
-    $vars->{'yy'}=substr($yyyy,2);
-    $vars->{'mm'}=sprintf("%02d",$mon+1);
-    $vars->{'dd'}=sprintf("%02d",$day);
-    $vars->{'ddd'}=sprintf("%03d",$yday+1);
-    return $vars;
-}
-
-=head2 $cfg->getTimeVariable( $key, $offset )
-
-Returns the time variable offset by $offset days
-
-=cut
-
-sub getTimeVariable
-{
-    my($self,$key,$offset)=@_;
-    my $vars=$self->timeVariables($self->get('timestamp'),$offset);
-    return $vars->{$key} if exists $vars->{$key};
-    croak("Invalid time variable $key in configuration ".$self->{configfile});
-}
 
 =head2 $cfg->setTime( $timestamp )
 
@@ -193,13 +157,16 @@ Sets the time used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
 sub setTime
 {
     my($self,$timestamp)=@_;
-    my $vars=$self->timeVariables($timestamp);
-    $self->_set('timestamp',$timestamp);
-    while( my ($k,$v) = each %$vars )
-    {
-        $self->_set($k,$v);
-    }
+    my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
+    my $yyyy=sprintf("%04d",$year+1900);
+    $self->{_timestamp}=$timestamp;
+    $self->_set('yyyy',$yyyy);
+    $self->_set('yy',substr($yyyy,2));
+    $self->_set('mm',sprintf("%02d",$mon+1));
+    $self->_set('dd',sprintf("%02d",$day));
+    $self->_set('ddd',sprintf("%03d",$yday+1));
 }
+
 
 =head2 $cfg->getRaw( $var )
 
@@ -236,10 +203,10 @@ sub getRaw
 
     return $default if defined $default;
 
-    croak("Key $key missing in configuration ".$self->{configfile});
+    die "$key missing\n";
 }
 
-=head2 $value=$cfg->get($var)
+=head2 $value=$cfg->get($var, $default)
 
 Returns the interpolated value for a variable
 
@@ -247,13 +214,40 @@ Returns the interpolated value for a variable
 
 sub get
 {
-    my( $self, $key, $default ) = @_;
-    my $value=$self->getRaw($key,$default);
-    my $maxexpand=5;
-    while( $value=~ /\$\{\w+(?:[+-]\d+)?\}/ && $maxexpand-- > 0)
+    my( $self, $key, $default, $depth, $offset ) = @_;
+    $depth //= 0;
+    $offset //=0;
+    my $maxdepth=$self->getRaw('max_config_interpolation_depth',5);
+    if( $depth > 0 && $depth > $maxdepth )
     {
-        $value =~ s/\$\{(\w+)\}/$self->getRaw($1)/eg;
-        $value =~ s/\$\{(\w+)([+-]\d+)\}/$self->getTimeVariable($1,$2)/eg;
+        die "Configuration file interpolation nesting > max_config_interpolation_depth\n";
+    }
+    my $timestamp=$self->{_timestamp};
+    if( $offset )
+    {
+        $self->setTime($timestamp+$offset*$SECS_PER_DAY);
+    }
+    my $value='';
+    eval
+    {
+        $value=$self->getRaw($key,$default);
+        my $nextdepth=$depth;
+        while( $value=~ /\$\{\w+(?:[+-]\d+)?\}/)
+        {
+            $nextdepth++;
+            $value =~ s/\$\{(\w+)\}/$self->get($1,undef,$nextdepth,0)/eg;
+            $value =~ s/\$\{(\w+)([+-]\d+)\}/$self->get($1,undef,$nextdepth,$2)/eg;
+        }
+        $self->setTime($timestamp) if $offset;
+    };
+    if( $@ )
+    {
+        $self->setTime($timestamp) if $offset;
+        my $msg=$@;
+        die $msg if $depth > 0;
+        $msg =~ s/\s*$//;
+        $msg .= ' evaluating '.$key.' in '.$self->{configfile}."\n";
+        croak($msg);
     }
     return $value;
 }

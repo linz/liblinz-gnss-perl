@@ -15,7 +15,6 @@ use strict;
 
 package LINZ::GNSS::DailyProcessor;
 use Carp;
-use Cwd;
 use Archive::Zip qw/ :ERROR_CODES /;
 use Cwd qw/abs_path/;
 use File::Path qw/make_path remove_tree/;
@@ -91,7 +90,9 @@ sub runProcessor
     my $rerun=$self->get('rerun','0');
     my $stopfile=$self->get('stop_file','');
     my $maxconsecutivefails=$self->get('max_consecutive_fails','0')+0;
+    my $maxconsecutiveskip=$self->get('max_consecutive_prerequisite_fails','0')+0;
     my $faillist=[];
+    my $nskip;
 
     my $runno=0;
     my $terminate=0;
@@ -156,7 +157,7 @@ sub runProcessor
                 foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
                 {
                     my $pfile=$prerequisite;
-                    $pfile=$targetdir.'/'.$pfile if $pfile !~ /^[\/\\]/;
+                    $pfile=~ s/^\~\//$targetdir\//;
                     if(! -e $pfile )
                     {
                         $self->info("Skipping $year $day as $prerequisite not found");
@@ -172,7 +173,17 @@ sub runProcessor
                 $self->info("Skipping $year $day: $msg");
                 $skip=1;
             }
-            next if $skip;
+            if( $skip )
+            {
+                $nskip++;
+                if( $maxconsecutiveskip && $nskip >= $maxconsecutiveskip )
+                {
+                    $self->warn('Processing stopped as maximum number of consecutive prerequisite files missing reached');
+                    last;
+                }
+                next;
+            }
+            $nskip=0;
 
             # Can we get a lock on the file.
             
@@ -189,10 +200,8 @@ sub runProcessor
             $self->cleanTarget();
             $self->clearLogBuffers();
             $self->info("Processing $year $day");
-            my $homedir=getcwd();
             eval
             {
-                chdir($targetdir);
                 my $result=$func->($self);
                 if( ! $result )
                 {
@@ -219,7 +228,6 @@ sub runProcessor
                     $terminate = 1;
                 }
             }
-            chdir($homedir);
         };
         if( $@ )
         {
@@ -1262,7 +1270,8 @@ __END__
  
  # Location of results files, status files, lock files for daily processing.
  
- target_directory ${configdir}/${yyyy}/${ddd}
+ base_dir ${configdir}
+ target_directory ${base_dir}/${yyyy}/${ddd}
  
  # Lock file - used to prevent two jobs trying to work on the same job
  # Lock expiry is the time out for the lock - a lock that is older than this
@@ -1327,10 +1336,13 @@ __END__
  
  max_consecutive_fails 0
  
- # Prerequisite file(s).  If specified then days will be skipped if their 
- # directory does not include this specified file(s)
+ # Prerequisite file(s).  If specified then days will be skipped if the
+ # specified files do not exist.  Prerequisite files can start be specified
+ # as ~/filename to specifiy a file in the target directory
  
  prerequisite_files
+
+ max_consecutive_prerequisite_fails
 
  # Clean on start setting controls which files are removed from the
  # result directory when the jobs starts.  The default is just to remove
@@ -1348,7 +1360,7 @@ __END__
 
  # File that will stop the scirpt if it exists
  
- stop_file ${configdir}/${configname}.stop
+ stop_file ${base_dir}/${configname}.stop
  
  # =======================================================================
  # The following items are used by the runBernesePcf function

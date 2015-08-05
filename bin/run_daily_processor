@@ -47,10 +47,28 @@ my $configfile=shift @ARGV;
 my @params;
 foreach my $prm (@ARGV)
 {
-    push(@params,$prm) if $prm =~ /\=/;
-    $opts{h}=1 if lc($prm) eq 'stop';
-    $opts{H}=1 if lc($prm) eq 'restart';
+    if( lc($prm) eq 'stop' )
+    {
+       $opts{h}=1;
+    } 
+    elsif(lc($prm) eq 'restart')
+    {
+        $opts{H}=1;
+    }
+    elsif($prm !~ /^\w+\=/)
+    {
+        print "Invalid option $prm: options must be entered as option=value\n";
+        exit();
+    }
+    else
+    {
+        push(@params,$prm) if $prm =~ /\=/;
+    }
 }
+ 
+# Fix up parameters accidentally entered without '='
+
+
 if( $opts{f} )
 {
     push(@params,'retry_max_age_days=0','retry_interval_days=0');

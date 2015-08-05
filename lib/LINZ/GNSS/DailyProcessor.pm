@@ -318,21 +318,28 @@ sub runBernesePcf
         foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
         {
             next if $cfdef =~ /^\s*$/;
-            if( $cfdef !~ /^\s*(\S.*?)(?:\s+(uncompress))?\s+(\w.*?)\s*$/i )
+            if( $cfdef !~ /^\s*(\w+)\s+(\w.*?)\s*$/i )
             {
                 $self->error("Invalid pcf_campaign_file definition: $cfdef");
                 $return=0;
                 last;
             }
-            my($dir,$uncompress,$filename) = ($1,$2,$3);
+            my($dir,$filename) = ($1,$2,$3);
             my $filedir=$campdir.'/'.$dir;
             if( ! -d $filedir )
             {
                 $self->error("Invalid target directory $dir in pcf_campaign_file definition: $cfdef");
                 $return=0;
             }
+            my @filenames=split(' ',$filename); 
+            my $uncompress=0;
+            if( lc($filenames[0]) eq 'uncompress')
+            {
+                shift(@filenames);
+                $uncompress=1;
+            }
             my @files=();
-            foreach my $f (split(' ',$filename))
+            foreach my $f (@filenames)
             {
                 if( $f =~ /[\*\?]/ )
                 {
@@ -1482,8 +1489,8 @@ __END__
  # the generic message.  If both are blank then no message is sent for the status
 
  notification_subject
- notification_success_subject
- notification_fail_subject
+ notification_subject_success
+ notification_subject_fail
 
  # Notification message text. Notifications may be sent on success or failure.  The
  # text will be taken from the status specific message if it is defined, otherwise
@@ -1494,8 +1501,8 @@ __END__
  # processing the current day
 
  notification_text
- notification_success_text
- notification_fail_text
+ notification_text_success
+ notification_text_fail
 
  #end_config
  

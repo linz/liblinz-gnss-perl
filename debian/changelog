@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.35.0-1) trusty; urgency=medium
+
+  * Fixing pod documentation error
+  * Fixing daily processing copy file handling
+  * Extending time offset to apply to all config items
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 06 Aug 2015 11:02:27 +1200
+
 liblinz-gnss-perl (1.34.0-2) trusty; urgency=medium
 
   * Fixing perl lib dependency

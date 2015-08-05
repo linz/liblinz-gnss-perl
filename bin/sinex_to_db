@@ -240,11 +240,11 @@ any file ending .SNX or .SNX.gz will be processed.
 
 Accept SINEX files without covariance information
 
-=back
-
 =item -v
 
 Verbose mode
+
+=back
 
 =cut
 

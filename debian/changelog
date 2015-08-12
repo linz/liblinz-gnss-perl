@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.36.1-1) trusty; urgency=medium
+
+  * Fixes around compressed rinex files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 13 Aug 2015 09:06:38 +1200
+
 liblinz-gnss-perl (1.36.0-1) trusty; urgency=medium
 
   * Adding SQLite option to scan_rinex_files

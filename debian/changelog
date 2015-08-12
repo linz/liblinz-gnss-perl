@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.36.0-1) trusty; urgency=medium
+
+  * Adding SQLite option to scan_rinex_files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 12 Aug 2015 14:49:13 +1200
+
 liblinz-gnss-perl (1.35.0-1) trusty; urgency=medium
 
   * Fixing pod documentation error

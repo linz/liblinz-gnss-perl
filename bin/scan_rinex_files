@@ -8,11 +8,13 @@ use File::Find;
 use LINZ::GNSS::RinexFile;
 use LINZ::Geodetic::Ellipsoid;
 use Getopt::Std;
+use DBI;
 
 my $opts={};
-getopts('rha',$opts);
+getopts('rhad:',$opts);
 my $recursive=$opts->{r};
 my $append=$opts->{a};
+my $sqldb=$opts->{d};
 
 help(! $opts->{h}) if $opts->{h} || ! @ARGV;
 
@@ -30,7 +32,7 @@ sub format_time
 
 sub scanRinex
 {
-    my($filename,$source,$filesize,$filedate)=@_;
+    my($filename,$source,$filesize,$filedate,$func)=@_;
     my $basename=$source;
     $basename=~s/.*[^\\\/\:]//;
     eval
@@ -40,8 +42,9 @@ sub scanRinex
         my $et=$rf->endtime;
         my $types=$rf->obstypes;
         my $llh=$grs80->geog($rf->xyz);
+        my $hen=$rf->delta_hen;
         my $ot=join(":",sort @$types);
-        print join("\t",
+        $func->(
             $basename,
             $filesize,
             format_time($filedate),
@@ -55,10 +58,13 @@ sub scanRinex
             $rf->interval,
             $rf->nobs,
             $ot,
+            $hen->[0],
+            $hen->[1],
+            $hen->[2],
             $llh->lon,
             $llh->lat,
             $source
-           ),"\n";
+           );
     };
     if( $@ )
     {
@@ -68,7 +74,7 @@ sub scanRinex
 
 sub scanFile
 {
-    my ($file,$source)=@_;
+    my ($file,$source,$func)=@_;
     if( ! -f $file )
     {
         print STDERR "Cannot open file: $file (from $source)\n" if ! -e $file;
@@ -101,7 +107,7 @@ sub scanFile
             $command=$command." > $localfile";
             system($command);
         }
-        scanRinex($localfile,$source,$filesize,$filedate);
+        scanRinex($localfile,$source,$filesize,$filedate,$func);
         unlink($localfile) if $localfile ne $file;
 
     };
@@ -113,7 +119,7 @@ sub scanFile
 
 sub scanZip
 {
-    my($zipfile)=@_;
+    my($zipfile,$func)=@_;
     eval
     {
         # print "Processing zip $zipfile\n";
@@ -123,7 +129,7 @@ sub scanZip
             my $fn=$f->fileName;
             my $localname='lrtmpzz';
             $f->extractToFileNamed($localname);
-            scanFile($localname,"$zipfile:$fn");
+            scanFile($localname,"$zipfile:$fn",$func);
             unlink $localname if -e $localname;
         }
     };
@@ -135,25 +141,25 @@ sub scanZip
 
 sub scanZipOrFile
 {
-    my ($file)=@_;
+    my ($file,$func)=@_;
     if( $file=~/$zip_re/ )
     {
-        scanZip($file);
+        scanZip($file,$func);
     }
     elsif( $file =~ /$rinex_re/ )
     {
-        scanFile($file,$file);
+        scanFile($file,$file,$func);
     }
 }
 
 sub scan
 {
-    my($file)=@_;
+    my($file,$func)=@_;
     if( -d $file )
     {
         return if ! $recursive;
         find(  {
-            wanted=>sub {scanZipOrFile($_) if -f $_},
+            wanted=>sub {scanZipOrFile($_,$func) if -f $_},
             no_chdir=>1,
             },
             $file
@@ -161,19 +167,83 @@ sub scan
     }
     else
     {
-        scanZipOrFile($file);
+        scanZipOrFile($file,$func);
     }
 
 }
 
 
+my $func;
+my $finish;
+if( $sqldb )
+{
+    my $create_sql=<<EOD;
+        create table if not exists rinex(
+            id integer primary key not null,
+            file varchar(50),
+            size integer,
+            date datetime,
+            mark varchar(4),
+            number varchar(20),
+            antenna varchar(20),
+            receiver varchar(20),
+            start_time datetime,
+            end_time datetime,
+            duration integer,
+            interval integer,
+            nobs integer,
+            obstypes varchar(200),
+            deltah double,
+            deltae double,
+            deltan double,
+            lon double,
+            lat double,
+            sourcefile varchar(255)
+            )
+EOD
+    my $insert_sql=<<EOD;
+        insert into rinex (
+            file,
+            size,
+            date,
+            mark,
+            number,
+            antenna,
+            receiver,
+            start_time,
+            end_time,
+            duration,
+            interval,
+            nobs,
+            obstypes,
+            deltah,
+            deltae,
+            deltan,
+            lon,
+            lat,
+            sourcefile) 
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+EOD
+    unlink $sqldb if -f $sqldb && ! $append;
+    my $dbh=DBI->connect("dbi:SQLite:dbname=$sqldb","","");
+    die "Cannot open SQLite database $sqldb\n" if ! $dbh;
+    $dbh->do($create_sql);
+    $func=sub{ $dbh->do($insert_sql,{},@_); };
+    $finish=sub { $dbh->disconnect(); };
+}
+else
+{
+    print "file\tsize\tdate\tmark\tnumber\tantenna\treceiver\tstart_time\tend_time\tduration\tinterval\tnobs\tobstypes\tdeltah\tdeltae\tdeltan\tlon\tlat\tsourcefile\n" if ! $append;
 
-print "file\tsize\tdate\tmark\tnumber\tantenna\treceiver\tstart_time\tend_time\tduration\tinterval\tnobs\tobstypes\tlon\tlat\tsourcefile\n" if ! $append;
+    $func=sub{ print join("\t",@_),"\n"; };
+    $finish=sub{};
+}
 
 foreach my $f (@ARGV)
 {
-    scan($f);
+    scan($f,$func);
 }
+$finish->();
 
 sub help
 {
@@ -195,7 +265,7 @@ scan_rinex_files - Summarises the contents of RINEX files.
 
 =head1 Synopsis
 
-    scan_rinex_files [-r] [-a] file_or_dir ... > files.csv
+    scan_rinex_files [-d dbfile] [-r] [-a] file_or_dir ... > files.csv
     scan_rinex_files -h
 
 =head1 Description
@@ -204,10 +274,14 @@ The scan_rinex_files command scans a specified list of files, identifying RINEX 
 summarising their content in CSV format.  The RINEX files can be Hatanaka compressed, 
 gzipped or unix compressed, and inside zip files.
 
+If the -d (database) option is specified then the data are written to an SQLite database
+file, otherwise they are written in CSV format to stdout. 
+
 If the -r (recursive) option is specified then the list of files can include
 directories that will be scanned recursively.
 
-If the -a (append) option is specified then the file header is omitted from the output.
+If the -a (append) option is specified then the file header is omitted from the output if
+writing to stdout, and the database file is not overwritten if using SQLite.
 
 =cut
 

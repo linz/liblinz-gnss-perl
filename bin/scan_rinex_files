@@ -11,10 +11,11 @@ use Getopt::Std;
 use DBI;
 
 my $opts={};
-getopts('rhad:',$opts);
+getopts('rxhad:',$opts);
 my $recursive=$opts->{r};
 my $append=$opts->{a};
 my $sqldb=$opts->{d};
+my $skipobs=$opts->{x};
 
 help(! $opts->{h}) if $opts->{h} || ! @ARGV;
 
@@ -37,7 +38,7 @@ sub scanRinex
     $basename=~s/.*[^\\\/\:]//;
     eval
     {
-        my $rf=new LINZ::GNSS::RinexFile($filename);
+        my $rf=new LINZ::GNSS::RinexFile($filename,skip_obs=>$skipobs);
         my $st=$rf->starttime;
         my $et=$rf->endtime;
         my $types=$rf->obstypes;
@@ -88,12 +89,12 @@ sub scanFile
         if( $s1 =~ /\.z$/i )
         {
             $command="compress -d < \"$file\"";
-            $s1=~ $`;
+            $s1= $`;
         }
         elsif( $s1 =~ /\.gz(ip)?$/i )
         {
             $command="gzip -d < \"$file\"";
-            $s1=~ $`;
+            $s1= $`;
         }
         if( $s1=~ /\.\d\dd$/i )
         {

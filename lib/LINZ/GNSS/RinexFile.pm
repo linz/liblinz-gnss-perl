@@ -167,6 +167,8 @@ sub _scanHeader
     my $rftype = 0;
     my $satsys = 0;
     my $version='';
+    my $hatanaka=0;
+    $self->{hatanaka}=0;
     $self->{headers}={};
     while(my $line=<$f>)
     {
@@ -176,6 +178,12 @@ sub _scanHeader
         my $rectype=_trimsub($line,60);
         if( ! $rftype )
         {
+            if( $rectype =~ /^CRINEX\s/ )
+            {
+                $hatanaka=1;
+                $self->{hatanaka}=1;
+                next;
+            }
             die("RINEX VERSION / TYPE missing in $filename\n")
                 if $rectype ne 'RINEX VERSION / TYPE';
             $version=_trimsub($line,0,20);
@@ -210,6 +218,10 @@ sub _scanObs
     my $nobs=0;
     my $lasttime;
     my $copy=1;
+    if( $self->{hatanaka} )
+    {
+        die "Scanning RINEX observations in Hatanaka compressed files not supported\n";
+    }
     while( my $line=<$f> )
     {
         next if $line =~ /^\s*$/;

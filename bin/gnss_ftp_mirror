@@ -77,13 +77,16 @@ use File::Path;
 use File::Copy;
 use Config::General;
 use POSIX qw/strftime/;
+use LINZ::RunBatch;
 use LINZ::GNSS::Time qw/parse_gnss_date seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
 
 my $syntax=<<EOD;
 
-Syntax: gnss_ftp_mirror.pl [-v] config_file
+Syntax: gnss_ftp_mirror.pl [-b|-B logfile] [options] config_file
 
 Options are:
+   -b            Run in batch mode starting with 'at now'
+   -B logfile    Run in batch mode with a specified log file
    -v            Verbose mode
    -V            Even more verbose
    -s ###        Start date to download (days before now)
@@ -274,6 +277,7 @@ my %patterns=(
     'ddd' =>  '\d\d\d',
     'code' => '[a-z0-9]{4}',
     'CODE' => '[A-Z0-9]{4}',
+    'Code' => '[A-Za-z0-9]{4}',
 );
 
 my @dirparts;
@@ -332,6 +336,7 @@ sub filteredOptions
         {
             $fieldvalues{CODE}=uc($fieldvalues{$f});
             $fieldvalues{code}=lc($fieldvalues{$f});
+            $fieldvalues{Code}=$fieldvalues{$f};
             $code=$fieldvalues{CODE};
         }
     }
@@ -791,7 +796,8 @@ __END__
  # capitalisation.
 
  # Also can accept {code} or {CODE} for upper or lower case four character
- # codes which will match a valid code (ignoring case).
+ # codes which will match a valid code. Use {Code} for a case insensitive
+ # code match.
  # 
  # These will be replaced with values corresponding to the maximum number
  # of days before the current date to process.  Can also include ? for any

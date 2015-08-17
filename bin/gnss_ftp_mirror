@@ -124,6 +124,21 @@ my %config=Config::General->new(
     -ConfigFile=>$conffile,
     -LowerCaseNames=>1,)->getall();
 
+# Expand references in configuration
+
+foreach my $k (keys(%config))
+{
+    my $v=$config{$k};
+    my $maxiterations=10;
+    while( $maxiterations > 0 )
+    {
+        my $v0=$v;
+        $v =~ s/(\{(\w+)\})/exists $config{lc($2)} ? $config{lc($2)} : $1/eg;
+        last if $v eq $v0;
+    }
+    $config{$k}=$v;
+}
+
 my $startage=($opts{s} // $config{startage})+0;
 my $endage=($opts{e} // $config{endage})+0;
 
@@ -147,6 +162,8 @@ my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
 my $markerpath=$config{markerpath};
 my $postdownloadcommand=$config{postdownloadcommand};
+my $dochdir=$config{postdownloadcommandchdir};
+$dochdir=0 if $dochdir =~ /(no|false)/i;
 
 my $startdate=parse_gnss_date("now-$startage");
 my $enddate=parse_gnss_date("now-$endage");
@@ -169,6 +186,7 @@ if( $verbose )
     print  "Target file path:      $targetpath\n";
     print  "Marker file path:      $markerpath\n";
     print  "Post download command: $postdownloadcommand\n";
+    printf "Change dir for pdc   : %s\n",$dochdir ? 'yes' : 'no';
     printf "Start date:            %04d:%03d\n",seconds_yearday($startdate);
     printf "End date:              %04d:%03d\n",seconds_yearday($enddate);
     if( $maxruntime > 0 )
@@ -194,6 +212,7 @@ $|=1;
 
 $targetpath =~ s/^\~/$confdir/;
 $markerpath =~ s/^\~/$confdir/;
+$postdownloadcommand =~ s/(^|\s)\~\//$1.$confdir.'\/'/eg;
 
 my @months=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
 my @umonths=();
@@ -417,7 +436,6 @@ sub downloadDir
         my $marker=expandTarget($opts,$file,$markerpath,'marker file name',"$dirname/$file");
         my $command=expandTarget($opts,$file,$postdownloadcommand,'marker file name',"$dirname/$file");
 
-        next if ! defined($target) || ! defined($marker) || ! defined($command);
         next if ! $target;
 
 
@@ -488,11 +506,12 @@ sub downloadDir
             {
                 print "Running $command\n" if $verbose;
                 my $cwd=getcwd;
-                chdir($tgtpath);
+                chdir($tgtpath) if $dochdir;
                 foreach my $cmdline (split(/\n/,$command) )
                 {
                     my @command=split(' ',$cmdline);
                     next if ! @command;
+                    next if $command =~ /^\s*\#/;
                     eval
                     {
                         system(@command);
@@ -728,6 +747,10 @@ __END__
 =head2 Example configuration file
  
  # Example configuration file:
+ #
+ # Note all configuration item values can contain references to other configuration
+ # item values as {xxxxx}, where xxx is the other item.  But note special values
+ # for date components and file names that should not be used.
  
  # RemoteUri is the the base of the remote directory
  
@@ -801,8 +824,12 @@ __END__
  # Processing script. Command to run once a file has been downloaded.  The script
  # is run in the target directory.  The command can include parameters, and can
  # include the replacement strings for filename, code, etc.
+ #
+ # If PostDownloadCommandChDir evaluates to true then the script changes to the 
+ # download directory to execute the command.
  
  PostDownloadCommand process_downloaded_file.sh {filename}
+ PostDownloadCommandChDir 1
  
  # Codes to download.  Use Codes * (or omit codes altogether), to download
  # all available codes.

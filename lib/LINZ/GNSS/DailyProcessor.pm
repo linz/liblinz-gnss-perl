@@ -409,7 +409,13 @@ sub runBernesePcf
 
         my $testfile=$self->get('pcf_test_success_file','');
 
-        if( $status->{status} ne 'OK' )
+        if( $status->{status} eq 'OK' && $testfile && ! -e "$campdir/$testfile" )
+        {
+            $status->{status} = 'FAIL';
+            $self->warn("PCF required output file $testfile not built - run failed");
+            $return=0;
+        }
+        elsif( $status->{status} ne 'OK' )
         {
             $self->warn(join(': ',"Bernese PCF $pcf failed",
                 $status->{fail_pid},
@@ -417,48 +423,45 @@ sub runBernesePcf
                 $status->{fail_prog},
                 $status->{fail_message}
             ));
-            my $copydir=$self->get('pcf_fail_copy_dir','');
-            if( $copydir )
-            {
-                my $copytarget=$targetdir.'/'.$copydir;
-                my $copysource=$campdir;
-                if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
-                {
-                    $self->error("Failed to copy $copysource to $copytarget");
-                }
-            }
-        
-            $return=0;
-        }
-        elsif( $testfile && ! -e "$campdir/$testfile" )
-        {
-            $status->{status} = 'FAIL';
-            $self->warn("PCF required output file $testfile not built - run failed");
             $return=0;
         }
         else
         {
             $self->info("Bernese PCF $pcf successfully run");
-            my $copyfiles=$self->get('pcf_save_files','');
-            if( $copyfiles )
+        }
+
+        my $fail=$return ? '' : '_fail';
+        my $copydir=$self->get('pcf'.$fail.'_copy_dir','');
+        my $copyfiles=$self->get('pcf'.$fail.'_save_files','');
+
+        if( $copydir )
+        {
+            my $copytarget=$targetdir.'/'.$copydir;
+            my $copysource=$campdir;
+            if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
             {
-                foreach my $file (split(' ',$copyfiles))
+                $self->error("Failed to copy $copysource to $copytarget");
+            }
+        }
+        
+        if( $copyfiles )
+        {
+            foreach my $file (split(' ',$copyfiles))
+            {
+                $file =~ /(.*?)(?:\:(gzip|compress))?$/i;
+                my ($filename,$compress)=($1,$2);
+                my $src="$campdir/$filename";
+                my $target=$filename;
+                $target =~ s/.*[\\\/]//;
+                $target="$targetdir/$target";
+                File::Copy::copy($src,$target) if -e $src;
+                if( $compress )
                 {
-                    $file =~ /(.*?)(?:\:(gzip|compress))?$/i;
-                    my ($filename,$compress)=($1,$2);
-                    my $src="$campdir/$filename";
-                    my $target=$filename;
-                    $target =~ s/.*[\\\/]//;
-                    $target="$targetdir/$target";
-                    File::Copy::copy($src,$target) if -e $src;
-                    if( $compress )
+                    my $prog=lc($compress) eq 'gzip' ? 'gzip' : 'compress';
+                    my $progexe=File::Which::which($prog);
+                    if( $progexe )
                     {
-                        my $prog=lc($compress) eq 'gzip' ? 'gzip' : 'compress';
-                        my $progexe=File::Which::which($prog);
-                        if( $progexe )
-                        {
-                            system($progexe,$target);
-                        }
+                        system($progexe,$target);
                     }
                 }
             }
@@ -1404,15 +1407,22 @@ __END__
  
  pcf_test_success_file
 
+ # Bernese output can be saved either by saving the entire directory to
+ # a specified location (relative to the target directory), or by saving 
+ # specific file.  In either case there are separate settings depending on
+ # whether the outcome was successful or not. 
+ 
  # Files that will be copied to the target directory if the PCF succeeds
  # File can be suffixed ':gzip' or ':compress' to compress them after copying.
  
  pcf_save_files   BPE/PNZDAILY.OUT
+ pcf_fail_save_files
 
  # Directory into which to copy Bernese campaign files if the PCF fails.
  # (Note: this is relative to the target directory for the daily process.
  # Files are not copied if this is not saved).
 
+ pcf_copy_dir
  pcf_fail_copy_dir fail_data
 
  # By default the Bernese runtime environment is deleted once the script has finished.

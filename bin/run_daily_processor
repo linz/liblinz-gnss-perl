@@ -10,7 +10,7 @@ use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
-getopts('hHcCfs:e:m:',\%opts);
+getopts('hHcCfs:e:t:T:m:',\%opts);
 
 if( $opts{c} || $opts{C} )
 {
@@ -37,6 +37,8 @@ Options can include
                (retry_max_age_days=0, retry_interval_days=0)
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
+   -t yyyy-ddd Test specific day - outputs to current directory, outputs debug info
+   -T dir      Test target directory - also copies bernese processing directory to dir/bernese
    -m #        Maximum number of days to process
    -h          Halt running processes by creating a "stop file" (same as "stop")
    -H          Delete the stop file and restart (same as "restart")
@@ -73,8 +75,18 @@ if( $opts{f} )
 {
     push(@params,'retry_max_age_days=0','retry_interval_days=0');
 }
-push(@params,'start_date='.$opts{s}) if $opts{s};
-push(@params,'end_date='.$opts{e}) if $opts{e};
+my $startdate=$opts{t} || $opts{s};
+my $enddate=$opts{t} || $opts{e};
+my $targetdir=$opts{T} || ($opts{t} ? '.' : '');
+die "Invalid test target directory $targetdir specified\n" if $targetdir && ! -d $targetdir;
+
+push(@params,'start_date='.$startdate) if $startdate;
+push(@params,'end_date='.$enddate) if $enddate;
+push(@params,'target_directory='.$targetdir) if $targetdir;
+push(@params,'logsettings=debug') if $opts{t};
+push(@params,'rerun=1') if $opts{t};
+push(@params,'pcf_copy_dir=bernese') if $opts{T};
+push(@params,'pcf_fail_copy_dir=bernese') if $opts{T};
 push(@params,'max_days_processed_per_run='.$opts{m}) if $opts{m};
 
 eval

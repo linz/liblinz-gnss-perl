@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.38.0-1) trusty; urgency=medium
+
+  * Adding streaming GNS stations
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 20 Nov 2015 19:54:17 +1300
+
 liblinz-gnss-perl (1.37.0-1) trusty; urgency=medium
 
   * Improve management of post download script

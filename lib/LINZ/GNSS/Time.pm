@@ -48,8 +48,8 @@ our @EXPORT = qw(
     seconds_ymdhms
     start_time_utc_day
     start_time_gnss_week
-    seconds_decimal_yr
-    decimal_yr_seconds
+    seconds_decimal_year
+    decimal_year_seconds
     localdaytime_seconds
     gnssweek_seconds
     year_seconds
@@ -60,6 +60,8 @@ our @EXPORT = qw(
     seconds_julianday
     julianday_seconds
     parse_gnss_date
+    seconds_decimal_yr
+    decimal_yr_seconds
 );
 
 our @EXPORT_OK = qw(
@@ -289,7 +291,13 @@ sub julianday_seconds
     return ($jday-40587)*(60*60*24);
 }
 
-sub seconds_decimal_yr {
+=head2 $dyear=seconds_decimal_year($seconds)
+
+Returns the date in decimal years corresponding to a timestamp
+
+=cut
+
+sub seconds_decimal_year {
     my $time = shift;
     my ($sec, $min, $hr, $day, $mon, $year) = gmtime($time);
     my $yr_start1 = $START_YR_TIMES{$year}
@@ -300,7 +308,15 @@ sub seconds_decimal_yr {
     return $year + 1900 + $decimal_days;
 }
 
-sub decimal_yr_seconds {
+sub seconds_decimal_yr { return seconds_decimal_year(@_); }
+
+=head2 $seconds=decimal_year_seconds($dyear)
+
+Returns the timestamp corresponding to a date in decimal years.
+
+=cut
+
+sub decimal_year_seconds {
     my $decimal_yr = shift;
     my $year = int($decimal_yr);
     my $dec_part = $decimal_yr - $year;
@@ -311,6 +327,7 @@ sub decimal_yr_seconds {
         || ($START_YR_TIMES{$year+1} = timegm(0, 0, 0, 1, 0, $year+1));
     return $yr_start1 + ($yr_start2  - $yr_start1) * $dec_part;
 }
+sub decimal_yr_seconds { return decimal_year_seconds(@_); }
 
 sub start_time_utc_day {
     my $time = shift;
@@ -444,6 +461,8 @@ Parses a date in one of the following formats:
    jjjjj         Julian day
    now           Right now
    now-ddd       ddd days before now
+
+If the date cannot be interpreted then croaks.
 
 =cut
 

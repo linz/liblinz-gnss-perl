@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.40.0-1) trusty; urgency=medium
+
+  * Adding option to update configuration items on the command line
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 18 Dec 2015 13:49:52 +1300
+
 liblinz-gnss-perl (1.39.0-1) trusty; urgency=medium
 
   * Minor tidying of Time.pm

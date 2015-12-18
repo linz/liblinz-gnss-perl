@@ -21,7 +21,10 @@ with dates matching the last 30 days.
 
 =head2 Synopsis:
 
- gnss_ftp_mirror.pl [options] config_file
+ gnss_ftp_mirror.pl [options] config_file [item=value ...]
+
+The parameters are the name of a configuration, and a set of configuration
+values which override the values in the configuration file.
 
 Options are:
 
@@ -82,7 +85,7 @@ use LINZ::GNSS::Time qw/parse_gnss_date seconds_yearday time_elements seconds_ym
 
 my $syntax=<<EOD;
 
-Syntax: gnss_ftp_mirror.pl [-b|-B logfile] [options] config_file
+Syntax: gnss_ftp_mirror.pl [-b|-B logfile] [options] config_file [item=value ...]
 
 Options are:
    -b            Run in batch mode starting with 'at now'
@@ -113,10 +116,18 @@ if( $opts{c} )
 my $verbose=$opts{V} ? 2 : $opts{v} ? 1 : 0;
 my $ignoresize=$opts{i};
 
-@ARGV == 1 || die $syntax;
+@ARGV >= 1 || die $syntax;
 
-my $conffile=$ARGV[0]; 
+my $conffile=shift @ARGV;
 die "Cannot find config file $conffile\n" if ! -e $conffile;
+
+my %argconfig=();
+foreach my $arg (@ARGV)
+{
+    die "Invalid configuration argument $arg: should be xxx=yyy"
+        if $arg !~ /^(\w+)\=(.*)/;
+    $argconfig{lc($1)} = $2;
+}
 
 my $confdir=$conffile;
 $confdir =~ s/[^\\\/]*$//;
@@ -126,6 +137,11 @@ $confdir = '.' if $confdir eq '';
 my %config=Config::General->new(
     -ConfigFile=>$conffile,
     -LowerCaseNames=>1,)->getall();
+
+foreach my $k (keys %argconfig)
+{
+    $config{$k}=$argconfig{$k};
+}
 
 # Expand references in configuration
 

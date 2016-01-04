@@ -11,6 +11,7 @@ format may change (particularly if GeodesyML gets adopted).
 use XML::LibXML qw/:libxml/;
 use XML::LibXML::XPathContext;
 use LINZ::GNSS::Time qw/ymdhms_seconds/;
+use Carp qw/croak/;
 
 our $IGSNamespaces={
         equip=>"http://sopac.ucsd.edu/ns/geodesy/doc/igsSiteLog/equipment/2004" ,
@@ -50,8 +51,34 @@ Open and scan the site log file.
 
 sub new
 {
-    my($class,$logxml)=@_;
+    my($class,$sitelogfile)=@_;
+    open(my $sf,"<",$sitelogfile) || croak("Cannot open IGS site log file $sitelogfile\n");
+    my $line=<$sf>;
+    close($sf);
+    my $self;
+    if( $line =~ /\s*\<\?xml\s/ )
+    {
+        $self=readXml($class,$sitelogfile);
+    }
+    else
+    {
+        croak("Current LINZ::GNSS::IGSSiteLog can only read XML formatted site logs");
+    }
+    my $source=$sitelogfile;
+    $source =~ s/.*[\\\/]//;
+    $self->{source}=$source;
+    return $self;
+}
 
+=head2 $sitelog=LINZ::GNSS::IGSSiteLog->readXml( $xmlfilename )
+
+Open and scan an XML site log file.
+
+=cut
+
+sub readXml
+{
+    my($class,$logxml)=@_;
     my $sitelog=XML::LibXML->load_xml(location=>$logxml);
     my $xpc=XML::LibXML::XPathContext->new($sitelog->documentElement);
 
@@ -151,6 +178,18 @@ sub approxXYZ
 {
     my($self)=@_;
     return $self->{approxXYZ};
+}
+
+=head2 $xyz=$sitelog->source
+
+Return the name of the file from which the sitelog was read
+
+=cut
+
+sub source
+{
+    my($self)=@_;
+    return $self->{source};
 }
 
 =head2 foreach my $antenna ($sitelog->antennaList)

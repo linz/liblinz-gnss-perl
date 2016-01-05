@@ -137,7 +137,8 @@ sub getType
 Returns a list of types matching the specified type and subtype in a data request, ordered from 
 highest to lowest priority.  The list will contain more than one element if 
 the subtype is suffixed with '+'.  In this case all subtypes with equal or higher
-priority are included.
+priority are included.  Use a subtype of '' to list all subtypes with a priority > 0
+or subtype of '*' to list all subtypes.
 
 Can be called as LINZ::GNSS::FileTypeList->getTypes($type,$subtype) to return the 
 default settings for the type.
@@ -156,12 +157,12 @@ sub getTypes
     }
     $type=uc($type);
     $subtype=uc($subtype);
-    my $plus= $subtype eq '' || $subtype=~s/\+$//;;
+    my $plus= $subtype eq '' || $subtype eq '*' || $subtype=~s/\+$//;;
     my @result=();
     if( exists $self->{$type} )
     {
         my $basepriority=0;
-        if( $subtype ne '' )
+        if( $subtype ne '' && $subtype ne '*' )
         {
             return @result if ! exists $self->{$type}->{$subtype};
             push(@result,$self->{$type}->{$subtype});
@@ -171,7 +172,7 @@ sub getTypes
         {
             foreach my $t (values %{$self->{$type}})
             {
-                push(@result,$t) if $t->{priority} > $basepriority;
+                push(@result,$t) if $t->{priority} > $basepriority || $subtype eq '*';
             }
             @result = sort {$b->{priority} <=> $a->{priority}} @result;
         }
@@ -257,7 +258,7 @@ sub types
     my @result=();
     foreach my $t (@basetypes,@othertypes)
     {
-        push(@result,@{$self->getTypes($t)});
+        push(@result,@{$self->getTypes($t,'*')});
     }
     return wantarray ? @result : \@result;
 }

@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.41.1-1) trusty; urgency=medium
+
+  * Removing unused and undocumented and non-existent SSC files, and fixing location of BROADCAST orbit files
+  * Allowing listing of non-prioritized types/subtypes
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 05 Jan 2016 13:34:16 +1300
+
 liblinz-gnss-perl (1.41.0-1) trusty; urgency=medium
 
   * Adding IGS XML site log reading - requires XML::LibXML

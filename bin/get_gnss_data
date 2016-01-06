@@ -256,7 +256,7 @@ Just list the available file types and exit
 
 =item -s
 
-List the data centres and file types that ahve been configured if no data is requested.  If data has
+List the data centres and file types that have been configured if no data is requested.  If data has
 been requested then list the files that could be downloaded to fill the request.
 
 =back

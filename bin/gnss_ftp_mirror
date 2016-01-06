@@ -102,8 +102,47 @@ Options are:
 EOD
 
 #=====================================================================
-# Get options
 
+my @months=('jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec');
+my @umonths=();
+my @ccmonths=();
+my @fullmonths=('january','february','march','april','may','june',
+                'july','august','september','october','november','december');
+my @ufmonths=();
+my @cfmonths=();
+
+foreach my $mon (@months) 
+{
+    push(@umonths,uc($mon));
+    my $ccmon=$mon;
+    substr($ccmon,0,1)=uc(substr($ccmon,0,1));
+    push(@ccmonths,uc($mon));
+}
+
+foreach my $mon (@fullmonths) 
+{
+    push(@ufmonths,uc($mon));
+    my $ccmon=$mon;
+    substr($ccmon,0,1)=uc(substr($ccmon,0,1));
+    push(@cfmonths,uc($mon));
+}
+
+my %patterns=(
+    'yyyy' => '\d\d\d\d',
+    'yy' =>   '\d\d',
+    'mm' =>   '\d\d',
+    'mmm' =>  '('.join('|',@months).')',
+    'Mmm' =>  '('.join('|',@ccmonths).')',
+    'MMM' =>  '('.join('|',@umonths).')',
+    'dd'  =>  '\d\d',
+    'ddd' =>  '\d\d\d',
+    'code' => '[a-z0-9]{4}',
+    'CODE' => '[A-Z0-9]{4}',
+    'Code' => '[A-Za-z0-9]{4}',
+);
+
+#=================================================================
+# Get options
 my %opts;
 getopts('Vvcis:e:p:r:',\%opts);
 
@@ -145,6 +184,7 @@ foreach my $k (keys %argconfig)
 
 # Expand references in configuration
 
+my %unresolved=();
 foreach my $k (keys(%config))
 {
     my $v=$config{$k};
@@ -153,9 +193,20 @@ foreach my $k (keys(%config))
     {
         my $v0=$v;
         $v =~ s/(\{(\w+)\})/exists $config{lc($2)} ? $config{lc($2)} : $1/eg;
+        $v =~ s/(\{ENV\:(\w+)\})/exists $ENV{$2} ? $ENV{$2} : $1/eg;
+        $v =~ s/(\{(\w+)\})/! exists $patterns{$2} && exists $ENV{$2} ? $ENV{$2} : $1/eg;
         last if $v eq $v0;
     }
+    foreach my $var ($v =~ /\{((?:ENV\:)\w+)\}/g)
+    {
+        $unresolved{$var}=1 if ! exists $patterns{$var};
+    }
     $config{$k}=$v;
+}
+if( %unresolved )
+{
+    my $badvar=join(' ',sort keys %unresolved);
+    die "The following configuration items are undefined: $badvar\n";
 }
 
 my $startage=($opts{s} // $config{startage})+0;
@@ -233,29 +284,6 @@ $targetpath =~ s/^\~/$confdir/;
 $markerpath =~ s/^\~/$confdir/;
 $postdownloadcommand =~ s/(^|\s)\~\//$1.$confdir.'\/'/eg;
 
-my @months=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
-my @umonths=();
-my @ccmonths=();
-my @fullmonths=split(' ','jan feb mar apr may jun jul aug sep oct nov dec');
-my @ufmonths=();
-my @cfmonths=();
-
-foreach my $mon (@months) 
-{
-    push(@umonths,uc($mon));
-    my $ccmon=$mon;
-    substr($ccmon,0,1)=uc(substr($ccmon,0,1));
-    push(@ccmonths,uc($mon));
-}
-
-foreach my $mon (@fullmonths) 
-{
-    push(@ufmonths,uc($mon));
-    my $ccmon=$mon;
-    substr($ccmon,0,1)=uc(substr($ccmon,0,1));
-    push(@cfmonths,uc($mon));
-}
-
 # @valid_dates is a list of possible date options that can be matched against fields directory/filenames.
 # This is the starting point for filtering out the candidate files.
 
@@ -281,20 +309,6 @@ for( my $i = $startdate; $i <= $enddate; $i += $SECS_PER_DAY )
 
 # @dirparts is an array of components of the remote file path.  Each in turn
 # is used to filter down the valid options before passing on to the next directory.
-
-my %patterns=(
-    'yyyy' => '\d\d\d\d',
-    'yy' =>   '\d\d',
-    'mm' =>   '\d\d',
-    'mmm' =>  '('.join('|',@months).')',
-    'Mmm' =>  '('.join('|',@ccmonths).')',
-    'MMM' =>  '('.join('|',@umonths).')',
-    'dd'  =>  '\d\d',
-    'ddd' =>  '\d\d\d',
-    'code' => '[a-z0-9]{4}',
-    'CODE' => '[A-Z0-9]{4}',
-    'Code' => '[A-Za-z0-9]{4}',
-);
 
 my @dirparts;
 foreach my $p ( split(/\//,$remotedir),$remotefilere)
@@ -772,6 +786,12 @@ __END__
  # Note all configuration item values can contain references to other configuration
  # item values as {xxxxx}, where xxx is the other item.  But note special values
  # for date components and file names that should not be used.
+ #
+ # {xxxx} strings that are not matched can be replaced by environment variables if
+ # they exist, except for the code and time patterns listed below, which are 
+ # replaced with components of the file path.
+ #
+ # {ENV:xxx} can be used to explicitly replace environment variables.
  
  # RemoteUri is the the base of the remote directory
  

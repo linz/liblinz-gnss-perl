@@ -3,8 +3,8 @@ package LINZ::GNSS::IGSSiteLog;
 
 =head1 LINZ::GNSS::IGSSiteLog
 
-Package to read an IGS XML site log file as generated on the Geonet site.  Note that this
-format may change (particularly if GeodesyML gets adopted).
+Package to read an IGS site log files, either ASCII or XML formatted.
+Note that the XML format may change (particularly if GeodesyML gets adopted).
 
 =cut
 
@@ -27,6 +27,7 @@ sub _timestampFromIGSDate
     my($igsdate)=@_;
     return undef if $igsdate =~ /^\s*$/;
     my($y,$m,$d,$hh,$mm)=$igsdate=~/(\d+)/g;
+    return undef if $mm eq '';
     return ymdhms_seconds($y,$m,$d,$hh,$mm,0);
 }
 
@@ -43,9 +44,9 @@ sub _readSiteLogNode
     return $data;
 }
 
-=head2 $sitelog=new LINZ::GNSS::IGSSiteLog( $xmlfilename )
+=head2 $sitelog=new LINZ::GNSS::IGSSiteLog( $filename )
 
-Open and scan the site log file.
+Open and scan the site log file - either ASCII or XML format.
 
 =cut
 
@@ -62,12 +63,105 @@ sub new
     }
     else
     {
-        croak("Current LINZ::GNSS::IGSSiteLog can only read XML formatted site logs");
+        $self=readAscii($class,$sitelogfile);
     }
     my $source=$sitelogfile;
     $source =~ s/.*[\\\/]//;
     $self->{source}=$source;
     return $self;
+}
+
+=head2 $sitelog=LINZ::GNSS::IGSSiteLog->readAscii( $filename )
+
+Open and scan an IGS ASCII format site log
+
+=cut
+
+sub readAscii
+{
+    my($class,$filename)=@_;
+    open( my $lf, "<", $filename ) || croak("Cannot open IGS log file $filename");
+    my $sections={};
+    my $section='0.';
+    my $lastkey='';
+    while( my $line = <$lf> )
+    {
+        if($line =~ s/^\s*(\d+\.(?:\d*|x))\s*//)
+        {
+            $section=$1;
+            $lastkey='';
+        }
+        next if $line !~ /\s*(\S.*?)?\s*\:\s+(\S.*?)\s*$/;
+        my ($key,$value)=(lc($1),$2);
+        if( $key eq '' )
+        {
+            $sections->{$section}->{$lastkey} .= "\n".$value if $lastkey;
+        }
+        else
+        {
+            $key =~ s/\s*\(.*\)//g;
+            $key =~ s/\s+(\w)/uc($1)/eg;
+            $key =~ s/^(\w)/lc($1)/eg;
+            # Specific fixes to match XML keys
+            $key =~ s/^iersDomes/iersDOMES/;
+            $key =~ s/^([xyz])Coordinate/$1CoordinateInMeters/;
+            $key =~ s/^fourCharacterId/fourCharacterID/;
+            $key =~ s/^latitude$/latitude-North/;
+            $key =~ s/^longitude$/longitude-East/;
+            $key =~ s/^elevation$/elevation-m_ellips./;
+            $key =~ s/^marker\-\>arp(Up|North|East).*$/marker-arp$1Ecc./;
+            $key =~ s/^additionalInformation$/notes/;
+            $sections->{$section}->{$key}=$value;
+            $lastkey=$key;
+        }
+    }
+    foreach my $key ('1.','2.','3.1','4.1')
+    {
+        croak("$filename does not appear to be a valid IGS site log\n") 
+            if ! exists $sections->{$key};
+    }
+    my $id=$sections->{'1.'};
+    my $xyzdata=$sections->{'2.'};
+    my @receivers=();
+    my @antennae=();
+    foreach my $section (keys %$sections)
+    {
+        push(@receivers,$sections->{$section}) if $section =~ /^3\.\d+/;
+        push(@receivers,$sections->{$section}) if $section =~ /^4\.\d+/;
+    }
+
+    my $xyz=[
+        ($xyzdata->{xCoordinateInMeters} // 0.0) + 0.0,
+        ($xyzdata->{yCoordinateInMeters} // 0.0) + 0.0,
+        ($xyzdata->{zCoordinateInMeters} // 0.0) + 0.0,
+        ];
+
+    foreach my $rec (@receivers)
+    {
+        foreach my $d ('dateInstalled','dateRemoved')
+        {
+            $rec->{$d}=_timestampFromIGSDate($rec->{$d});
+        }
+    }
+    @receivers = sort {$a->{dateInstalled} <=> $b->{dateInstalled}} @receivers;
+
+    foreach my $ant (@antennae)
+    {
+        foreach my $d ('dateInstalled','dateRemoved')
+        {
+            $ant->{$d}=_timestampFromIGSDate($ant->{$d});
+        }
+        my $enu=[
+            ($ant->{'marker-arpEastEcc.'} // 0.0) + 0.0,
+            ($ant->{'marker-arpNorthEcc.'} // 0.0) + 0.0,
+            ($ant->{'marker-arpUpEcc.'} // 0.0) + 0.0
+        ];
+        $ant->{offsetENU}=$enu;
+    }
+    @antennae = sort {$a->{dateInstalled} <=> $b->{dateInstalled}} @antennae;
+
+    my $self={id=>$id,approxXYZ=>$xyz, antennae=>\@antennae,receivers=>\@receivers};
+    return bless $self, $class;
 }
 
 =head2 $sitelog=LINZ::GNSS::IGSSiteLog->readXml( $xmlfilename )

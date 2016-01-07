@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.42.0-1) trusty; urgency=medium
+
+  * Adding handling of environment variables to gnss_ftp_mirror
+  * Adding reading of ASCII format IGS site logs
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 08 Jan 2016 06:49:23 +1300
+
 liblinz-gnss-perl (1.41.1-1) trusty; urgency=medium
 
   * Removing unused and undocumented and non-existent SSC files, and fixing location of BROADCAST orbit files

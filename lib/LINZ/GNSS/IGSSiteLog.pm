@@ -127,7 +127,7 @@ sub readAscii
     foreach my $section (keys %$sections)
     {
         push(@receivers,$sections->{$section}) if $section =~ /^3\.\d+/;
-        push(@receivers,$sections->{$section}) if $section =~ /^4\.\d+/;
+        push(@antennae,$sections->{$section}) if $section =~ /^4\.\d+/;
     }
 
     my $xyz=[

@@ -261,7 +261,7 @@ if( $verbose )
     printf "End date:              %04d:%03d\n",seconds_yearday($enddate);
     if( $maxruntime > 0 )
     {
-        printf "Max run time:     %.1f minutes\n",$maxruntime/60;
+        printf "Max run time:     %.1f minutes\n",$maxruntime;
     }
     if( $allcodes )
     {

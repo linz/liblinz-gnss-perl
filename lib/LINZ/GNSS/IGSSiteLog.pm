@@ -25,9 +25,10 @@ our $IGSNamespaces={
 sub _timestampFromIGSDate
 {
     my($igsdate)=@_;
-    return undef if $igsdate =~ /^\s*$/;
-    my($y,$m,$d,$hh,$mm)=$igsdate=~/(\d+)/g;
-    return undef if $mm eq '';
+    return undef if $igsdate !~ /^\s*((?:19|20)\d\d)\-([01]\d)\-([0123]\d)(?:T([012]\d)\:([012345]\d))?/;
+    # return undef if $igsdate =~ /^\s*$/;
+    my($y,$m,$d,$hh,$mm)=($1,$2,$3,$4 // 0, $5 // 0);
+    return undef if $d < 1 || $d > 31;
     return ymdhms_seconds($y,$m,$d,$hh,$mm,0);
 }
 
@@ -91,7 +92,7 @@ sub readAscii
             $section=$1;
             $lastkey='';
         }
-        next if $line !~ /\s*(\S.*?)?\s*\:\s+(\S.*?)\s*$/;
+        next if $line !~ /\s*(\S.*?)?\s*\:\s*(\S.*?)?\s*$/;
         my ($key,$value)=(lc($1),$2);
         if( $key eq '' )
         {

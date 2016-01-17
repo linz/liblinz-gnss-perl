@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.42.1-1) trusty; urgency=medium
+
+  * Making reading dates/times in IGS site log more robust
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 18 Jan 2016 10:30:24 +1300
+
 liblinz-gnss-perl (1.42.0-1) trusty; urgency=medium
 
   * Adding handling of environment variables to gnss_ftp_mirror

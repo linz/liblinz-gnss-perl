@@ -41,10 +41,12 @@ More verbose mode - additional information only messages
 =item -s ###        
 
 Specify the start date for downloads as days before the current date.  eg -s 30
+or in a GNSS date format eg 2014-050.
 
 =item -e ###        
 
 Specify the end date for downloads as days before the current date.  eg -s 30
+or in a GNSS date format eg 2014-050.
 
 =item -p ##
 
@@ -235,8 +237,10 @@ my $postdownloadcommand=$config{postdownloadcommand};
 my $dochdir=$config{postdownloadcommandchdir};
 $dochdir=0 if $dochdir =~ /(no|false)/i;
 
-my $startdate=parse_gnss_date("now-$startage");
-my $enddate=parse_gnss_date("now-$endage");
+my $startdate=$startage =~ /^\d+$/ ? "now-$startage" : $startage;
+$startdate=parse_gnss_date($startdate);
+my $enddate=$endage =~ /^\d+$/ ? "now-$endage" : $endage;
+$enddate=parse_gnss_date($enddate);
 
 my $maxruntime=$config{maxruntime}+0;
 my $jobexpirytime = $maxruntime > 0 ? time()+$maxruntime*60 : 0;

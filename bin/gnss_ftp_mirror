@@ -211,8 +211,8 @@ if( %unresolved )
     die "The following configuration items are undefined: $badvar\n";
 }
 
-my $startage=($opts{s} // $config{startage})+0;
-my $endage=($opts{e} // $config{endage})+0;
+my $startage=$opts{s} // $config{startage};
+my $endage=$opts{e} // $config{endage};
 
 $config{maxruntime} = ($opts{r}+0) if $opts{r};
 $config{pause} = $opts{p} if exists $opts{p};

@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.43.0-1) trusty; urgency=medium
+
+  * Add option for explicit start and end dates in gnss_ftp_mirror command line
+  * Fixing bug in setting start/end dates
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 03 Feb 2016 18:53:33 +1300
+
 liblinz-gnss-perl (1.42.1-1) trusty; urgency=medium
 
   * Making reading dates/times in IGS site log more robust

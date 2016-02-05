@@ -12,7 +12,6 @@
 
 use strict;
 
-
 package LINZ::GNSS::SinexFile;
 
 use LINZ::GNSS::Time qw/yearday_seconds/;
@@ -52,7 +51,7 @@ sub new
 
 =head2 $stns=$sf->stations()
 
-Returns a list of stations in the SINEX file.  May be called in a scalar or array context.
+Returns a list of station solutions in the SINEX file.  May be called in a scalar or array context.
 Note this only returns stations for which coordinates have been calculated in the solution.
 It does not return the full coordinate covariance matrix - just the covariance for the 
 each station X,Y,Z coordinates.
@@ -81,11 +80,27 @@ The description of the station from the site/id section
 
 The mean epoch of the solution
 
+=item start_epoch 
+
+The start epoch of the solution
+
+=item end_epoch 
+
+The end epoch of the solution
+
+=item ref_epoch 
+
+The reference epoch of the solution coordinate
+
 =item prmoffset
 
 The offset of the X parameter in the full coordinate covariance matrix
 
 =item xyz
+
+An array hash with the xyz coordinate
+
+=item vxyz
 
 An array hash with the xyz coordinate
 
@@ -95,6 +110,8 @@ An array hash of array hashes defining the 3x3 covariance matrix
 
 =back
 
+Note: currently the covariance information does not include velocity covariances.
+
 =cut 
 
 sub stations
@@ -103,6 +120,32 @@ sub stations
     my $stations=$self->{solnstns};
     return wantarray ? @$stations : $stations;
 }
+
+
+=head2 $site=$sf->site($code,$mark)
+
+Return data for a site.  The mark (point) at the site
+may also be specified, otherwise all marks are return.  
+The object returned is a LINZ::GNSS::SinexFile::Site object.
+
+=cut
+
+sub site
+{
+    my($self,$code,$mark)=@_;
+    $mark .= ':' if $mark ne '';
+    my $stndata=$self->{stations}->{$code};
+    croak("Code $code not in SINEX file\n") if ! $stndata;
+    my @solutions=();
+    foreach my $solnid (keys %$stndata)
+    {
+        next if $mark ne '' && substr($solnid,0,length($mark)) ne $mark;
+        push(@solutions,$stndata->{$solnid});
+    }
+    croak("No information found for $code $mark\n") if ! @solutions;
+    return LINZ::GNSS::SinexFile::Site->new($code,\@solutions);
+}
+
 
 =head2 $stn=$sf->station($code,$solnid)
 
@@ -367,9 +410,13 @@ sub _getStation
             code=>$mcode,
             solnid=>$solnid,
             epoch=>0,
+            start_epoch=>0,
+            end_epoch=>0,
+            ref_epoch=>0,
             prmoffset=>0,
             estimated=>0,
             xyz=>[0.0,0.0,0.0],
+            vxyz=>[0.0,0.0,0.0],
             covar=>[[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
             };
         $stations->{$mcode}->{$solnid} = $newstn;
@@ -456,14 +503,22 @@ sub _scanSolutionEstimate
         my ($id,$ptype,$mcode,$solnid,$epoch,$value)=
            (_trim($1)+0,_trim($2),_trim($3),_trim($4).':'._trim($5),_trim($6),_trim($9)+0);
 
-        next if $ptype !~ /^STA([XYZ])$/;
+        next if $ptype !~ /^(STA|VEL)([XYZ])$/;
+        my $isxyz = $1 eq 'STA';
+        my $pno=index('XYZ',$2);
 
         my $stn=$self->_getStation($mcode,$solnid);
-        my $pno=index('XYZ',$1);
-        $stn->{xyz}->[$pno]=$value;
-        $stn->{estimated}=1;
-        $stn->{epoch}=$self->_sinexDateToTimestamp($epoch);
-        $prms->{$id}={stn=>$stn,pno=>$pno};
+        if( $isxyz )
+        {
+            $stn->{xyz}->[$pno]=$value;
+            $stn->{estimated}=1;
+            $stn->{ref_epoch}=$self->_sinexDateToTimestamp($epoch);
+            $prms->{$id}={stn=>$stn,pno=>$pno};
+        }
+        else
+        {
+            $stn->{vxyz}->[$pno]=$value;
+        }
     }
     $self->_compileStationList();
     return 1;
@@ -566,8 +621,11 @@ sub _scanEpochs
             \s(\d\d\:\d\d\d\:\d\d\d\d\d) # end epoch
             \s(\d\d\:\d\d\d\:\d\d\d\d\d) # mean epoch
             /x;
-        my ($code,$solnid,$meanepoch)=(_trim($1),_trim($2).':'._trim($3),$7);
-        $self->_getStation($code,$solnid)->{epoch}=$self->_sinexDateToTimestamp($meanepoch);
+        my ($code,$solnid,$startepoch,$endepoch,$meanepoch)=(_trim($1),_trim($2).':'._trim($3),$5,$6,$7);
+        my $stn=$self->_getStation($code,$solnid);
+        $stn->{epoch}=$self->_sinexDateToTimestamp($meanepoch);
+        $stn->{start_epoch}=$self->_sinexDateToTimestamp($startepoch);
+        $stn->{end_epoch}=$self->_sinexDateToTimestamp($endepoch);
     }
     return 1;
 }
@@ -692,5 +750,200 @@ sub filterStationsOnly
     close($tgt);
 }
 
+=head1 LINZ::GNSS::SinexFile::Site
+
+  Solution information for a site.  Returned by SinexFile->site($code)
+
+=cut
+
+# Note: currently only solution and coordinate information for a site
+# has been implemented.
+#
+# This is a minimal implementation that will hopefully support a 
+# more complete implementation without needing to break the API.
+
+package LINZ::GNSS::SinexFile::Site;
+
+use Carp;
+
+sub new
+{
+    my($class,$code,$solutions)=@_;
+    my $marks={};
+    my $self={code=>$code,marks=>$marks,mark=>undef};
+    bless $self,$class;
+    my %markdata;
+    foreach my $soln (@$solutions)
+    {
+        my $markid=$soln->{solnid};
+        $markid=~ s/\:.*//;
+        push(@{$markdata{$markid}},$soln);
+    }
+    my $firstid=undef;
+    my $lastid=undef;
+    foreach my $markid (keys %markdata)
+    {
+        $marks->{$markid}=LINZ::GNSS::SinexFile::Mark->new($self,$markid,$markdata{$markid});
+        $firstid=$markid if ! defined($firstid);
+        $lastid=$markid;
+    }
+    $self->{mark}=$marks->{$firstid} if $firstid eq $lastid;
+    return $self;
+}
+
+=head2 my $code=$site->code()
+
+Return the code identifying the site
+
+=cut
+
+sub code
+{
+    my($self)=@_;
+    return $self->{code};
+}
+
+=head2 my @marks=$site->marks()
+
+Return an array of marks (or array ref, depending on context)
+
+=cut
+
+sub marks
+{
+    my($self)=@_;
+    my @marks=values %{$self->{marks}};
+    return wantarray ? @marks : \@marks;
+}
+
+=head2 my @marks=$site->mark( $markid )
+
+Return the specified mark for a site.  If no markid is specified, then
+return the mark if there is only one defined, else raise an exception
+
+=cut
+
+sub mark
+{
+    my($self,$markid)=@_;
+    if( $markid eq '')
+    {
+        return $self->{mark} if defined($self->{mark});
+        croak("No unique mark defined for site "+$self->code);
+    }
+    croak("Mark $markid not defined for site "+$self->code) if ! exists $self->{marks}->{$markid};
+    return $self->{marks}->{$markid};
+}
+
+=head1 LINZ::GNSS::SinexFile::Mark
+
+Solution information for a site.  Returned by SinexFile::Site->mark($markid)
+
+=cut
+
+# Note: currently only solution and coordinate information for a site
+# has been implemented.
+#
+# This is a minimal implementation that will hopefully support a 
+# more complete implementation without needing to break the API.
+
+package LINZ::GNSS::SinexFile::Mark;
+
+use LINZ::GNSS::Time qw/seconds_decimal_year/;
+use Carp;
+
+sub new
+{
+    my($class,$site,$markid,$solutions)=@_;
+    my @solutions=sort {$a->{start_epoch} <=> $b->{start_epoch}} @$solutions;
+    my $self={site=>$site,markid=>$markid,solutions=>\@solutions};
+    return bless $self,$class;
+}
+
+=head2 my $site=$mark->site()
+
+Return the code identifying the site
+
+=cut
+
+sub site
+{
+    my($self)=@_;
+    return $self->{site};
+}
+
+=head2 my $code=$mark->code()
+
+Return the code identifying the site
+
+=cut
+
+sub code
+{
+    my($self)=@_;
+    return $self->{site}->code;
+}
+
+=head2 my $markid=$mark->markid()
+
+Return the code identifying the site
+
+=cut
+
+sub markid
+{
+    my($self)=@_;
+    return $self->{markid};
+}
+
+=head2 my $solution=$mark->solution($epoch,$extrapolate)
+
+Returns the solution that applies at an epoch.  
+
+If $extrapolate is non zero then solutions can be extrapolated past the final solution date.
+If $extrapolate is > 1 then the solution may be interpolated between defined epochs (by using 
+the previous epoch).
+If $extrapolate is > 2 then the first solution may also be extrapolated before its start date.
+
+=cut
+
+sub solution
+{
+    my($self,$date,$extrapolate)=@_;
+    my $lastsoln;
+    my $inrange=0;
+    foreach my $soln (@{$self->{solutions}})
+    {
+        $lastsoln=undef if $extrapolate < 2;
+        next if $soln->{start_epoch} > $date;
+        return $soln if $soln->{end_epoch} >= $date;
+        $lastsoln=$soln;
+    }
+    return $lastsoln if $lastsoln && $extrapolate;
+    return $self->{solutions}->[0] if $extrapolate > 2;
+    croak("No solution found for requested mark and date\n");
+}
+
+=head2 my $xyz=$site->xyz($epoch,$extrapolate)
+
+Calculates the XYZ coordinate for the site (and mark if ambiguous) at an epoch.
+
+Can extrapolate solutions (see $site->solution() for info on the $extrapolate parameter).
+
+=cut
+
+sub xyz
+{
+    my($self,$date,$extrapolate)=@_;
+    my $solution=$self->solution($date,$extrapolate);
+    croak("No solution available for requested date\n") if ! $solution;
+    my $yeardiff=seconds_decimal_year($date)-seconds_decimal_year($solution->{ref_epoch});
+    my $xyz=[0.0,0.0,0.0];
+    foreach my $i (0..2)
+    {
+        $xyz->[$i]=$solution->{xyz}->[$i]+$solution->{vxyz}->[$i]*$yeardiff;
+    }
+    return $xyz;
+}
 
 1;

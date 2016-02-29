@@ -7,6 +7,7 @@ use LINZ::GNSS::Time qw/
     time_elements
     seconds_datetime 
     seconds_julianday
+    seconds_decimal_year
     $SECS_PER_DAY
     /;
 
@@ -33,6 +34,7 @@ my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($seconds);
 my $day=substr('SunMonTueWedThuFriSat',$wday*3,3);
 my $jday=seconds_julianday($seconds);
 my $datestr=seconds_datetime($seconds);
+my $dyear=sprintf("%.3f",seconds_decimal_year($seconds));
 
 if( $opts{f} )
 {
@@ -46,6 +48,7 @@ if( $opts{f} )
         'y'=>substr($year,2),
         'u'=>$seconds,
         'j'=>$jday,
+        'f'=>$dyear,
     };
     $format=$opts{f};
     $format=~ s/([DWdnYyuj])/$strings->{$1}/eg;
@@ -58,6 +61,7 @@ else
     print "GNSS week/day       : $gnssweek $wday\n";
     print "Modified Julian day : $jday\n";
     print "Unix timestamp      : $seconds\n";
+    print "Decimal year        : $dyear\n";
     print "\nNote: all values are UTC\n";
 }
 
@@ -94,6 +98,8 @@ Converts dates between different GPS formats.  Dates can be entered as:
    ssssssssss    Unix time stamp
    jjjjj         Julian day
    now           Right now!
+   today         Start of current day
+   yyyy.yyy      Decimal year
 
 All are in terms of UTC time.  Seconds are referred to the start of the day,
 (ie 00:00:00)
@@ -108,5 +114,6 @@ on the format with the following substitutions.
    Y  the year
    u  the unix timestamp
    j  julian day
+   f  decimal year
 
 =cut

@@ -461,6 +461,9 @@ Parses a date in one of the following formats:
    jjjjj         Julian day
    now           Right now
    now-ddd       ddd days before now
+   today         Start of current UTC day
+   today-ddd     ddd days before today
+   yyyy.yyyy     decimal years
 
 If the date cannot be interpreted then croaks.
 
@@ -470,47 +473,65 @@ sub parse_gnss_date
 {
     my($datestr)=@_;
     my $seconds;
-    # yyyy mm dd
-    if( $datestr=~ /^((?:19|20)\d\d)\W+([01]?\d)\W+([0123]?\d)$/ )
-    {
-        $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
-    }
-    # dd mm yyyy
-    elsif( $datestr=~ /^([0123]?\d)\W+([01]?\d)\W+((?:19|20)\d\d)$/ )
-    {
-        $seconds=ymdhms_seconds($3,$2,$1,0,0,0);
-    }
-    # yyyymmdd
-    elsif( $datestr=~ /^((?:19|20)\d\d)([01]\d)([0123]\d)$/ )
-    {
-        $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
-    }
-    # yyyy ddd
-    elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
-    {
-        $seconds=yearday_seconds($1,$2);
-    }
-    # wwww d  (week day)
-    elsif( $datestr=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
-    {
-        $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
-    }
-    # ssssssssss
-    elsif( $datestr =~ /^\d{10}$/ )
-    {
-        $seconds=$datestr+0;
-    }
-    # ddddd
-    elsif( $datestr =~ /^\d{5}$/ )
-    {
-        $seconds=julianday_seconds($datestr);
-    }
-    # now-#
-    elsif( lc($datestr) =~ /^now(?:\-(\d+))?$/ )
-    {
-        $seconds=time()-($1 // 0)*$SECS_PER_DAY;
-    }
-    else
+    eval {
+        # yyyy mm dd
+        if( $datestr=~ /^((?:19|20)\d\d)\W+([01]?\d)\W+([0123]?\d)$/ )
+        {
+            $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
+        }
+        # dd mm yyyy
+        elsif( $datestr=~ /^([0123]?\d)\W+([01]?\d)\W+((?:19|20)\d\d)$/ )
+        {
+            $seconds=ymdhms_seconds($3,$2,$1,0,0,0);
+        }
+        # yyyymmdd
+        elsif( $datestr=~ /^((?:19|20)\d\d)([01]\d)([0123]\d)$/ )
+        {
+            $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
+        }
+        # yyyy ddd
+        elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
+        {
+            $seconds=yearday_seconds($1,$2);
+        }
+        # wwww d  (week day)
+        elsif( $datestr=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
+        {
+            $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
+        }
+        # ssssssssss
+        elsif( $datestr =~ /^\d{10}$/ )
+        {
+            $seconds=$datestr+0;
+        }
+        # ddddd
+        elsif( $datestr =~ /^\d{5}$/ )
+        {
+            $seconds=julianday_seconds($datestr);
+        }
+        # yyyy.yyy
+        elsif( $datestr =~ /^[12]\d\d\d\.\d+$/ )
+        {
+            $seconds=decimal_year_seconds($datestr);
+        }
+        # now-#
+        elsif( lc($datestr) =~ /^now(?:\-(\d+))?$/ )
+        {
+            $seconds=time()-($1 // 0)*$SECS_PER_DAY;
+        }
+        # today-#
+        elsif( lc($datestr) =~ /^today(?:\-(\d+))?$/ )
+        {
+            my($sec,$min,$hour)=gmtime();
+            my $daysecs=$sec+$min*60+$hour*3600;
+            $seconds=time()-$daysecs-($1 // 0)*$SECS_PER_DAY;
+        }
+        else
+        {
+            $seconds=datetime_seconds($datestr);
+        }
+    };
+    if( $@ )
     {
         croak("Invalid date specified: $datestr");
     }

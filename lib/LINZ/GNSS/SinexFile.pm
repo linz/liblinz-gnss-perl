@@ -4,11 +4,18 @@
 
   This is currently not written as a general purpose SINEX file reader/writer.
 
-  The current purpose is simply to read station coordinate/covariance information.
-  All sorts of assumptions are made - essentially hoping this works with Bernese generated
-  SINEX files from ADDNEQ...
+  The initial current purpose is simply to read station coordinate/covariance information.
+  Be aware of simplifications made.
+
+  Initial implementation was for reading only returned stations using the stations() function.
+  This has been enhanced to handle sites with multiple marks and solutions, and to calculate
+  coordinates at a specific epoch, as well as limited output of SINEX file.  The initial stations()
+  function is deprecated in favour of sitecodes() and site().
 
 =cut
+
+# Although the stations() function is deprecated this module has not yet been updated to reflect
+# the more correctly structured use of site and mark.
 
 use strict;
 
@@ -35,7 +42,12 @@ Obtain the full coordinate covariance matrix.
 
 =item need_covariance
 
-Set to 0 if covariance information is not required
+Set to 0 if covariance information is not required, but will
+be loaded if it is present.
+
+=item skip_covariance
+
+Set to 1 to ignore convariance information.
 
 =back
 
@@ -50,6 +62,8 @@ sub new
 }
 
 =head2 $stns=$sf->stations()
+
+Note: this is deprecated in favour of sitecodes() and site().
 
 Returns a list of station solutions in the SINEX file.  May be called in a scalar or array context.
 Note this only returns stations for which coordinates have been calculated in the solution.
@@ -121,6 +135,22 @@ sub stations
     return wantarray ? @$stations : $stations;
 }
 
+
+=head2 @codes=$sf->sitecodes()
+
+Return a list of sitecode of sites in the file.  Each site can be obtained with the 
+site() function, which provides a marks() function, which provides a solutions() 
+function.
+
+=cut
+
+
+sub sitecodes()
+{
+    my($self)=@_;
+    my @codes = sort(keys(%{$self->{stations}}));
+    return wantarray ? @codes : \@codes;
+}
 
 =head2 $site=$sf->site($code,$mark)
 
@@ -278,14 +308,15 @@ sub _scan
     $self->{obs_start_date}=$self->_sinexDateToTimestamp(substr($header,32,12));
     $self->{obs_end_date}=$self->_sinexDateToTimestamp(substr($header,45,12));
 
-    my $needcvr=exists $options{need_covariance} && ! $options{need_covariance};
+    my $cvropt=exists $options{need_covariance} && ! $options{need_covariance};
+    $cvropt=1 if $options{skip_covariance};
 
     my $blocks={
         'SITE/ID'=>0, 
         'SOLUTION/STATISTICS'=>1, # Statistics are treated as optional
         'SOLUTION/EPOCHS'=>0,
         'SOLUTION/ESTIMATE'=>0,
-        'SOLUTION/MATRIX_ESTIMATE L COVA'=>$needcvr,
+        'SOLUTION/MATRIX_ESTIMATE L COVA'=>$cvropt,
     };
     while( my $block=$self->_findNextBlock($sf) )
     {
@@ -862,7 +893,7 @@ sub new
 
 =head2 my $site=$mark->site()
 
-Return the code identifying the site
+Returns the site with which the mark is associated.
 
 =cut
 
@@ -886,7 +917,7 @@ sub code
 
 =head2 my $markid=$mark->markid()
 
-Return the code identifying the site
+Return the specific id of the mark
 
 =cut
 

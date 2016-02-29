@@ -483,7 +483,6 @@ sub _compileStationList
         push(@solnstns,grep {$_->{estimated}} values %{$stations->{$k}});
     }
 
-
     # Form parameter numbers for solution coordinates in covariance matrix
     # and copy back to stations
 
@@ -887,7 +886,8 @@ sub new
 {
     my($class,$site,$markid,$solutions)=@_;
     my @solutions=sort {$a->{start_epoch} <=> $b->{start_epoch}} @$solutions;
-    my $self={site=>$site,markid=>$markid,solutions=>\@solutions};
+    my $name=$solutions[0]->{name};
+    my $self={site=>$site,markid=>$markid,name=>$name,solutions=>\@solutions};
     return bless $self,$class;
 }
 
@@ -925,6 +925,18 @@ sub markid
 {
     my($self)=@_;
     return $self->{markid};
+}
+
+=head2 my $code=$mark->name()
+
+Return the name of the mark
+
+=cut
+
+sub name
+{
+    my($self)=@_;
+    return $self->{name};
 }
 
 =head2 my $solution=$mark->solution($epoch,$extrapolate)

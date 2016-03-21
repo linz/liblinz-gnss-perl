@@ -29,6 +29,7 @@ use LINZ::GNSS::Time qw/
     yearday_seconds
     seconds_yearday
     /;
+use List::Util;
 use Log::Log4perl qw(:easy);
 
 use vars qw/$processor/;
@@ -88,6 +89,7 @@ sub runProcessor
     my $retry_interval_days=$self->get('retry_interval_days');
 
     my $rerun=$self->get('rerun','0');
+    my $procorder=lc($self->get('processing_order','backwards'));
     my $stopfile=$self->get('stop_file','');
     my $maxconsecutivefails=$self->get('max_consecutive_fails','0')+0;
     my $maxconsecutiveskip=$self->get('max_consecutive_prerequisite_fails','0')+0;
@@ -96,7 +98,35 @@ sub runProcessor
 
     my $runno=0;
     my $terminate=0;
+
+    my @rundates=();
     for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY*$increment )
+    {
+        push(@rundates,$date);
+    }
+
+    if( $procorder eq 'forwards' )
+    {
+        @rundates=reverse(@rundates);
+    }
+    elsif( $procorder eq 'random' )
+    {
+        @rundates = List::Util::shuffle(@rundates);
+    }
+    elsif( $procorder eq 'binary_fill' )
+    {
+        my @dateb=();
+        foreach my $r (@rundates)
+        {
+            my $bin=unpack('B10',pack('c',int(($r-$start_date)/$SECS_PER_DAY)));
+            $bin = reverse( $bin );
+            push(@dateb,[$r,$bin]);
+        }
+        @dateb=sort {$a->[1] cmp $b->[1]} @dateb;
+        @rundates=map {$_->[0]} @dateb;
+    }
+
+    foreach my $date (@rundates)
     {
         last if $terminate;
         # Test for a stop file ..
@@ -1321,6 +1351,13 @@ __END__
  # Number of days to subtract for each day processed
 
  date_increment 1
+
+ # Order of processing.  Options are forwards (from earliest date),
+ # backwards (from latest date), binary_fill (fills with scheme that 
+ # aims to provide uniform coverage while filling), and random
+ # Default is backwards
+ 
+ processing_order backwards
  
  # Limits on number of jobs.  0 = unlimited
  # Maximum number of days is the maximum number of days that will be processed,

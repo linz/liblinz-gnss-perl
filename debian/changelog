@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.46.0-1) trusty; urgency=medium
+
+  * Adding processing order options to daily processor
+  * Adding getSubTypes function
+  * Adding option for installing files directly into bernese campaign
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 23 Mar 2016 07:56:25 +1300
+
 liblinz-gnss-perl (1.45.0-1) trusty; urgency=medium
 
   * Expanding parse_gnss_date to handle some time formats and adding decimal year to gnssdate

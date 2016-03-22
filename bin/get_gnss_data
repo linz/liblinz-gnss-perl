@@ -21,13 +21,27 @@ if( $@ )
 }
 
 my %opts;
-getopts('d:f:ilshc',\%opts);
+getopts('b:d:f:ilshc',\%opts);
+my $campaign=$opts{b} || '';
 my $dir=$opts{d} || '.';
 $dir='' if $opts{c};
+$campaign='' if $opts{c};
 my $listonly=$opts{s};
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
+
+my $target=$dir;
+if( $campaign )
+{
+    die "Bernese campaign $campaign does not exist\n"
+        if ! -d $ENV{P}.'/'.$campaign;
+    $target=LINZ::GNSS::DataCenter::GetCenter('bernese');
+}
+else
+{
+    $campaign='local';
+}
 
 if( $opts{l} )
 {
@@ -104,7 +118,7 @@ eval
         }
 
         my $request = join(' ',$type,$date,$stations[0]);
-        $request = LINZ::GNSS::DataRequest::Parse($request);
+        $request = LINZ::GNSS::DataRequest::Parse($request,$campaign);
         @stations=('NONE') if ! $request->use_station;
         while (my $s=shift @stations)
         {
@@ -121,7 +135,7 @@ eval
                 print "\n";
                 next;
             }
-            my ($status,$when,$files)=$cache->getData($request,$dir,queue=>0);
+            my ($status,$when,$files)=$cache->getData($request,$target,queue=>0);
             if( $status eq COMPLETED )
             {
                 my $reqstr=$request->type.':'.$request->supplied_subtype;
@@ -239,6 +253,10 @@ Specifies that the files will be retrieved to the cache, but not copied to a tar
 =item -d dirname
 
 Specifies the directory into which files will be downloaded.  The default is the current directory.
+
+=item -b campaign
+
+Specificies the name of a bernese campaign that the data will be loaded in to
 
 =item -f filename
 

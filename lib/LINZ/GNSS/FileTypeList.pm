@@ -180,6 +180,32 @@ sub getTypes
     return wantarray ? @result : \@result;
 }
 
+=head2 @subtypes = $typelist->getSubTypes($type,$plustypes)
+
+Returns a list of valid subtypes for a type.  If $plustypes is true then
+~The list may include '+' types where there is a higher priority option for a type.
+
+May be called as LINZ::GNSS::FileTypeList->getSubTypes($type)
+
+=cut
+
+sub getSubTypes
+{
+    my($self,$type,$plustypes) = @_;
+    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
+    my @types=sort {$b->{priority} <=> $a->{priority} || $a->{subtype} cmp $b->{subtype}} values(%{$self->{$type}});
+    my @subtypes=();
+    foreach my $t (@types)
+    {
+        if( $plustypes && $t->{priority} && $t->{priority} < $types[0]->{priority} )
+        {
+            push(@subtypes,$t->{subtype}.'+');
+        }
+        push(@subtypes,$t->{subtype});
+    }
+    return wantarray ? @subtypes : \@subtypes;
+}
+
 =head2 $typelist->setFilename( $type, $subtype, $filename );
 
 Reset the filename for a type and subtype(s) in a list. The new filename should 

@@ -1,8 +1,5 @@
 #!/usr/bin/perl 
 
-eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
-    if 0; # not running under some shell
-
 =head1 gnss_ftp_mirror
 
 Simple ftp mirror script to recursely mirror files from a remote ftp site 
@@ -177,7 +174,9 @@ $confdir = '.' if $confdir eq '';
 
 my %config=Config::General->new(
     -ConfigFile=>$conffile,
-    -LowerCaseNames=>1,)->getall();
+    -LowerCaseNames=>1,
+    -UseApacheInclude=>1,
+    -IncludeRelative=>1 )->getall();
 
 foreach my $k (keys %argconfig)
 {
@@ -220,6 +219,7 @@ $config{verbose} = 1 if $verbose;
 
 my $codes=$config{codes};
 $codes = join(' ',@$codes) if ref($codes) eq 'ARRAY';
+$codes = join(' ',keys %$codes) if ref($codes) eq 'HASH';
 my $validcodes={};
 my $allcodes=0;
 foreach my $c (split(' ',$codes))
@@ -321,6 +321,7 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
     $p =~ s/\./\\./g;
     $p =~ s/\?/./g;
     $p =~ s/\*/.*/g;
+    $p =~ s/\(\.\<(\w+)\>/(?<\1>/g;
     $p =~ s/(\{(\w+)\})/
              exists $patterns{$2} ?
                 '(?<'.$2.'>'.$patterns{$2}.')' :
@@ -328,7 +329,7 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
                 /exg;
     $p = '^'.$p.'$';
 
-    my @fields=( $p =~ /\?\<(\w+)\>/g );
+    my @fields=( $p =~ /\(\?\<(\w+)\>/g );
     push( @dirparts, { re=>qr/$p/, fields=>\@fields });
 }
 
@@ -796,6 +797,12 @@ __END__
  # replaced with components of the file path.
  #
  # {ENV:xxx} can be used to explicitly replace environment variables.
+ #
+ # Configuration items can be included from another file using:
+ #
+ # include filename
+ #
+ # Filenames are relative to this configuration file.
  
  # RemoteUri is the the base of the remote directory
  

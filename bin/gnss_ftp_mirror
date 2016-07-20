@@ -77,6 +77,7 @@ use Net::FTP;
 use Cwd;
 use File::Path;
 use File::Copy;
+use Time::Hires;
 use Config::General;
 use POSIX qw/strftime/;
 use LINZ::RunBatch;
@@ -89,6 +90,7 @@ Syntax: gnss_ftp_mirror.pl [-b|-B logfile] [options] config_file [item=value ...
 Options are:
    -b            Run in batch mode starting with 'at now'
    -B logfile    Run in batch mode with a specified log file
+   -n            List downloaded files
    -v            Verbose mode
    -V            Even more verbose
    -s ###        Start date to download (days before now)
@@ -143,7 +145,7 @@ my %patterns=(
 #=================================================================
 # Get options
 my %opts;
-getopts('Vvcis:e:p:r:',\%opts);
+getopts('Vvncis:e:p:r:',\%opts);
 
 if( $opts{c} )
 {
@@ -152,6 +154,7 @@ if( $opts{c} )
 }
 
 my $verbose=$opts{V} ? 2 : $opts{v} ? 1 : 0;
+my $listfiles=$opts{n};
 my $ignoresize=$opts{i};
 
 @ARGV >= 1 || die $syntax;
@@ -408,12 +411,12 @@ sub expandTarget
         $value =~ s/\{(\w+)\}/$opt->{$1}/eg;
         if( $value =~ /\{\w+\}/ )
         {
-            print "** Unresolved $variable name $value for $location\n";
+            print STDERR "** Unresolved $variable name $value for $location\n";
             return;
         }
         if( $result && $value ne $result )
         {
-            print "** Ambiguous $variable for $location ($result,$value)\n";
+            print STDERR "** Ambiguous $variable for $location ($result,$value)\n";
             return;
         }
         $result = $value;
@@ -428,7 +431,7 @@ sub downloadDir
     print "Processing $dirname\n" if $verbose;
     if( ! $ftp->cwd($dirname) )
     {
-        print "** Cannot access remote directory $dirname\n";
+        print STDERR "** Cannot access remote directory $dirname\n";
         return;
     }
     my ($dirs, $files) = $ftp->dirList();
@@ -451,7 +454,7 @@ sub downloadDir
             next if ! @$opts;
             downloadDir( $ftp, "$dirname/$dir", $opts, \@parts );
         }
-        print "** Job terminated - maximum run time expired\n" if $expired;
+        print STDERR "** Job terminated - maximum run time expired\n" if $expired;
         return;
     }
 
@@ -484,7 +487,7 @@ sub downloadDir
         {
             if( ! -f $target )
             {
-                print "** Cannot create file at $target - something is already there\n";
+                print STDERR "** Cannot create file at $target - something is already there\n";
                 next;
             }
             # Check the size - if it matches then assume the file is up to date.
@@ -518,7 +521,7 @@ sub downloadDir
 
         if( ! -d $tgtpath && ! File::Path::make_path($tgtpath) )
         {
-            print "** Cannot create target directory at $tgtpath\n";
+            print STDERR "** Cannot create target directory at $tgtpath\n";
             next;
         }
 
@@ -530,18 +533,19 @@ sub downloadDir
 
         if( ! $ftp->get($file,$tmp) )
         {
-            print "** Failed to download $dirname/$file\n";
-            print $ftp->message,"\n";
+            print STDERR "** Failed to download $dirname/$file\n";
+            print STDERR $ftp->message,"\n";
             unlink($tmp);
         }
         elsif( ! move($tmp,$target) )
         {
-            print "Failed to overwrite $target\n";
+            print STDERR "** Failed to overwrite $target\n";
             unlink($tmp);
         }
         else
         {
             print "Successfully downloaded $target\n" if $verbose;
+            print "$target\n" if $listfiles;
             if( $command )
             {
                 print "Running $command\n" if $verbose;
@@ -558,7 +562,7 @@ sub downloadDir
                     };
                     if( $@ )
                     {
-                        print $@;
+                        print STDERR $@;
                     }
                 }
                 chdir($cwd);
@@ -571,7 +575,7 @@ sub downloadDir
             }
         }
     }
-    print "** Job terminated - maximum run time expired\n" if $expired;
+    print STDERR "** Job terminated - maximum run time expired\n" if $expired;
 }
 
 # Simplistic parsing of a directory listing.
@@ -659,7 +663,7 @@ sub ftp
         print "Connecting to $host\n" if $self->verbose;
         $ftp=Net::FTP->new($host, Timeout=>$self->timeout);
         last if $ftp;
-        sleep( $self->reconnectwait) if $trying;
+        Time::HiRes::usleep( $self->reconnectwait * 1000000) if $trying;
     }
 
     if( ! $ftp )
@@ -689,7 +693,7 @@ sub reconnect
 {
     my( $self)=@_;
     $self->quit;
-    sleep( $self->reconnectwait );
+    Time::HiRes::usleep( $self->reconnectwait * 1000000 );
 }
 
 sub run
@@ -724,7 +728,7 @@ sub get
         $self->reconnect;
         $self->{_ndownload} = 0;
     }
-    sleep( $self->pause ) if $self->{_ndownload};
+    Time::HiRes::usleep( $self->pause * 1000000 ) if $self->{_ndownload};
     my $ntries=0;
     my $success=0;
     while( 1 )

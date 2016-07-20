@@ -36,6 +36,7 @@ use fields qw (
     name
     filetypes
     stncodes
+    excludestations
     allstations
     priority
     scratchdir
@@ -147,6 +148,12 @@ sub new
         if( $s eq '*' ) { $allstations=1; }
         else { $stncodes->{uc($s)}=$s; }
     }
+    my $notstnlist=$cfgdc->{notstations} || [];
+    my $excludestations={};
+    foreach my $s (split(' ',$notstnlist))
+    {
+        $excludestations->{uc($s)}=$s; 
+    }
     my $priority=$cfgdc->{priority} || 0;
 
     # Create a scratch directory that is unique
@@ -174,6 +181,7 @@ sub new
     $self->{name}=$name;
     $self->{filetypes}=$filetypes;
     $self->{stncodes}=$stncodes;
+    $self->{excludestations}=$excludestations;
     $self->{allstations}=$allstations;
     $self->{priority}=$priority;
     $self->{scratchdir}=$scratchdir;
@@ -327,6 +335,7 @@ sub LocalDirectory
 =head2 LINZ::GNSS::DataCenter::AvailableStations()
 
 Returns a sorted list of stations codes that may be available from the data centres
+
 =cut
 
 sub AvailableStations
@@ -537,6 +546,7 @@ sub name { return $_[0]->{name}; }
 sub uri { return $_[0]->{uri}; }
 sub filetypes { return $_[0]->{filetypes}; }
 sub stations { return sort(keys(%{$_[0]->{stncodes}})); }
+sub excludestations { return sort(keys(%{$_[0]->{excludestations}})); }
 sub priority { return $_[0]->{priority}; }
 sub scheme { return $_[0]->{scheme}; }
 sub basepath { return $_[0]->{basepath}; }
@@ -577,6 +587,24 @@ sub description
             }
         }
         $dsc .= "\n";
+        my @excludestations=$self->excludestations;
+        if( @excludestations )
+        {
+            $prefix="  Not stations: ";
+            my $nst=0;
+            foreach my $st (@excludestations)
+            {
+                $dsc.=$prefix.$st;
+                $nst++;
+                $prefix=' ';
+                if( $nst == 12 )
+                {
+                    $prefix="\n                ";
+                    $nst=0;
+                }
+            }
+            $dsc .= "\n";
+        }
     }
     return $dsc;
 }
@@ -633,7 +661,9 @@ sub checkRequest
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     return 0,undef if 
         $request->use_station && 
-        ! (($self->{allstations} && ! $matchstation) || exists $self->{stncodes}->{uc($request->station)});
+        ! ( ($self->{allstations} && ! $matchstation
+                 && ! exists $self->{excludestations}->{uc($request->station)})
+              || exists $self->{stncodes}->{uc($request->station)});
     return $self->filetypes->checkRequest($request,undef,$subtype);
 }
 

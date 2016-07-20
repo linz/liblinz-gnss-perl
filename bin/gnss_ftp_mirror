@@ -77,7 +77,7 @@ use Net::FTP;
 use Cwd;
 use File::Path;
 use File::Copy;
-use Time::Hires;
+use Time::HiRes;
 use Config::General;
 use POSIX qw/strftime/;
 use LINZ::RunBatch;

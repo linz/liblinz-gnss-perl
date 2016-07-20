@@ -1,3 +1,12 @@
+liblinz-gnss-perl (1.47.0-1) trusty; urgency=medium
+
+  * Fixing handling of captures in regexp and adding include file option
+  * gnss_ftp_mirror adding list new files, sub second timer resolution, errors to STDERR
+  * Fixing module name
+  * Adding option to exclude stations from DataCenter
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 21 Jul 2016 10:46:54 +1200
+
 liblinz-gnss-perl (1.46.0-1) trusty; urgency=medium
 
   * Adding processing order options to daily processor

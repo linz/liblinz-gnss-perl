@@ -87,9 +87,11 @@ sub readAscii
     my $lastkey='';
     while( my $line = <$lf> )
     {
-        if($line =~ s/^\s*(\d+\.(?:\d*|x))\s*//)
+        if($line =~ /^\s*(\d+\.+(?:\d*|x))\s*/)
         {
             $section=$1;
+            $section =~ s/\.+/\./;
+            $line =~ s/^\s*(\d+\.+(?:\d*|x))\s*//;
             $lastkey='';
         }
         next if $line !~ /\s*(\S.*?)?\s*\:\s*(\S.*?)?\s*$/;

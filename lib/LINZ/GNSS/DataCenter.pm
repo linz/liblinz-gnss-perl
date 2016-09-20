@@ -149,6 +149,7 @@ sub new
         else { $stncodes->{uc($s)}=$s; }
     }
     my $notstnlist=$cfgdc->{notstations} || [];
+    $notstnlist = ref($notstnlist) eq 'ARRAY' ? join(' ',@$notstnlist) : $notstnlist;
     my $excludestations={};
     foreach my $s (split(' ',$notstnlist))
     {
@@ -532,6 +533,8 @@ Accessor functions for attributes of the data centre. Attributes are:
 
 =item stations
 
+=item excludestations
+
 =item priority
 
 =item scheme
@@ -662,8 +665,12 @@ sub checkRequest
     return 0,undef if 
         $request->use_station && 
         ! ( ($self->{allstations} && ! $matchstation
-                 && ! exists $self->{excludestations}->{uc($request->station)})
-              || exists $self->{stncodes}->{uc($request->station)});
+              || exists $self->{stncodes}->{uc($request->station)}));
+
+    return 0,undef if
+        $request->use_station  
+        && exists $self->{excludestations}->{uc($request->station)};
+
     return $self->filetypes->checkRequest($request,undef,$subtype);
 }
 

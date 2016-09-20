@@ -489,15 +489,15 @@ sub parse_gnss_date
         {
             $seconds=ymdhms_seconds($1,$2,$3,0,0,0);
         }
-        # yyyy ddd
-        elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
-        {
-            $seconds=yearday_seconds($1,$2);
-        }
         # wwww d  (week day)
         elsif( $datestr=~/^(\d\d\d\d)(?:w\s*|\W+)([0-6])$/i )
         {
             $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
+        }
+        # yyyy ddd
+        elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
+        {
+            $seconds=yearday_seconds($1,$2);
         }
         # ssssssssss
         elsif( $datestr =~ /^\d{10}$/ )

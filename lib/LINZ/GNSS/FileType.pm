@@ -60,6 +60,7 @@ use LINZ::GNSS::Time qw(
     $SECS_PER_WEEK
     $GNSSTIME0
 );
+use LINZ::GNSS::Variables qw(ExpandEnv);
 
 our $freqmap = {
     'hourly'  => $SECS_PER_HOUR,
@@ -463,7 +464,7 @@ sub _expandName
         $1 eq uc($1) ? uc($timeCodes->{lc($1)}) :
         $timeCodes->{lc($1)}
        /exg; 
-    $name =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined\n"/eg;
+    $name=ExpandEnv($name,"for filetype ".$self->{name});
     return $name;
 }
 

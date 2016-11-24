@@ -29,6 +29,7 @@ use LINZ::GNSS::Time qw/
     yearday_seconds
     seconds_yearday
     /;
+use LINZ::GNSS::Variables qw/ExpandEnv/;
 use List::Util;
 use Log::Log4perl qw(:easy);
 
@@ -342,8 +343,7 @@ sub runBernesePcf
             UseStandardSessions=>1,
             );
         $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
-        $campdir=$campaign->{CAMPAIGN};
-        $campdir =~ s/\$\{(\w+)\}/$ENV{$1}/eg;
+        $campdir = ExpandEnv($campaign->{CAMPAIGN},'for campaign directory');
         $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
         $self->setPcfParams($pcf_params,$campaign->{variables});
         $self->info("Campaign dir: $campdir");

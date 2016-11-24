@@ -65,6 +65,7 @@ use Log::Log4perl;
 
 use LINZ::GNSS::FileCompression;
 use LINZ::GNSS::DataRequest qw(UNAVAILABLE PENDING DELAYED COMPLETED);
+use LINZ::GNSS::Variables qw(ExpandEnv);
 
 our $nextid=0;
 our $centers=[];
@@ -164,7 +165,7 @@ sub new
     my $scratchdir=$LINZ::GNSS::DataCenter::scratchdir."/gnss_gdt_$id"."_".$$;
 
     # Process the object
-    $uri =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined for datacenter $name\n"/eg;
+    $uri = ExpandEnv($uri,"for datacenter $name");
     my $uriobj=URI->new($uri);
     my $scheme=$uriobj->scheme || 'file';
     my $host='';

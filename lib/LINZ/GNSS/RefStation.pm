@@ -14,6 +14,7 @@ use Time::Local;
 use File::Path qw(make_path);
 use Storable;
 use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime/;
+use LINZ::GNSS::Variables qw/ExpandEnv/;
 use Log::Log4perl qw/get_logger/;
 use Carp;
 
@@ -64,7 +65,7 @@ sub LoadConfig
    }
 
     $refstn_filename = $cfg->{refstationfilename};
-    $refstn_filename =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined for reference station filename\n"/eg;
+    $refstn_filename = ExpandEnv($refstn_filename, 'for reference station filename');
     if( $refstn_filename !~ /\[ssss\]/)
     {
         croak("Reference station filename in configuration must include [ssss] as code placeholder");
@@ -78,7 +79,7 @@ sub LoadConfig
     if( exists( $cfg->{refstationcachedir} ) )
     {
         $refstn_cachedir = $cfg->{refstationcachedir};
-        $refstn_cachedir =~ s/\$\{(\w+)\}/$ENV{$1} || croak "Environment variable $1 not defined for reference station cache directory\n"/eg;
+        $refstn_cachedir = ExpandEnv($refstn_cachedir, 'for reference station cache directory');
     }
 
     if( exists($cfg->{rankdistancefactor}) )

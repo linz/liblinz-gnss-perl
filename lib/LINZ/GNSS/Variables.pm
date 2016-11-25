@@ -65,7 +65,7 @@ sub ExpandEnv
     my $maxiterations=5;
     while( $maxiterations-- > 0 )
     {
-        last if ! ($string =~ s/\$\{([\w\|]+(?:\|\|[^\}]*)?)\}/_expand($1,$context)/eg);
+        last if ! ($string =~ s/\$\{([\w\|]+(?:\|\|[^\{\}]*)?)\}/_expand($1,$context)/eg);
     }
     return $string;
 }

@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.50.1-2) xenial; urgency=medium
+
+  * Adding missing dependency
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 06 Jan 2017 07:03:09 +1300
+
 liblinz-gnss-perl (1.48.0-1) trusty; urgency=medium
 
   [ Dionne Hansen ]

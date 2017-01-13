@@ -459,7 +459,7 @@ Writes an end of data record to an output file $ofh.
 sub writeEndData
 {
     my( $self, $ofh ) = @_;
-    print $ofh "$$ END TABLE\n";
+    print $ofh "\$\$ END TABLE\n";
 }
 
 package LINZ::GNSS::BLQFile::Data;

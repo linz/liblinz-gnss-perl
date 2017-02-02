@@ -20,7 +20,7 @@ if that is not defined it will try to use an environment variable xxx.
 Supplied as an array of var=value strings can be interpreted and will over-ride
 any settings in the configuration file
 
-=item An configuration override can be specified config=xxx
+=item A configuration override can be specified config=xxx
 
 If specified then the script will look for variables "var-xxx" before var
 in the configuration file.  This allows overriding a few parameters in the
@@ -61,6 +61,33 @@ using the setTime function. They are in terms of gmtime.
 
 Each of the variables can also be offset by a number of days, eg
 ${yyyy+14} ${ddd+14}
+
+=item Date based configuration overrides
+
+The file can include a special configuration item "date_based_configuration" 
+which defines alternative configuration settings based on date range, similar
+to the configuration override.  Date based configuration is defined by a multiline
+configuration in which each line is formatted as 
+
+    cfgtype before|after date [comment]
+
+For example
+
+  date_based_configuration <<END
+    finalorbits after now-30
+    posteq after 2016-11-13
+    nocod2 before 2005-08-01  CODE2 products not available before August 2005
+  END
+
+  products CODE2
+  products-nocod2 CODE
+
+The comment is ignored.  The configuration setting nocod2 will apply before 2005-08-01.
+Any other configuration item xxx can have an alternative version xxx-nocod2 which will
+be used before that date. If several date configurations are defined that could apply
+for an item then the first one in the date_based_configuration list will be used.
+For example in the configuration above if both finalorbits and posteq apply at
+the currently set date, then xxx-finalorbits would be used in preference to xxx-posteq.
 
 =back
 
@@ -134,8 +161,13 @@ sub new
         croak("Error reading config file $errfile: $message\n");
     }
 
-    my $self={data=>\%data,args=>\%args,configfile=>$cfgfile,_logger_init=>0};
+    my $suffices=[];
+    push(@$suffices,'-'.$args{config}) if $args{config};
+    push(@$suffices,'');
+
+    my $self={data=>\%data,args=>\%args,configfile=>$cfgfile,suffices=>$suffices,_logger_init=>0};
     bless $self,$class;
+    $self->_loadDateBasedConfiguration();
     $self->setTime(time());
 
     return $self;
@@ -145,6 +177,70 @@ sub _set
 {
     my($self,$key,$value)=@_;
     $self->{args}->{$key}=$value;
+}
+
+sub _loadDateBasedConfiguration
+{
+    my($self)=@_;
+    my $dbcfg=$self->getRaw('date_based_configuration');
+    my $dateconfigs=[];
+    foreach my $cfg (split(/\n/,$dbcfg))
+    {
+        my @parts=split(' ',$cfg);
+        next if ! @parts;
+        eval
+        {
+            die "Incomplete date based configuration item\n" 
+               if $#parts < 2;
+            my $cfgcode = lc($parts[0]);
+            my $before = lc($parts[1]);
+            my $datestr = $parts[2];
+            die "Invalid configuration $cfgcode\n" if $cfgcode !~ /^\w+$/;
+            die "Need before/after not $before\n" if $before !~ /^(before|after)$/;
+            my $date;
+            eval
+            {
+                $date=parse_gnss_date($datestr);
+            };
+            die "Invalid date $datestr\n" if $@;
+            push(@$dateconfigs,[$before,$date,$cfgcode]);
+        };
+        if( $@ )
+        {
+            my $msg=$@;
+            $msg =~ s/\s*$//;
+            $msg .= " in date based configuration: $cfg\n";
+            die $msg;
+        }
+    }
+    $self->{date_configuration}=$dateconfigs;
+}
+
+sub _setDateBasedConfiguration
+{
+    my($self,$timestamp) = @_;
+    my @configs=();
+    my @sprefix=();
+    my $arg=$self->{args}->{config};
+    push(@sprefix,'-'.$arg) if $arg;
+    push(@sprefix,'');
+    foreach my $dbc ( @{$self->{date_configuration}} )
+    {
+        my ($before,$date,$cfgcode) = @$dbc;
+        my $isok=$timestamp < $date;
+        $isok = ! $isok if $before eq 'after';
+        push(@configs,$cfgcode) if $isok;
+    }
+    my @suffices=();
+    foreach my $sp ( @sprefix )
+    {
+        foreach my $dc (@configs)
+        {
+            push( @suffices, $sp.'-'.$dc );
+        }
+        push( @suffices, $sp );
+    }
+    $self->{suffices}=\@suffices;
 }
 
 
@@ -165,6 +261,7 @@ sub setTime
     $self->_set('mm',sprintf("%02d",$mon+1));
     $self->_set('dd',sprintf("%02d",$day));
     $self->_set('ddd',sprintf("%03d",$yday+1));
+    $self->_setDateBasedConfiguration( $timestamp );
 }
 
 
@@ -182,15 +279,11 @@ sub getRaw
 
     return $self->{args}->{$lkey} if exists $self->{args}->{$lkey};
 
-    my $cfg=$self->{args}->{config};
-
-    if( $cfg )
+    foreach my $sf (@{$self->{suffices}})
     {
-        my $cfgkey=$lkey.'-'.$cfg;
+        my $cfgkey=$lkey.$sf;
         return $self->{data}->{$cfgkey} if exists $self->{data}->{$cfgkey};
     };
-
-    return $self->{data}->{$lkey} if exists $self->{data}->{$lkey};
 
     if( $lkey =~ /^pid_(\d)$/ )
     {

@@ -151,6 +151,14 @@ sub LoadConfig
             Log::Log4perl->easy_init($DEBUG);
         }
     };
+    # Set up default logger if fail to init
+    if( $@ )
+    {
+        my $errmsg=$@;
+        Log::Log4perl->easy_init($DEBUG);
+        my $logger=Log::Log4perl::get_logger('LINZ.GNSS');
+        $logger->error($errmsg);
+    }
     LINZ::GNSS::FileCompression::LoadCompressionTypes( $config );
     LINZ::GNSS::FileTypeList::LoadDefaultTypes( $config );
     LINZ::GNSS::DataCenter::LoadDataCenters( $config );

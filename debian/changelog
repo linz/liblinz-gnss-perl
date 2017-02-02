@@ -1,3 +1,14 @@
+liblinz-gnss-perl (1.51.0-1) xenial; urgency=medium
+
+  [ Dionne Hansen ]
+  * Corrected end of table print statement
+
+  [ Chris Crook ]
+  * Handling error in Log4perl initiallization
+  * Adding date based configuration
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 03 Feb 2017 08:45:49 +1300
+
 liblinz-gnss-perl (1.50.1-2) xenial; urgency=medium
 
   * Adding missing dependency

@@ -419,7 +419,7 @@ sub writeBlqData
     $computed ||= $blqdata->{computed};
     $computed ||= "Computed by LINZ BLQFile routines";
     print $ofh "\$\$\n";
-    print $ofh " ".$blqdata->{code}."\n";
+    print $ofh "  ".$blqdata->{code}."\n";
     print $ofh "\$\$ ".$self->{model}."\n";
     print $ofh "\$\$ ".$computed."\n";
     printf $ofh "\$\$ %-26s RADI TANG  lon/lat: %9.4f %9.4f %9.3f\n",

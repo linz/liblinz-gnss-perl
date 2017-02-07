@@ -24,6 +24,7 @@ logdir=/var/log/bernese52/getdata
 
 case "$1" in
     configure)
+        groupadd -f bern_users
         # Create the directory for GNSS reference stations
         mkdir -p $refstndir
         chown -R :bern_users $refstndir

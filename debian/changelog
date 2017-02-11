@@ -1,3 +1,12 @@
+liblinz-gnss-perl (1.53.0-1) xenial; urgency=medium
+
+  [ Dionne Hansen ]
+  * missing space before station code stopped bernese from using the ocean tide loading values for that site.
+
+  [ Chris Crook ]
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Sun, 12 Feb 2017 08:01:47 +1300
+
 liblinz-gnss-perl (1.51.0-2) xenial; urgency=medium
 
   * Fixed missing group bern_users

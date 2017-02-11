@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.52.0-1) xenial; urgency=medium
+
+  * Adding gnss_ftp_mirror configuration to prevent downloading if already done recently
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Sun, 12 Feb 2017 07:58:31 +1300
+
 liblinz-gnss-perl (1.51.0-2) xenial; urgency=medium
 
   * Fixed missing group bern_users

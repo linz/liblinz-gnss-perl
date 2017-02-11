@@ -142,6 +142,30 @@ my %patterns=(
     'Code' => '[A-Za-z0-9]{4}',
 );
 
+# Convert a time duration to seconds. Format is a number
+# followed optionally by s,m,h,d for seconds, hours, minutes,
+# days.  Default is minutes.
+
+my %timeunitconv=(
+    's' => 1,
+    'm' => 60,
+    'h' => 60*60,
+    'd' => 60*60*24,
+);
+
+my $timespanre=qr/^\s*(\d+(?:\.\d*)?)\s*((?:s(?:econds?)?|m(?:inutes?)?|h(?:ours?)?|d(?:ays?)?)?)\s*$/;
+
+sub timeToSeconds
+{
+    my($spanstr)=@_;
+    $spanstr=lc($spanstr);
+    return 0 if $spanstr !~ $timespanre;
+    my $seconds=$1;
+    my $units=substr($2 || 'm',0,1);
+    $seconds *= $timeunitconv{$units};
+    return $seconds;
+}
+
 #=================================================================
 # Get options
 my %opts;
@@ -237,6 +261,8 @@ my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
 my $markerpath=$config{markerpath};
 my $postdownloadcommand=$config{postdownloadcommand};
+my $statusfile=$config{statusfile};
+my $mintimesincerun=$config{mintimesincelastrun};
 my $dochdir=$config{postdownloadcommandchdir};
 $dochdir=0 if $dochdir =~ /(no|false)/i;
 
@@ -245,8 +271,18 @@ $startdate=parse_gnss_date($startdate);
 my $enddate=$endage =~ /^\d+$/ ? "now-$endage" : $endage;
 $enddate=parse_gnss_date($enddate);
 
-my $maxruntime=$config{maxruntime}+0;
+my $maxruntime=timeToSeconds($config{maxruntime});
 my $jobexpirytime = $maxruntime > 0 ? time()+$maxruntime*60 : 0;
+
+my $mintimesincesuccess=0;
+my $mintimesincefail=0;
+if( $mintimesincerun )
+{
+    my($minsucc,$minfail)=split(' ',$mintimesincerun);
+    $minfail=$minsucc if $minfail eq '';
+    $mintimesincesuccess=timeToSeconds($minsucc);
+    $mintimesincefail=timeToSeconds($minfail);
+}
 
 my $ftp=new FtpConnection( %config );
 
@@ -279,6 +315,35 @@ if( $verbose )
         printf "Downloading:      %d codes\n",scalar(keys %$validcodes);
     }
     printf "FTP timeout:     %s\n",$ftp->timeout;
+    if( $mintimesincesuccess || $mintimesincefail )
+    {
+        printf "Min time since last successful run: %.1f minutes\n",$mintimesincesuccess/60;
+        printf "Min time since last failed run:     %.1f minutes\n",$mintimesincefail/60;
+    }
+}
+
+# Test status file
+
+my $successfile=$statusfile.'.success' if $statusfile;
+my $failfile=$statusfile.'.fail' if $statusfile;
+
+if( $statusfile )
+{
+    if( (-e $successfile && $mintimesincesuccess > $SECS_PER_DAY*(-M $successfile) )
+     || (-e $failfile && $mintimesincefail > $SECS_PER_DAY*(-M $failfile) ) )
+    {
+        if( $verbose )
+        {
+            print "Skipping download as already done recently\n";
+            exit;
+        }
+    }
+    # Get rid of old status files, create a fail file.  Replace
+    # with success file if complete successfully.
+    unlink($successfile);
+    unlink($failfile);
+    open(my $ffh, ">$failfile") || die "Cannot create status file $failfile\n";
+    close($ffh);
 }
 
 # Ensure outputs are flushed to make it easy to monitor progress..
@@ -324,7 +389,7 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
     $p =~ s/\./\\./g;
     $p =~ s/\?/./g;
     $p =~ s/\*/.*/g;
-    $p =~ s/\(\.\<(\w+)\>/(?<\1>/g;
+    $p =~ s/\(\.\<(\w+)\>/(?<$1>/g;
     $p =~ s/(\{(\w+)\})/
              exists $patterns{$2} ?
                 '(?<'.$2.'>'.$patterns{$2}.')' :
@@ -339,6 +404,13 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
 
 downloadDir( $ftp, $ftp->basedir, \@valid_dates, \@dirparts );
 $ftp->quit();
+
+if( $statusfile )
+{
+    unlink($failfile);
+    open(my $ffh, ">$successfile") || die "Cannot create status file $successfile\n";
+    close($successfile);
+}
 
 if( $verbose )
 {
@@ -838,6 +910,17 @@ __END__
  # Maximum runtime in minutes - once this time has expired the job will finish
  
  MaxRunTime 120
+
+ # StatusFile - if this is defined then at the completion of the run there
+ # will be a file named either xxx.success or xxx.fail.  The age of this can
+ # be tested with the MinTimeSinceLastRun option.  This specifies either a 
+ # single time, or two times (since success and since failure).  Time can
+ # be followed by h or d for hours or days (eg 5d).  Default is hours.  
+ # If the script is run sooner than the minimum time then it will stop 
+ # immediately.
+ 
+ # StatusFile .mirror_status
+ # MinTimeSinceLastRun 7d 4
  
  # RemotePath is the path to the files to download.
  #

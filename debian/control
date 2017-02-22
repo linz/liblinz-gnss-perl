@@ -29,6 +29,7 @@ Depends: ${misc:Depends} liblinz-geodetic-perl,
     libwww-perl,
     libperlio-gzip-perl,
     linz-rinex-rnxcmp,
+    linz-coordsys,
     gzip,
     ncompress
 Description: LINZ::GNSS perl modules for managing GNSS data downloads

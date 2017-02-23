@@ -1,3 +1,13 @@
+liblinz-gnss-perl (1.53.1-1) xenial; urgency=medium
+
+  [ Dionne Hansen ]
+  * Added data center to point to archive of private CORS data on rad1 /home/positionz/CORS_providers_data, and lists all global survey and geosystems site codes
+
+  [ Chris Crook ]
+  * Restoring getdata.conf changes
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 24 Feb 2017 12:08:41 +1300
+
 liblinz-gnss-perl (1.53.0-2) xenial; urgency=medium
 
   * Adding missing dependency

@@ -260,6 +260,7 @@ my $remotedir=$config{remotedir};
 my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
 my $markerpath=$config{markerpath};
+my $commandshell=$config{postdownloadcommandshell};
 my $postdownloadcommand=$config{postdownloadcommand};
 my $statusfile=$config{statusfile};
 my $mintimesincerun=$config{mintimesincelastrun};
@@ -298,6 +299,7 @@ if( $verbose )
     print  "Remote file RE:        $remotefilere\n";
     print  "Target file path:      $targetpath\n";
     print  "Marker file path:      $markerpath\n";
+    print  "Post download shell    $commandshell\n" if $commandshell;
     print  "Post download command: $postdownloadcommand\n";
     printf "Change dir for pdc   : %s\n",$dochdir ? 'yes' : 'no';
     printf "Start date:            %04d:%03d\n",seconds_yearday($startdate);
@@ -618,7 +620,24 @@ sub downloadDir
         {
             print "Successfully downloaded $target\n" if $verbose;
             print "$target\n" if $listfiles;
-            if( $command )
+            if( $command && $commandshell )
+            {
+                my $cwd=getcwd;
+                chdir($tgtpath) if $dochdir;
+                print "Running postdownload script with $commandshell";
+                eval
+                {
+                    open(my $shell, "| $commandshell" ) || die "Cannot execute $commandshell\n";
+                    print $shell $command;
+                    close($shell);
+                };
+                if( $@ )
+                {
+                    print STDERR $@;
+                }
+                chdir($cwd);
+            }
+            elsif( $command )
             {
                 print "Running $command\n" if $verbose;
                 my $cwd=getcwd;

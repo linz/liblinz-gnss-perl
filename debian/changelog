@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.54.0-1) xenial; urgency=medium
+
+  * Modified to allow using a command shell to execute post download command script
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 30 Mar 2017 06:01:57 +1300
+
 liblinz-gnss-perl (1.53.1-1) xenial; urgency=medium
 
   [ Dionne Hansen ]

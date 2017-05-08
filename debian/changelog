@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.54.1-1) xenial; urgency=medium
+
+  * Fixing error when date_based_configuration not defined
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 09 May 2017 10:16:33 +1200
+
 liblinz-gnss-perl (1.54.0-1) xenial; urgency=medium
 
   * Modified to allow using a command shell to execute post download command script

@@ -182,7 +182,7 @@ sub _set
 sub _loadDateBasedConfiguration
 {
     my($self)=@_;
-    my $dbcfg=$self->getRaw('date_based_configuration');
+    my $dbcfg=$self->getRaw('date_based_configuration','');
     my $dateconfigs=[];
     foreach my $cfg (split(/\n/,$dbcfg))
     {

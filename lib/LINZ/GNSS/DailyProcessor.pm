@@ -356,7 +356,7 @@ sub runBernesePcf
         foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
         {
             next if $cfdef =~ /^\s*$/;
-            if( $cfdef !~ /^\s*(\w+)\s+(\w.*?)\s*$/i )
+            if( $cfdef !~ /^\s*(\w+)\s+((?:\/|\w).*?)\s*$/i )
             {
                 $self->error("Invalid pcf_campaign_file definition: $cfdef");
                 $return=0;

@@ -300,7 +300,7 @@ sub runBernesePcf
     return 1 if $pcf eq '' || lc($pcf) eq 'none';
 
     # If params is defined then use (which allows overriding default params with none)
-    $pcf_params //= $self->get('pcf_params');
+    $pcf_params //= $self->get('pcf_params','');
     my $pcf_cpu=$self->get('pcf_cpufile','UNIX'); 
     my $return=1;
 

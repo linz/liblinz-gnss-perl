@@ -519,7 +519,7 @@ sub Merge
                 version type satsys 
                 markname marknumber 
                 antnumber anttype 
-                recnumber rectype recversion 
+                recnumber rectype  
                 delta_hen 
                 obstypes
             /)

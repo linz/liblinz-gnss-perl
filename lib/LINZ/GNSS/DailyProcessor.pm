@@ -300,7 +300,7 @@ sub runBernesePcf
     return 1 if $pcf eq '' || lc($pcf) eq 'none';
 
     # If params is defined then use (which allows overriding default params with none)
-    $pcf_params //= $self->get('pcf_params');
+    $pcf_params //= $self->get('pcf_params','');
     my $pcf_cpu=$self->get('pcf_cpufile','UNIX'); 
     my $return=1;
 
@@ -356,7 +356,7 @@ sub runBernesePcf
         foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
         {
             next if $cfdef =~ /^\s*$/;
-            if( $cfdef !~ /^\s*(\w+)\s+(\w.*?)\s*$/i )
+            if( $cfdef !~ /^\s*(\w+)\s+((?:\/|\w).*?)\s*$/i )
             {
                 $self->error("Invalid pcf_campaign_file definition: $cfdef");
                 $return=0;

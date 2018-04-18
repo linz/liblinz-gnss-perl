@@ -1,3 +1,16 @@
+liblinz-gnss-perl (1.55.0-1) xenial; urgency=medium
+
+  [ Chris Crook ]
+  * Allowing pcf_campaign_files to have an absolute path
+  * Fixing bug causing silent fail if pcf_params not defined
+
+  [ dnhansen50 ]
+  * removed check for firmware version number, it was causing concatenation failures, where a firmware upgrade should not stop a file merge over 2 days
+
+  [ Chris Crook ]
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 19 Apr 2018 09:24:32 +1200
+
 liblinz-gnss-perl (1.54.1-1) xenial; urgency=medium
 
   * Fixing error when date_based_configuration not defined

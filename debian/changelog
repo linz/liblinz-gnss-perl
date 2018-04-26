@@ -1,3 +1,14 @@
+liblinz-gnss-perl (1.56.0-1) xenial; urgency=medium
+
+  [ dnhansen50 ]
+  * Packaging
+  * added private cors sites and uri for the archive.
+  * Continuing getdata ping-pong
+
+  [ Chris Crook ]
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 26 Apr 2018 12:53:02 +1200
+
 liblinz-gnss-perl (1.55.0-1) trusty; urgency=medium
 
   [ Chris Crook ]

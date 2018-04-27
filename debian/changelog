@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.57.0-1) xenial; urgency=medium
+
+  * Adding option to retrieve data from a specific data centre
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 27 Apr 2018 14:45:16 +1200
+
 liblinz-gnss-perl (1.56.0-1) xenial; urgency=medium
 
   [ dnhansen50 ]

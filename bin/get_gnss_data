@@ -21,11 +21,15 @@ if( $@ )
 }
 
 my %opts;
-getopts('b:d:f:ilshc',\%opts);
+getopts('b:d:f:n:ilshc',\%opts);
+
+die "Cannot use -c option with -d, -b, or -n options\n" 
+    if $opts{c} && ($opts{b} || $opts{d} || $opts{n});
+die "Cannot use -d and -b options\n" if $opts{b} && $opts{d};
+
 my $campaign=$opts{b} || '';
 my $dir=$opts{d} || '.';
-$dir='' if $opts{c};
-$campaign='' if $opts{c};
+my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
@@ -88,7 +92,18 @@ else
 
 eval
 {
-    my $cache=LINZ::GNSS::FileCache::Cache();
+    my $cache;
+    my %options;
+    
+    if( $dcname )
+    {
+        $cache=LINZ::GNSS::DataCenter::GetCenter($dcname);
+    }
+    else
+    {
+        $cache=LINZ::GNSS::FileCache::Cache();
+        $options{queue}=0;
+    }
 
     my $nrequest=0;
     foreach my $argdata (@input)
@@ -135,7 +150,7 @@ eval
                 print "\n";
                 next;
             }
-            my ($status,$when,$files)=$cache->getData($request,$target,queue=>0);
+            my ($status,$when,$files)=$cache->getData($request,$target,%options);
             if( $status eq COMPLETED )
             {
                 my $reqstr=$request->type.':'.$request->supplied_subtype;
@@ -201,9 +216,9 @@ get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in 
 
 =head1 Synopsis
 
-    get_gnss_data [-s] [-d dirname | -c] date type [station ...]
-    get_gnss_data [-s] [-d dirname | -c] -f filename date
-    get_gnss_data [-s] [-d dirname | -c] -i date
+    get_gnss_data [options] date type [station ...]
+    get_gnss_data [options] -f filename date
+    get_gnss_data [options] -i date
     get_gnss_data -l
     get_gnss_data -s
     get_gnss_data -h
@@ -248,7 +263,11 @@ which case station codes will be extracted from a Bernese .CRD file.
 
 =item -c
 
-Specifies that the files will be retrieved to the cache, but not copied to a target directory
+Specifies that the files will be retrieved to the cache, but not copied to a target directory.
+
+=item -n dcname
+
+Specifies that the data will be downloaded from a specific data centre.  
 
 =item -d dirname
 
@@ -256,7 +275,7 @@ Specifies the directory into which files will be downloaded.  The default is the
 
 =item -b campaign
 
-Specificies the name of a bernese campaign that the data will be loaded in to
+Specificies the name of a bernese campaign into which files will be loaded.
 
 =item -f filename
 

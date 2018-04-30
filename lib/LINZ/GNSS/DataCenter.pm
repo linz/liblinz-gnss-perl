@@ -132,7 +132,7 @@ sub new
     my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
     my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
     my $timeout = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
-    my $ftp_passive = $cfgdc->{passive_ftp} || $LINZ::GNSS::DataCenter::ftp_passive;
+    my $ftp_passive = $cfgdc->{ftppassive} || $LINZ::GNSS::DataCenter::ftp_passive;
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
@@ -256,7 +256,7 @@ sub LoadDataCenters
     my $pwd=$cfg->{anonymousftppassword};
     $LINZ::GNSS::DataCenter::ftp_password=$pwd if $pwd;
 
-    my $passive=$cfg->{passiveftp};
+    my $passive=$cfg->{ftppassive};
     $LINZ::GNSS::DataCenter::ftp_passive=$passive if $passive;
 
     # Load data centers
@@ -728,6 +728,11 @@ sub connect
         {
             my $name=$self->{name};
             $self->_logger->info("Connecting datacenter $name to host $host");
+            $self->_logger->debug("Connection info: host $host");
+            $self->_logger->debug("Connection info: user $user");
+            $self->_logger->debug("Connection info: timeout $timeout");
+            $self->_logger->debug("Connection info: passive $passive");
+
             $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
             my $ftp=Net::FTP->new( $host, Timeout=>$timeout, Passive=>$passive )
                || croak "Cannot connect to $host\n";

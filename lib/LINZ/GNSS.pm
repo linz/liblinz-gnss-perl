@@ -96,6 +96,9 @@ The default filename is /etc/bernese52/getdata.conf
 Configuration from configfile.`hostname` will be merged into the 
 configuration if it exists.
 
+If the environment variable DEBUG_LINZGNSS is set then scripts 
+using LINZ::GNSS will emit debug output.
+
 =cut
 
 our $CoordSysList;

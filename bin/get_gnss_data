@@ -32,6 +32,8 @@ my $dir=$opts{d} || '.';
 my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
 
+help(!$opts{h}) if $opts{h} || ! @ARGV;
+
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
 
@@ -60,7 +62,6 @@ if( $listonly && ! @ARGV )
     exit();
 }
 
-help(!$opts{h}) if $opts{h} || ! @ARGV;
 
 my $date=shift(@ARGV);
 
@@ -212,7 +213,8 @@ __DATA__
 
 =head1 Name
 
-get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in the Bernese datapool
+get_gnss_data - retrieve GNSS data via the LINZ::GNSS file cache (by default in the Bernese datapool.  
+This script can only be used by a user configured to use the Bernese software.
 
 =head1 Synopsis
 

@@ -46,6 +46,7 @@ use fields qw (
     user
     password
     basepath
+    ftp_passive
     ftp
     timeout
     connected
@@ -73,6 +74,7 @@ our $prioritized_centers=[];
 our $ftp_user='anonymous';
 our $ftp_password='none';
 our $ftp_timeout=30;
+our $ftp_passive='default';
 
 sub _makepath
 {
@@ -130,6 +132,7 @@ sub new
     my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
     my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
     my $timeout = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
+    my $ftp_passive = $cfgdc->{passive_ftp} || $LINZ::GNSS::DataCenter::ftp_passive;
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
@@ -193,6 +196,7 @@ sub new
     $self->{basepath}=$uriobj->path;
     $self->{user} = $user;
     $self->{password} = $pwd;
+    $self->{ftp_passive} = $ftp_passive;
     $self->{ftp}=undef;
     $self->{timeout} = $timeout;
     $self->{connected}=undef;
@@ -251,6 +255,9 @@ sub LoadDataCenters
     # Default login information
     my $pwd=$cfg->{anonymousftppassword};
     $LINZ::GNSS::DataCenter::ftp_password=$pwd if $pwd;
+
+    my $passive=$cfg->{passiveftp};
+    $LINZ::GNSS::DataCenter::ftp_passive=$passive if $passive;
 
     # Load data centers
     my $dcs=$cfg->{datacenters}->{datacenter};
@@ -712,13 +719,17 @@ sub connect
         my $user=$self->{user};
         my $pwd=$self->{password};
         my $timeout=$self->{timeout};
+        my $ftpmode=$self->{ftp_passive};
+        my $passive;
+        $passive=1 if lc($ftpmode) eq 'on';
+        $passive=0 if lc($ftpmode) eq 'off';
 
         eval
         {
             my $name=$self->{name};
             $self->_logger->info("Connecting datacenter $name to host $host");
             $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
-            my $ftp=Net::FTP->new( $host, Timeout=>$timeout )
+            my $ftp=Net::FTP->new( $host, Timeout=>$timeout, Passive=>$passive )
                || croak "Cannot connect to $host\n";
 
             $self->{ftp}=$ftp;

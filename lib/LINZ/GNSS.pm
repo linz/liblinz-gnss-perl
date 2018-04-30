@@ -81,6 +81,7 @@ use LINZ::GNSS::DataCenter;
 use LINZ::GNSS::FileCache;
 use LINZ::GNSS::RefStation;
 use LINZ::Geodetic::CoordSysList;
+use Sys::Hostname;
 use Config::General qw(ParseConfig);
 use Log::Log4perl qw(:easy);
 use Carp;
@@ -91,6 +92,9 @@ Loads the configuration information for the main modules, FileTypeList,
 DataCenter, and FileCache.
 
 The default filename is /etc/bernese52/getdata.conf
+
+Configuration from configfile.`hostname` will be merged into the 
+configuration if it exists.
 
 =cut
 
@@ -105,6 +109,18 @@ sub _Config
     }
     croak("LINZ::GNSS configuration file $filename cannot be found\n") if ! -e $filename;
     my %config=ParseConfig(-ConfigFile=>$filename,-LowerCaseNames=>1);
+
+    my $configlocal=$filename.'.'.hostname;
+    if( -e $configlocal )
+    {
+        %config=ParseConfig(
+            -ConfigFile=>$configlocal,
+            -LowerCaseNames=>1,
+            -DefaultConfig=>\%config,
+            -MergeDuplicateOptions=>1,
+            -MergeDuplicateBlocks=>1
+            );
+    }
     return \%config;
 }
 

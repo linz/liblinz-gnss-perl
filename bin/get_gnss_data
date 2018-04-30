@@ -32,8 +32,6 @@ my $dir=$opts{d} || '.';
 my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
 
-help(!$opts{h}) if $opts{h} || ! @ARGV;
-
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig();
 
@@ -62,6 +60,7 @@ if( $listonly && ! @ARGV )
     exit();
 }
 
+help(!$opts{h}) if $opts{h} || ! @ARGV;
 
 my $date=shift(@ARGV);
 

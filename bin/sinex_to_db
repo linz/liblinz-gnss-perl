@@ -161,7 +161,7 @@ sub loadFile
         $nstn++;
         my $xyz=$stn->{xyz};
         my $cvr=$stn->{covar};
-        my $epoch=seconds_datetime($stn->{epoch});
+        my $epoch=seconds_datetime($stn->{ref_epoch});
         $sth->execute(
             $stn->{code}, 
             $solntype, 

@@ -5,7 +5,17 @@ liblinz-gnss-perl (1.59.0-1) trusty; urgency=medium
 
   [ Dionne Hansen ]
 
- -- Dionne Hansen <dhansen@linz.govt.nz>  Mon, 25 Jun 2018 16:50:16 +1200
+ -- Dionne Hansen <dhansen@linz.govt.nz>  Wed, 04 Jul 2018 15:00:00 +1200
+
+liblinz-gnss-perl (1.58.3-1) xenial; urgency=medium
+
+  [ dnhansen50 ]
+  * added eliot sinclair 'es' sites and positions partners 'pp' sites
+
+  [ Chris Crook ]
+  * Changing sinex_to_db to use reference epoch rather than midpoint of range of data for station
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 04 Jul 2018 14:37:00 +1200
 
 liblinz-gnss-perl (1.58.2-1) xenial; urgency=medium
 

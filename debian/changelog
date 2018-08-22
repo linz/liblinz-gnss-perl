@@ -1,3 +1,9 @@
+liblinz-gnss-perl (1.60.0-1) xenial; urgency=medium
+
+  * Removing filtering on model end date
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 23 Aug 2018 11:15:29 +1200
+
 liblinz-gnss-perl (1.59.0-1) trusty; urgency=medium
 
   [ dnhansen50 ]

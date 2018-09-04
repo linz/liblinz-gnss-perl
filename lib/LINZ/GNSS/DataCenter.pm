@@ -723,6 +723,8 @@ sub connect
         my $passive;
         $passive=1 if lc($ftpmode) eq 'on';
         $passive=0 if lc($ftpmode) eq 'off';
+	my %options=();
+	$options{Passive}=$passive if defined($passive);
 
         eval
         {
@@ -734,7 +736,7 @@ sub connect
             $self->_logger->debug("Connection info: passive $passive");
 
             $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
-            my $ftp=Net::FTP->new( $host, Timeout=>$timeout, Passive=>$passive )
+            my $ftp=Net::FTP->new( $host, Timeout=>$timeout, %options )
                || croak "Cannot connect to $host\n";
 
             $self->{ftp}=$ftp;

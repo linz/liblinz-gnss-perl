@@ -710,7 +710,9 @@ sub available
 {
     my($self,$time) = @_;
     return 0 if $time < $self->{start_date};
-    return 0 if $self->{end_date} && $time > $self->{end_date};
+    # End date is end of available observations when model generated, so
+    # ignore for PositioNZ-PP as we expect to extrapolate.
+    # return 0 if $self->{end_date} && $time > $self->{end_date};
     foreach my $outage (@{$self->{outages}})
     {
         return 0 if $time >= $outage->{start} && $time <= $outage->{end};
@@ -732,12 +734,12 @@ sub availability
 {
     my ($self,$start,$end,$use_unreliable) = @_;
     return 0 if $self->{start_date} > $end;
-    return 0 if $self->{end_date} && $self->{end_date} < $start;
+    #return 0 if $self->{end_date} && $self->{end_date} < $start;
     my $total=$end-$start;
     return 0 if $total <= 0;
     my $available=$total;
     $available -= _max(0,$self->{start_date}-$start);
-    $available -= _max(0,$end-$self->{end_date}) if $self->{end_date};
+    #$available -= _max(0,$end-$self->{end_date}) if $self->{end_date};
     foreach my $outage (@{$self->{outages}})
     {
         next if $use_unreliable && $outage->{status} == UNRELIABLE;

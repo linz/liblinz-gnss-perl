@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.60.2-1) xenial; urgency=medium
+
+  [ Dionne Hansen ]
+  * added array to deal with differing interpretation of undefined value from Perl 18 to 26
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 13 Sep 2018 06:00:15 +1200
+
 liblinz-gnss-perl (1.60.1-1) xenial; urgency=medium
 
   * Further fixes to handle ignoring ref station end date

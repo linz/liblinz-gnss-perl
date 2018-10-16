@@ -1296,7 +1296,7 @@ __END__
  #   start_date-rapid -2
  #
  # Will use -14 for start_date by default, and -2 if the script is run
- # with cfg=rapid on the command line.
+ # with config=rapid as a suffix on the command line.
  
  # Working directories.  Paths are relative to the location of this
  # configuration file.  

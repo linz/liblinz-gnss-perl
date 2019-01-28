@@ -1,4 +1,3 @@
-use strict;
 
 =head1 LINZ::GNSS::DataCenter
 
@@ -34,6 +33,8 @@ package LINZ::GNSS::DataCenter;
 use fields qw (
     id
     name
+    user
+    password
     filetypes
     stncodes
     excludestations
@@ -43,12 +44,7 @@ use fields qw (
     uri
     scheme
     host
-    user
-    password
     basepath
-    ftp_passive
-    ftp
-    timeout
     connected
     fileid
     _logger
@@ -57,7 +53,6 @@ use fields qw (
 # scratchdir, fileid, and ftp are managed internally to 
 
 use Carp;
-use Net::FTP;
 use URI;
 use URI::file;
 use File::Path qw( make_path remove_tree );
@@ -85,6 +80,39 @@ sub _makepath
     make_path($path,{error=>\$errval, mode=>0777});
     umask($umask);
     return -d $path ? 1 : 0;
+}
+
+sub _getnameuri
+{
+    my ($cfgdc)=@_;
+    my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
+    my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
+    $uri = ExpandEnv($uri,"for datacenter $name");
+    my $uriobj=URI->new($uri);
+    my $scheme=$uriobj->scheme || 'file';
+    return $name,$uri, $scheme;
+}
+
+=head2 LINZ::GNSS::DataCenter::Create($cfgdc)
+
+Class factory creating a DataCenter.  This instantiates a 
+DataCenter subclass based on the type defined in the 
+configuration.  If this is not explicitly defined then the 
+scheme of the URI is used (eg ftp, http, https, file).
+
+=cut
+
+sub Create
+{
+    my ($cfgdc) = @_;
+    my ($name,$uri,$scheme)=_getnameuri($cfgdc);
+    my $class=$cfgdc->{type} || ucfirst(lc($scheme));
+    $class="LINZ::GNSS::DataCenter::$class";
+    my $location=$class;
+    $location =~ s/\:\:/\//g;
+    $location .= '.pm';
+    require $location;
+    return $class;
 }
 
 =head2 LINZ::GNSS::DataCenter->new($cfgdc)
@@ -131,8 +159,6 @@ sub new
     $self=fields::new($self) unless ref $self;
     my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
     my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
-    my $timeout = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
-    my $ftp_passive = $cfgdc->{ftppassive} || $LINZ::GNSS::DataCenter::ftp_passive;
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
@@ -178,8 +204,16 @@ sub new
         $host=$uriobj->host;
         my $userinfo = $uriobj->userinfo;
         ($user,$pwd)=split(/\:/,$userinfo,2);
-        $user ||= $LINZ::GNSS::DataCenter::ftp_user;
-        $pwd ||= $LINZ::GNSS::DataCenter::ftp_password;
+    }
+
+    $self->{user} = $cfgdc->{user} || $user;
+    $self->{pwd} = $cfgdc->{password} || $pwd;
+
+    my $credfile=$cfgdc->{credentialsfile};
+    if( $credfile )
+    {
+        $credfile=ExpandEnv($credfile);
+        ($user,$pwd)=$self->_readCredentials($credfile);
     }
 
     $self->{id}=$id;
@@ -194,11 +228,7 @@ sub new
     $self->{scheme}=$scheme;
     $self->{host}=$host;
     $self->{basepath}=$uriobj->path;
-    $self->{user} = $user;
     $self->{password} = $pwd;
-    $self->{ftp_passive} = $ftp_passive;
-    $self->{ftp}=undef;
-    $self->{timeout} = $timeout;
     $self->{connected}=undef;
     $self->{fileid}=0;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
@@ -269,7 +299,7 @@ sub LoadDataCenters
     {
         eval
         {
-            my $center = new LINZ::GNSS::DataCenter($cfgdc);
+            my $center = LINZ::GNSS::DataCenter::Create($cfgdc);
             push(@$centers,$center);
             push(@prioritized_centers,$center) if $center->priority > 0;
         };
@@ -704,139 +734,99 @@ sub checkRequest
 #    return $self->filetypes->filesAvailable($request,$self->{stncodes},$now);
 #}
 
+=head2 $center->credentials( $default )
+
+Returns the user credentials for the DataCenter.  If default is true
+then will return the default user/password if none explicitly defined.
+Credentials can be defined either with a user/password or with a 
+credentials_file.  If a credentials_file is specified then it should 
+contain two lines 
+
+   user username
+   password password
+
+Only the first such lines will be read.  Lines not matching this are
+are ignored.
+
+=cut
+
+sub _readCredentials
+{
+    my ($self,$credfile)=@_;
+    open(my $crdf,$credfile) || 
+        croak("Cannot open credentials files $credfile for DataCenter ".$self->name);
+    my ($user,$pwd);
+    while( my $line=<$crdf> )
+    {
+        $user=$1 if ! $user && $line =~ /^\s*user\s+(\S.*?)\s*$/i;
+        $pwd=$1 if ! $pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
+    }
+    croak("Credentials file $credfile doesn't define user") if ! defined($user);
+    return $user,$pwd;
+}
+
+sub credentials
+{
+    my($self,$default)=@_;
+    if( $self->user )
+    {
+        return $self->{user}, $self->{password};
+    }
+    if( $default )
+    {
+        return $LINZ::GNSS::DataCenter::ftp_user,$LINZ::GNSS::DataCenter::ftp_password;
+    }
+}
+
 =head2 $center->connect
 
-Initiates an FTP connection with the server
+Initiates a connection with the server.  Override in subclass.
 
 =cut
 
 sub connect
 {
     my($self) = @_;
-    if( $self->{scheme} eq 'ftp' && ! $self->{ftp} )
-    {
-        my $host=$self->{host};
-        my $user=$self->{user};
-        my $pwd=$self->{password};
-        my $timeout=$self->{timeout};
-        my $ftpmode=$self->{ftp_passive};
-        my $passive;
-        $passive=1 if lc($ftpmode) eq 'on';
-        $passive=0 if lc($ftpmode) eq 'off';
-	my %options=();
-	$options{Passive}=$passive if defined($passive);
-
-        eval
-        {
-            my $name=$self->{name};
-            $self->_logger->info("Connecting datacenter $name to host $host");
-            $self->_logger->debug("Connection info: host $host");
-            $self->_logger->debug("Connection info: user $user");
-            $self->_logger->debug("Connection info: timeout $timeout");
-            $self->_logger->debug("Connection info: passive $passive");
-
-            $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
-            my $ftp=Net::FTP->new( $host, Timeout=>$timeout, %options )
-               || croak "Cannot connect to $host\n";
-
-            $self->{ftp}=$ftp;
-            $ftp->login( $user, $pwd )
-               || croak "Cannot login to $host as $user\n";
-            $ftp->binary();
-       };
-       if( $@ )
-       {
-           my $message=$@;
-           $self->_logger->warn($@);
-           croak $@;
-       }
-   }
-   $self->{connected}=1;
+    $self->{connected}=1;
 }
 
 =head2 $center->disconnect
 
-Terminates an FTP connection with the server
+Terminates a connection with the server.  Override in subclass.
 
 =cut
 
 sub disconnect
 {
     my($self) = @_;
-    $self->{ftp}->quit() if $self->{ftp};
-    $self->{ftp} = undef;
     $self->{connected}=0;
 }
 
 # Routine to actually get a file from the data centre
+# Override in subclasses.
 
-sub _getfile
+sub getfile
 {
     my($self,$path,$file,$target)=@_;
-    $path=$self->{basepath}.'/'.$path if $self->{basepath};
-    my $source="$path/$file";
-    if( $self->scheme eq 'file' )
-    {
-        if( ! copy($source,$target) )
-        {
-            $self->_logger->warn("Cannot retrieve file $file");
-            croak "Cannot retrieve file $source\n";
-        }
-        $self->_logger->info("Retrieved $source");
-    }
-    elsif( $self->scheme eq 'ftp' )
-    {
-        my $ftp = $self->{ftp};
-        my $host=$self->{host};
-        $self->_logger->debug("Retrieving file $path/$file");
-        if( ! $ftp || ! $ftp->cwd($path) || ! $ftp->get($file,$target) )
-        {
-            $self->_logger->warn("Cannot retrieve file $path/$file from $host");
-            croak "Cannot retrieve $file from $host\n";
-        }
-        my $size= -s $target;
-        $self->_logger->info("Retrieved $file ($size bytes) from $host");
-    }
-    elsif( $self->scheme eq 'http' )
-    {
-        require LWP::Simple;
-        my $host=$self->{host};
-        my $url="http://$host"."$path/$file";
-        my $content=LWP::Simple::get($url);
-        if( ! $content )
-        {
-            self->_logger->warn("Cannot retrieve $url");
-            croak("Cannot retrieve $url");
-        }
-        open(my $f, ">$target" ) || croak("Cannot create file $target\n");
-        binmode($f);
-        print $f $content;
-        close($f);
-    }
+    croak("getfile not implemented in ".$self->{scheme}." Datacenter ".$self->name."\n");
 }
 
-# Check to see whether a file system based data center has a file
+# Check to see whether a data center has a file
+# Optionally override in subclasses.
 
-sub _hasfile
+sub hasfile
 {
     my($self,$spec)=@_;
-    croak "Cannot check files in '.$self->{scheme}.' Datacenter ".$self->name."\n" 
-        unless $self->{scheme} eq 'file';
-    my $target=$spec->{path}.'/'.$spec->{filename};
-    $target = $self->{basepath}.'/'.$target if $self->{basepath};
-    return -e $target;
+    croak("Cannot check files in ".$self->{scheme}." Datacenter ".$self->name."\n");
 }
 
-sub _putfile
+# Upload a file to a data center has a file
+# Optionally override in subclasses.
+
+sub putfile
 {
     my ($self,$source,$spec) = @_;
-    croak "Cannot save files to Datacenter ".$self->name."\n" 
-        unless $self->{scheme} eq 'file';
-    my $target=$spec->{path};
-    $target = $self->{basepath}.'/'.$target if $self->{basepath};
-    _makepath($target) || croak "Cannot create target directory $target\n"; 
-    $target=$target.'/'.$spec->{filename};
-    move($source,$target) || croak "Cannot copy file to $target\n";
+    croak("Cannot save files to Datacenter ".$self->name."\n");
 }
 
 
@@ -961,7 +951,7 @@ sub getData
             # If already available, then there's nothing to do
             # Just add it to the list of downloaded files (so that it is treated as part
             # of this download)
-            if($target->_hasfile($tospec))
+            if($target->hasfile($tospec))
             {
                 push(@$downloaded,$tospec);
                 next;
@@ -990,7 +980,7 @@ sub getData
 
             eval
             {
-                $self->_getfile($spec->{path},$spec->{filename},$tempfile);
+                $self->getfile($spec->{path},$spec->{filename},$tempfile);
             };
             if( $@ )
             {
@@ -1019,7 +1009,7 @@ sub getData
             }
 
             # Move the file to the target directory
-            $target->_putfile($tempfile,$tospec);
+            $target->putfile($tempfile,$tospec);
             push(@$downloaded,$tospec);
         };
         if( $@ )
@@ -1034,6 +1024,7 @@ sub getData
         unlink($tempfile) if -e $tempfile;
     }
 
+    # Disconnect if wasn't connected before this request
     $self->disconnect() if ! $connected;
 
     # Update the location of the downloaded files to point to the target base path.

@@ -12,7 +12,8 @@ sub new
 {
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
-    $self->SUPER::new();
+    $self->SUPER::new($cfgdc);
+    return $self;
 }
 
 

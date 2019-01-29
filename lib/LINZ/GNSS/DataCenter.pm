@@ -112,7 +112,7 @@ sub Create
     $location =~ s/\:\:/\//g;
     $location .= '.pm';
     require $location;
-    return $class;
+    return $class->new($cfgdc);
 }
 
 =head2 LINZ::GNSS::DataCenter->new($cfgdc)
@@ -157,8 +157,7 @@ sub new
 {
     my ($self,$cfgdc) = @_;
     $self=fields::new($self) unless ref $self;
-    my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
-    my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
+    my ($name,$uri,$scheme)=_getnameuri($cfgdc);
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
@@ -196,7 +195,6 @@ sub new
     # Process the object
     $uri = ExpandEnv($uri,"for datacenter $name");
     my $uriobj=URI->new($uri);
-    my $scheme=$uriobj->scheme || 'file';
     my $host='';
     my ($user,$pwd);
     if( $scheme ne 'file' )
@@ -206,8 +204,11 @@ sub new
         ($user,$pwd)=split(/\:/,$userinfo,2);
     }
 
-    $self->{user} = $cfgdc->{user} || $user;
-    $self->{pwd} = $cfgdc->{password} || $pwd;
+    if( $cfgdc->{user} )
+    {
+        $user = $cfgdc->{user};
+        $pwd = $cfgdc->{password};
+    }
 
     my $credfile=$cfgdc->{credentialsfile};
     if( $credfile )
@@ -228,6 +229,7 @@ sub new
     $self->{scheme}=$scheme;
     $self->{host}=$host;
     $self->{basepath}=$uriobj->path;
+    $self->{user} = $user;
     $self->{password} = $pwd;
     $self->{connected}=undef;
     $self->{fileid}=0;
@@ -356,7 +358,7 @@ sub LocalDirectory
         name=>'local',
         uri=>$dir,
         };
-    my $dtc=new LINZ::GNSS::DataCenter($cfg);
+    my $dtc=LINZ::GNSS::DataCenter::Create($cfg);
     foreach my $ft ($dtc->filetypes->types)
     {
         my $filename=uc($ft->filename);
@@ -768,7 +770,7 @@ sub _readCredentials
 sub credentials
 {
     my($self,$default)=@_;
-    if( $self->user )
+    if( $self->{user} )
     {
         return $self->{user}, $self->{password};
     }
@@ -985,6 +987,7 @@ sub getData
             if( $@ )
             {
                 my $message=$@;
+                $self->_logger->info("Retrieve failed: $message");
                 unlink($tempfile) if -e $tempfile;
                 my $ft=$self->filetypes->getFilespecType($spec);
                 my($available,$retry,$fail)=$ft->availableTime($request);

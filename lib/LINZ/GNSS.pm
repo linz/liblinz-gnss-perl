@@ -91,13 +91,15 @@ use Carp;
 Loads the configuration information for the main modules, FileTypeList,
 DataCenter, and FileCache.
 
-The default filename is /etc/bernese52/getdata.conf
+The default filename is /etc/bernese52/getdata.conf.  This can be overridden
+with the LINZGNSS_CONFIG_FILE environment variable.
 
 Configuration from configfile.`hostname` will be merged into the 
 configuration if it exists.
 
 If the environment variable DEBUG_LINZGNSS is set then scripts 
 using LINZ::GNSS will emit debug output.
+
 
 =cut
 
@@ -108,7 +110,7 @@ sub _Config
     my($filename)=@_;
     if( ! $filename )
     {
-        $filename="/etc/bernese52/getdata.conf";
+        $filename=$ENV{LINZGNSS_CONFIG_FILE} || "/etc/bernese52/getdata.conf";
     }
     croak("LINZ::GNSS configuration file $filename cannot be found\n") if ! -e $filename;
     my %config=ParseConfig(-ConfigFile=>$filename,-LowerCaseNames=>1);

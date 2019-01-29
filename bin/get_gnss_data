@@ -21,7 +21,7 @@ if( $@ )
 }
 
 my %opts;
-getopts('b:d:f:n:ilshc',\%opts);
+getopts('b:d:f:n:ilshciC:',\%opts);
 
 die "Cannot use -c option with -d, -b, or -n options\n" 
     if $opts{c} && ($opts{b} || $opts{d} || $opts{n});
@@ -31,9 +31,10 @@ my $campaign=$opts{b} || '';
 my $dir=$opts{d} || '.';
 my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
+my $cfgfile=$opts{C} || '';
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
-LINZ::GNSS::LoadConfig();
+LINZ::GNSS::LoadConfig($cfgfile);
 
 my $target=$dir;
 if( $campaign )
@@ -296,6 +297,11 @@ Just list the available file types and exit
 
 List the data centres and file types that have been configured if no data is requested.  If data has
 been requested then list the files that could be downloaded to fill the request.
+
+=item -C cfgfile
+
+Specifies a configuration file to use instead of the default file.  This can also be specified
+using the LINZGNSS_CONFIG_FILE environment variable
 
 =back
 

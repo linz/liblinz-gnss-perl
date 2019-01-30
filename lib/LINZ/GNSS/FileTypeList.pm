@@ -284,7 +284,8 @@ sub types
     my @result=();
     foreach my $t (@basetypes,@othertypes)
     {
-        push(@result,@{$self->getTypes($t,'*')});
+        my @subtypes=sort {$a->subtype cmp $b->subtype} @{$self->getTypes($t,'*')};
+        push(@result,@subtypes);
     }
     return wantarray ? @result : \@result;
 }

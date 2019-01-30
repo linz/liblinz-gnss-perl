@@ -106,6 +106,7 @@ sub Create
 {
     my ($cfgdc) = @_;
     my ($name,$uri,$scheme)=_getnameuri($cfgdc);
+    $scheme='http' if $scheme eq 'https';
     my $class=$cfgdc->{type} || ucfirst(lc($scheme));
     $class="LINZ::GNSS::DataCenter::$class";
     my $location=$class;
@@ -338,13 +339,20 @@ sub GetCenter
 =head2 LINZ::GNSS::DataCenter::LocalDirectory( $dir, %opts )
 
 Creates a data center representing a local directory to which files can be stored.
-Files are uncompressed, filenames upper case unless specified otherwise.
+Files are uncompressed, filenames upper case unless specified otherwise. If a name
+for the center is not defined in the options then it will create a unique name.
 
 Options can include:
 
 =over
 
-=item lowerCaseNames=>1
+=item * name=>'local'       Defines the name of the data centre
+
+=item * lowerCaseNames=>1   Saved file names will be lower case
+
+=item * compress=>1         Retain default compression
+
+=item * paths=>1            Keep default paths within directory (default is just use filename)
 
 =back
 
@@ -354,20 +362,36 @@ sub LocalDirectory
 {
     my($dir,%opts)=@_;
     croak("GNSS data target $dir is not a directory\n") if ! -d $dir;
+    my $name=$opts{name};
+    if( ! $name )
+    {
+        $name='local';
+        $ntry=0;
+        while(1)
+        {
+            last if ! LINZ::GNSS::DataCenter::GetCenter($name);
+            $ntry++;
+            $name=sprintf("local%02d",$ntry);
+        }
+    }
     my $cfg={
-        name=>'local',
+        name=>$name,
         uri=>$dir,
+        stations=>'*',
         };
     my $dtc=LINZ::GNSS::DataCenter::Create($cfg);
     foreach my $ft ($dtc->filetypes->types)
     {
         my $filename=uc($ft->filename);
-        $filename =~ s/\.Z$//;
-        $filename =~ s/\.GZ$//;
-        $filename =~ s/\]D$/]O/;
+        if( ! $opts{compress} )
+        {
+            $filename =~ s/\.Z$//;
+            $filename =~ s/\.GZ$//;
+            $filename =~ s/\]D$/]O/;
+        }
         $filename = lc($filename) if $opts{lowerCaseNames};
         $ft->setFilename($filename);
-        $ft->setPath('');
+        $ft->setPath('') if ! $opts{paths};
         $ft->setCompression('none');
     }
     return $dtc;
@@ -987,6 +1011,7 @@ sub getData
             if( $@ )
             {
                 my $message=$@;
+                chomp($message);
                 $self->_logger->info("Retrieve failed: $message");
                 unlink($tempfile) if -e $tempfile;
                 my $ft=$self->filetypes->getFilespecType($spec);

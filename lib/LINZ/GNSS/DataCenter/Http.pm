@@ -6,6 +6,9 @@ use base "LINZ::GNSS::DataCenter";
 use fields qw (
     );
 
+use LWP::UserAgent;
+use HTTP::Request;
+use MIME::Base64;
 use Carp;
 
 sub new
@@ -20,16 +23,24 @@ sub new
 sub getfile
 {
     my($self,$path,$file,$target)=@_;
-    $path=$self->{basepath}.'/'.$path if $self->{basepath};
-    my $source="$path/$file";
-    require LWP::Simple;
-    my $host=$self->{host};
-    my $url="http://$host"."$path/$file";
-    my $content=LWP::Simple::get($url);
+    my $url=$self->{uri}.$path.'/'.$file;
+    my ($user,$pwd)=$self->credentials;
+    my $ua=new LWP::UserAgent;
+    $ua->env_proxy;
+    my %headers=();
+    if( $user )
+    {
+        $headers{Authorization}="Basic ".encode_base64("$user:$pwd");
+    }
+    my $response=$ua->get($url,%headers);
+    if( $response->code ne '200' )
+    {
+        croak("Cannot retrieve $url: ".$response->message."\n");
+    }
+    my $content=$response->content;
     if( ! $content )
     {
-        self->_logger->warn("Cannot retrieve $url");
-        croak("Cannot retrieve $url");
+        croak("Cannot retrieve $url: No data\n");
     }
     open(my $f, ">$target" ) || croak("Cannot create file $target\n");
     binmode($f);

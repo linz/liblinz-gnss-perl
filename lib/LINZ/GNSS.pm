@@ -97,7 +97,7 @@ with the LINZGNSS_CONFIG_FILE environment variable.
 Configuration from configfile.`hostname` will be merged into the 
 configuration if it exists.
 
-If the environment variable DEBUG_LINZGNSS is set then scripts 
+If the environment variable LINZGNSS_DEBUG is set then scripts 
 using LINZ::GNSS will emit debug output.
 
 
@@ -167,9 +167,14 @@ sub LoadConfig
         {
             Log::Log4perl->easy_init($WARN);
         }
-        if( exists $ENV{DEBUG_LINZGNSS} )
+        # DEBUG_LINZGNSS variable deprecated - retained for backward compatibility
+        my $debug=$ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
+        if( $debug )
         {
-            Log::Log4perl->easy_init($DEBUG);
+            my $level=$DEBUG;
+            $level=$WARN if lc($debug) eq 'warn';
+            $level=$INFO if lc($debug) eq 'info';
+            Log::Log4perl->easy_init( $level );
         }
     };
     # Set up default logger if fail to init

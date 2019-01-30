@@ -27,7 +27,6 @@ sub getfile
     my $source="$path/$file";
     if( ! copy($source,$target) )
     {
-        $self->_logger->warn("Cannot retrieve file $file");
         croak "Cannot retrieve file $source\n";
     }
     $self->_logger->info("Retrieved $source");

@@ -42,10 +42,11 @@ our $cache;
 our $DefaultJobRetention=28;
 our $DefaultQueueLatency=1800;
 
-=head2 LINZ::GNSS::FileCache->new($location, $filetypes)
+=head2 LINZ::GNSS::FileCache->new($datacenter_name)
 
-Creates the cache in the specified location and supporting the types in the filetypes
-list.
+Creates the cache using the named data centre to store files.  This must be a 
+file based data centre.  If the environment variable LINZGNSS_CACHE_DIR is defined
+then it is used instead.
 
 =cut
 
@@ -53,10 +54,20 @@ sub new
 {
     my($self,$datacenter_name) = @_;
     $self=fields::new($self) unless ref $self;
-    my $datacenter = LINZ::GNSS::DataCenter::GetCenter($datacenter_name);
-    croak "Invalid datacenter $datacenter_name for FileCache\n" if ! $datacenter;
-    croak "FileCache datacenter $datacenter_name invalid as is not a file based center\n"
-        if $datacenter->scheme ne 'file';
+    my $datacenter;
+    if( $ENV{LINZGNSS_CACHE_DIR} )
+    {
+        $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($ENV{LINZGNSS_CACHE_DIR},
+            compress=>1,paths=>1,name=>'local-cache');
+        $datacenter_name='local-cache';
+    }
+    else
+    {
+        $datacenter = LINZ::GNSS::DataCenter::GetCenter($datacenter_name);
+        croak "Invalid datacenter $datacenter_name for FileCache\n" if ! $datacenter;
+        croak "FileCache datacenter $datacenter_name invalid as is not a file based center\n"
+            if $datacenter->scheme ne 'file';
+    }
     my $basepath=$datacenter->basepath;
     if( ! -d $basepath )
     {
@@ -146,6 +157,11 @@ sub _setupTables
         expiry DATETIME
     )
 EOD
+    # Index should be unique but not at present as bug created multiple
+    # records.
+    $dbh->do(<<EOD);
+    CREATE INDEX IF NOT EXISTS file_filename ON files(filename)
+EOD
     $dbh->do(<<EOD);
     CREATE TABLE IF NOT EXISTS jobs
     (
@@ -182,7 +198,7 @@ EOD
         PRIMARY KEY (request_id, file_id)
     )
 EOD
-
+    $dbh->do('ANALYZE');
 }
 
 =head2 $cache->addRequest( $request );
@@ -472,9 +488,11 @@ sub addFile
     chmod 0664, $filename;
     $self->_logger->debug("Adding file $filename for request $request_id");
     my($id,$oldexpiry) = $dbh->selectrow_array('select id, expiry from files where filename=?',{},$filename);
-    if( $id && $oldexpiry < $expiry )
+    if( $id ) 
     {
-        $dbh->do('update files set expiry=? where id=?',{},$expiry,$id);
+        $dbh->do('update files set expiry=? where id=?',{},$expiry,$id) if $oldexpiry < $expiry;
+        # Fix up for bug generating multiple versions of filename
+        $dbh->do('delete from files where filename=? and id != ?',{},$filename,$id);
     }
     else
     {
@@ -582,6 +600,7 @@ sub purge
     $now ||= time();
     $self->purgeJobs($now);
     $self->purgeFiles($now);
+    $self->{dbh}->do("VACUUM");
 }
 
 =head2 $cache->getRequests( request=>$r, id=>$id, jobid=>$id, type=>$t, station=>$s, where=>$sql, values=>[values] )

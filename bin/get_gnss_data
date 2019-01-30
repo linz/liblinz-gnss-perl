@@ -31,12 +31,13 @@ my $campaign=$opts{b} || '';
 my $dir=$opts{d} || '.';
 my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
+my $cacheonly=$opts{c};
 my $cfgfile=$opts{C} || '';
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig($cfgfile);
 
-my $target=$dir;
+my $target=$cacheonly ? undef : $dir;
 if( $campaign )
 {
     die "Bernese campaign $campaign does not exist\n"

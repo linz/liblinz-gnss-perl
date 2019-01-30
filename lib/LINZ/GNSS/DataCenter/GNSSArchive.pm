@@ -46,6 +46,7 @@ sub connect
     my $response=$ua->get($authuri,"Authorization"=>$authhdr);
     if( $response->code ne '200')
     {
+        $self->_logger->warn("Connection to ".$self->name." AuthKeyUri failed: ".$response->message);
         croak("Connection to ".$self->name." AuthKeyUri failed: ".$response->message."\n");
     }
     my $uri=new URI::URL($self->{uri});
@@ -78,6 +79,7 @@ sub getfile
     my $name=$self->name;
     if( $response->code ne '200' )
     {
+        $self->_logger->warn("Cannot retrieve $file from $name: ".$response->message."\n");
         croak("Cannot retrieve $file from $name: ".$response->message."\n");
     }
     open(my $f,">:raw",$target) || die "Cannot open file\n";

@@ -96,6 +96,8 @@ our $hourcodes = {
     '23'=>'x',
     };
 
+our $DefaultRetention=100;
+
 
 =head2 LINZ::GNSS::FileType->new($type,$subtype,$configdata)
 
@@ -147,7 +149,7 @@ sub new
     my $retention = $cfgft->{retention} || '';
     croak "Invalid retention $retention for file type $type:$subtype\n"
         if $retention !~ /^(?:\-?(\d+)\s+days?)?$/;
-    $retention=$1 ? $1+1 : 0;
+    $retention=$1 ? $1+1 : $LINZ::GNSS::FileType::DefaultRetention;
 
     my $expires = $cfgft->{expires} || '';
     croak "Invalid expires $expires for file type $type:$subtype\n"
@@ -279,7 +281,7 @@ The frequency the data is generated in seconds
 The latency of the data (as a code)
 
 =item $type->retention
-The preferred retentation period for the data in days
+The preferred retention period for the data in days
 
 =item $type->expires
 The maximum age for which a file is considered valid. (Used for 

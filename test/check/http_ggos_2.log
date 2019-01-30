@@ -1,0 +1,32 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ
+2000/01/01 00:00:00 Created DataCenter UNAVCO
+2000/01/01 00:00:00 Created DataCenter SOPAC
+2000/01/01 00:00:00 Created DataCenter CDDIS
+2000/01/01 00:00:00 Created DataCenter IGN
+2000/01/01 00:00:00 Created DataCenter CODE
+2000/01/01 00:00:00 Created DataCenter GGOS
+2000/01/01 00:00:00 Created DataCenter GGOS_2
+2000/01/01 00:00:00 Created DataCenter GeoNET
+2000/01/01 00:00:00 Created DataCenter Cache
+2000/01/01 00:00:00 Created DataCenter PrvtArchive
+2000/01/01 00:00:00 Created DataCenter bernese
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, CDDIS, IGN, GeoNET-PNZ, CODE, PrvtArchive, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Created DataCenter local-cache
+2000/01/01 00:00:00 Created FileCache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 Created DataCenter local
+2000/01/01 00:00:00 Running getData on GGOS to local for request job:VMF:::1523318400:1523404799
+2000/01/01 00:00:00 Retrieving file VMFG_20180410.H00
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Retrieving file VMFG_20180410.H06
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file1
+2000/01/01 00:00:00 Retrieving file VMFG_20180410.H12
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file2
+2000/01/01 00:00:00 Retrieving file VMFG_20180410.H18
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file3
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 4
+Retrieved VMF:VMF: output/VMFG_20180410.H00
+Retrieved VMF:VMF: output/VMFG_20180410.H06
+Retrieved VMF:VMF: output/VMFG_20180410.H12
+Retrieved VMF:VMF: output/VMFG_20180410.H18

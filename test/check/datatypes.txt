@@ -1,0 +1,31 @@
+Valid file types:subtypes are
+   ORB:BROADCAST  Broadcast orbits
+   ORB:CO2      CODE Repro2 orbits
+   ORB:CODE     CODE orbits
+   ORB:CODE_MGEX  CODE Multi-GNSS orbits
+   ORB:FINAL    Final orbits
+   ORB:RAPID    Rapid orbits
+   ORB:ULTRA    Ultra-rapid orbits
+   ERP:CO2      CODE Repro2 earth rotation parameters
+   ERP:CODE     CODE earth rotation parameters
+   ERP:CODE_MGEX  CODE Multi-GNSS earth rotation parameters
+   ERP:FINAL    Final earth rotation parameters
+   ERP:RAPID    Rapid earth rotation parameters
+   ERP:ULTRA    Ultra-rapid earth rotation parameters
+   OBS:DAILY*   Daily RINEX file
+   OBS:HOURLY*  Hourly RINEX file
+   CLK:CODE     Final clock file
+   CLK:FINAL    Final clock file
+   CLK:RAPID    Rapid clock file
+   IGSC:DAILY   IGS daily station solution SINEX file
+   IGSC:WEEKLY  IGS weekly station solution SINEX file
+   ION:FINAL    Bernese CODE ionosphere model
+   ION:PREDICT  Bernese CODE predicted ionosphere model
+   ION:RAPID    Bernese CODE rapid ionosphere model
+   P1C1:FINAL   CODE monthly P1-C1 DCB solutions (GPS satellites only)
+   P1C1:RAPID   CODE P1-C1 DCB moving average solution (GPS satellites only)
+   P1P2:FINAL   CODE monthly P1-P2 DCB solutions (GPS and Glonass satellites)
+   P1P2:RAPID   CODE P1-P2 DCB moving average solution (GPS and Glonass satellites)
+   TRP:FINAL    Bernese Troposphere parameters
+   VMF:VMF      Vienna atmospheric mapping functions
+Types marked with a '*' require a station code

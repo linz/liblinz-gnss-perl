@@ -1,0 +1,24 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ
+2000/01/01 00:00:00 Created DataCenter UNAVCO
+2000/01/01 00:00:00 Created DataCenter SOPAC
+2000/01/01 00:00:00 Created DataCenter CDDIS
+2000/01/01 00:00:00 Created DataCenter IGN
+2000/01/01 00:00:00 Created DataCenter CODE
+2000/01/01 00:00:00 Created DataCenter GGOS
+2000/01/01 00:00:00 Created DataCenter GGOS_2
+2000/01/01 00:00:00 Created DataCenter GeoNET
+2000/01/01 00:00:00 Created DataCenter Cache
+2000/01/01 00:00:00 Created DataCenter PrvtArchive
+2000/01/01 00:00:00 Created DataCenter bernese
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, CDDIS, IGN, GeoNET-PNZ, CODE, PrvtArchive, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Created DataCenter local-cache
+2000/01/01 00:00:00 Created FileCache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 Created DataCenter local
+2000/01/01 00:00:00 Running getData on SOPAC to local for request job:OBS::MCM4:1523318400:1523404799
+2000/01/01 00:00:00 Retrieving file MCM41000.18O
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+Retrieved OBS:DAILY for MCM4: output/MCM41000.18O

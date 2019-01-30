@@ -1,0 +1,32 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ
+2000/01/01 00:00:00 Created DataCenter UNAVCO
+2000/01/01 00:00:00 Created DataCenter SOPAC
+2000/01/01 00:00:00 Created DataCenter CDDIS
+2000/01/01 00:00:00 Created DataCenter IGN
+2000/01/01 00:00:00 Created DataCenter CODE
+2000/01/01 00:00:00 Created DataCenter GGOS
+2000/01/01 00:00:00 Created DataCenter GGOS_2
+2000/01/01 00:00:00 Created DataCenter GeoNET
+2000/01/01 00:00:00 Created DataCenter Cache
+2000/01/01 00:00:00 Created DataCenter PrvtArchive
+2000/01/01 00:00:00 Created DataCenter bernese
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, CDDIS, IGN, GeoNET-PNZ, CODE, PrvtArchive, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Created DataCenter local-cache
+2000/01/01 00:00:00 Created FileCache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 Created DataCenter local
+2000/01/01 00:00:00 Running getData on UNAVCO to local for request job:OBS::ROB4:1523318400:1523404799
+2000/01/01 00:00:00 Connecting datacenter UNAVCO to host data-out.unavco.org
+2000/01/01 00:00:00 Connection info: host data-out.unavco.org
+2000/01/01 00:00:00 Connection info: user anonymous
+2000/01/01 00:00:00 Connection info: timeout 
+2000/01/01 00:00:00 Connection info: passive 
+2000/01/01 00:00:00 Connection info: host data-out.unavco.org: user anonymous: password positionz@linz.govt.nz
+2000/01/01 00:00:00 Retrieving file ROB41000.18O
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Retrieving file /pub/rinex/obs/2018/100/rob41000.18d.Z
+2000/01/01 00:00:00 Retrieved rob41000.18d.Z (2373961 bytes) from data-out.unavco.org
+2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+Retrieved OBS:DAILY for ROB4: output/ROB41000.18O

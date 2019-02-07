@@ -221,9 +221,10 @@ sub supplied_subtype { return $_[0]->{supplied_subtype}; }
 
 Converts a string to a data request.  The string is formatted as 
 
-  [TYPE[:SUBTYPE]] YYYYY:DDD[-[YYYY:]DDD [CODE]
+  [TYPE[:SUBTYPE]] YYYYY:DDD[:HH][-[YYYY:]DDD[:HH]] [CODE]
 
 The default type is OBS.  Code is required only for types that require a code!
+Note that the final day or hour is included in the request.
 
 =cut 
 
@@ -232,21 +233,32 @@ sub Parse
     my ($string,$jobid) = @_;
     croak("Invalid data request string $string\n")
        if $string !~ /^\s*
+           # Type
            (?:(\w+)(?:\:([\w\+]+))?\s+)?
-           (\d{4})\:(\d{3})(?:\-(?:(\d{4})\:)?(\d{3}))?
+           # Date
+           (\d{4})\:(\d{3})(?:\:(\d\d))?
+           (?:\-(?:
+              (?:(\d{4})\:)?(\d{3})(?:\:(\d\d))?
+              |
+              (\d\d))
+              )?
+           # Code
            (?:\s+(\w{4}))?
            \s*$/x;
     my $type=$1 // 'OBS';
     my $subtype=$2 // '';
     my $year0=$3;
     my $doy0=$4;
-    my $year1 = $5 // $year0; 
-    my $doy1 = $6 // $doy0; 
-    my $code = $7;
+    my $hour0=$5 // '';
+    my $year1 = $6 // $year0; 
+    my $doy1 = $7 // $doy0; 
+    my $hour1 = $8 // $9 // ($hour0 eq '' ? 23 : $hour0);
+    $hour0 = 0 if $hour0 eq '';
+    my $code = $10;
     $jobid = $jobid // 'job';
 
-    my $start =  yearday_seconds($year0,$doy0);
-    my $end = yearday_seconds($year1,$doy1)+(24*3600-1);
+    my $start =  yearday_seconds($year0,$doy0)+$hour0*3600;
+    my $end = yearday_seconds($year1,$doy1)+(($hour1+1)*3600-1);
 
     return LINZ::GNSS::DataRequest->new($jobid,$type,$subtype,$start,$end,$code);
 }

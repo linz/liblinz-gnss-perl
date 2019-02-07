@@ -73,7 +73,14 @@ if($date =~ /^now(:?-\d+)?$/i)
 }
 
 die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n" 
-   if $date !~ /^[12]\d\d\d\:\d\d\d(?:\-(?:[12]\d\d\d\:)?\d\d\d)?$/;
+   if $date !~ /^
+           ([12]\d{3})\:(\d{3})(?:\:(\d\d))?
+           (?:\-(?:
+              (?:([12]\d{3})\:)?(\d{3})(?:\:(\d\d))?
+              |
+              (\d\d))
+              )?
+            $/x;
 
 my @input=();
 if( $opts{f} )

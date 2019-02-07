@@ -250,6 +250,8 @@ alternative is specified using the -d option.
 
 The date is specified by year and day of year, eg 2013:020.
 A range can be specified as 2013:020-025 or 2013:360-2014:001.
+The data can also include an hour, for example 2013:020:01.  The
+final day or hour of the request is included in the returned data.
 
 =item type
 

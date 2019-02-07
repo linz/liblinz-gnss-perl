@@ -5,6 +5,7 @@ package LINZ::GNSS::DataCenter::GNSSArchive;
 use base "LINZ::GNSS::DataCenter";
 use fields qw (
     authuri
+    alturi
     cookies
     );
 
@@ -22,6 +23,7 @@ sub new
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
     $self->{authuri}=$cfgdc->{authkeyuri};
+    $self->{alturi}=$cfgdc->{alternativeuri};
     if( ! $self->{authuri} )
     {
         croak("GNSSArchive datacenter ".$self->name." needs AuthKeyUri defined\n");
@@ -67,17 +69,24 @@ sub connect
 sub getfile
 {
     my($self,$path,$file,$target)=@_;
-    my $url=$self->{uri}.$path.'/'.$file;
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
-    my $request=HTTP::Request->new(GET=>$url);
-    foreach my $cookie (@{$self->{cookies}})
+    my $response;
+    foreach my $base ($self->{uri},$self->{alturi})
     {
-        $request->push_header("Cookie",$cookie);
+        next if ! $base;
+        my $url=$base.$path.'/'.$file;
+        $self->_logger->debug("GNSSArchive: Trying $url\n");
+        my $request=HTTP::Request->new(GET=>$url);
+        foreach my $cookie (@{$self->{cookies}})
+        {
+            $request->push_header("Cookie",$cookie);
+        }
+        $response=$ua->request($request);
+        last if $response->code eq '200';
     }
-    my $response=$ua->request($request);
     my $name=$self->name;
-    if( $response->code ne '200' )
+    if($response->code ne '200')
     {
         $self->_logger->warn("Cannot retrieve $file from $name: ".$response->message."\n");
         croak("Cannot retrieve $file from $name: ".$response->message."\n");

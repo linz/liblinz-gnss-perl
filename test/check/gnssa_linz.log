@@ -19,7 +19,11 @@
 2000/01/01 00:00:00 Running getData on LINZ-GNSSArchive to local for request job:OBS::GSAL:1531958400:1532044799
 2000/01/01 00:00:00 Retrieving file GSAL2000.18O
 2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
-2000/01/01 00:00:00 Retrieved gsal2000.18d.Z (220215 bytes) from LINZ-GNSSArchive
-2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
-2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
-Retrieved OBS:DAILY for GSAL: output/GSAL2000.18O
+2000/01/01 00:00:00 Cannot retrieve gsal2000.18d.Z from LINZ-GNSSArchive: Not Found
+2000/01/01 00:00:00 Retrieve failed: Cannot retrieve gsal2000.18d.Z from LINZ-GNSSArchive: Not Found
+ at ../bin/get_gnss_data line 155.
+2000/01/01 00:00:00 Download failed - maximum delay exceeded for this file
+2000/01/01 00:00:00 Returning status UNAV: available 0: files: 0
+Creds: ccrook@linz.govt.nz:hmssaPpXmynJ.JN9s
+Uri: https://authenticate.api.geodesy.linz.govt.nz/main/urlAuth
+Data OBS for GSAL not available

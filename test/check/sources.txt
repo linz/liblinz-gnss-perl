@@ -1,6 +1,6 @@
 Data may be retrieved from the following sources:
 
-Data center: LINZ-GNSSArchive (https://gnss-obs.geodesy.linz.io)
+Data center: LINZ-GNSSArchive (https://gnss-obs.geodesy.linz.govt.nz)
     Data types: OBS: DAILY
                 OBS: HOURLY
 

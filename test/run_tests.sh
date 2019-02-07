@@ -17,8 +17,8 @@ rm -rf $outputdir/*
 rm -rf $cachedir
 mkdir -p $cachedir
 
-if [ ! -e linz-gnss-credentials ]; then
-    echo "Need GNSS Archive credentials in ./linz-gnss-credentials file"
+if [ ! -e $HOME/linz-gnss-credentials ]; then
+    echo "Need GNSS Archive credentials in $HOME/linz-gnss-credentials file"
     exit
 fi
 

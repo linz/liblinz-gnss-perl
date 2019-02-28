@@ -31,4 +31,6 @@
 2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
 2000/01/01 00:00:00 Retrieved test_cache/rinex/daily/2018/200/AUCK2000.18D.Z
 2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
-Retrieved OBS:DAILY for AUCK: output/AUCK2000.18O
+Retrieved OBS:DAILY for AUCK: files/AUCK2000.18O
+636899021 6560465 files/AUCK2000.18O
+4218054451 116 files/cachefile.log

@@ -29,4 +29,5 @@
 2000/01/01 00:00:00 Retrieved rob41000.18d.Z (2373961 bytes) from data-out.unavco.org
 2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
 2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
-Retrieved OBS:DAILY for ROB4: output/ROB41000.18O
+Retrieved OBS:DAILY for ROB4: files/ROB41000.18O
+3236747625 21185341 files/ROB41000.18O

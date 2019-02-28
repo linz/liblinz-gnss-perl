@@ -21,4 +21,5 @@
 2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
 2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
 2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
-Retrieved OBS:DAILY for MCM4: output/MCM41000.18O
+Retrieved OBS:DAILY for MCM4: files/MCM41000.18O
+1890901357 11925795 files/MCM41000.18O

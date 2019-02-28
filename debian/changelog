@@ -1,3 +1,22 @@
+liblinz-gnss-perl (1.61.0-1) xenial; urgency=medium
+
+  [ Dionne Hansen ]
+  * changed the filename of DCB files to accomodate the change in compression on aiub website
+  * Added entries to get rinex3 data from GeoNet repository
+  * Adjusted the parameters added to use rapid processing - actual format is config=value rather than cfg=value
+  * changes to getdata.conf to accomodate rapid PPP processing and the inclusion of new Global Survey sites.
+  * adjusted get data conf to incorporate the compression of DCB files
+
+  [ Chris Crook ]
+  * Adding GNSSArchive as data centre type
+  * Updating get_gnss_data to provide option of specifying hour(s) in request
+  * Adding debug options, fixing FileCache database, adding authorisation to http data centers
+  * Adding tests for get_gnss_data and datacenter types
+  * Updating getdata.conf for LINZ GNSS Archive
+  * Updating getdata.conf to use relocated GeoNET files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 01 Mar 2019 11:16:19 +1300
+
 liblinz-gnss-perl (1.60.2-1) xenial; urgency=medium
 
   [ Dionne Hansen ]

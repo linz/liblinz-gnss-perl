@@ -1,5 +1,8 @@
 #!/usr/bin/perl 
 
+eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
+    if 0; # not running under some shell
+
 =head1 gnss_ftp_mirror
 
 Simple ftp mirror script to recursely mirror files from a remote ftp site 
@@ -131,6 +134,7 @@ foreach my $mon (@fullmonths)
 my %patterns=(
     'yyyy' => '\d\d\d\d',
     'yy' =>   '\d\d',
+    'hh' =>   '\d\d',
     'mm' =>   '\d\d',
     'mmm' =>  '('.join('|',@months).')',
     'Mmm' =>  '('.join('|',@ccmonths).')',

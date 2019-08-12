@@ -379,11 +379,14 @@ sub _scanSiteId
             carp("Invalid SINEX file - SITE/ID not terminated\n");
             last;
         }
-        croak("Invalid SITE/ID line $line in ".$self->{filename}."\n")
+        croak("Invalid SITE/ID line \n".
+            "  >$line\n".
+            "  > IIII CC MMMMMMMMM T DDDDDDDDDDDDDDDDDDDDDD DDD MM SS.S DDD MM SS.S HHHHHHH\n".
+            " in ".$self->{filename}."\n")
         if $line !~ /^
              \s([\s\w]{4})  # point id
              \s([\s\w]{2})  # point code
-             \s([\s\w]{9})  # monument id
+             \s(.{9})       # monument id
              \s\w           # Observation techniques
              \s(.{22})      # description
              \s([\s\-\d]{3}[\-\s\d]{3}[\-\s\d\.]{5}) # longitude DMS

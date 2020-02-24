@@ -77,9 +77,10 @@ use strict;
 use Getopt::Std;
 use URI;
 use Net::FTP;
-use Cwd;
+use Cwd qw(abs_path getcwd);
 use File::Path;
 use File::Copy;
+use File::Temp qw(tempdir);
 use Time::HiRes;
 use Config::General;
 use POSIX qw/strftime/;
@@ -198,7 +199,7 @@ foreach my $arg (@ARGV)
     $argconfig{lc($1)} = $2;
 }
 
-my $confdir=$conffile;
+my $confdir=abs_path($conffile);
 $confdir =~ s/[^\\\/]*$//;
 $confdir =~ s/[\\\/]$//;
 $confdir = '.' if $confdir eq '';
@@ -239,6 +240,27 @@ if( %unresolved )
 {
     my $badvar=join(' ',sort keys %unresolved);
     die "The following configuration items are undefined: $badvar\n";
+}
+
+my $bucketname=$config{s3_bucket};
+my $bucketprefix;
+my $bucket;
+my $localdir;
+my $localsrc;
+if( $bucketname )
+{
+    require LINZ::GNSS::AwsS3Bucket;
+    $bucketprefix = $config{s3_prefix};
+    $bucket = LINZ::GNSS::AwsS3Bucket->new(config_prefix=>'s3_',%config);
+    $localsrc='temporary working directory';
+    $localdir=tempdir(CLEANUP=>1)
+}
+else
+{
+    $localsrc = $config{localbasedirectory};
+    $localdir = $localsrc;
+    $localdir =~ s/^\~\//$confdir\//;
+    die "LocalBaseDirectory $localsrc is not a directory\n" if ! -d $localdir;
 }
 
 my $startage=$opts{s} // $config{startage};
@@ -301,6 +323,9 @@ if( $verbose )
     printf "Remote base dir:       %s\n",$ftp->basedir;
     print  "Remote directory:      $remotedir\n";
     print  "Remote file RE:        $remotefilere\n";
+    print  "Local base directory:  $localsrc\n" if ! $bucketname;
+    print  "S3 bucket:             $bucketname\n" if $bucketname;
+    print  "S3 prefix:             $bucketprefix\n" if $bucketprefix;
     print  "Target file path:      $targetpath\n";
     print  "Marker file path:      $markerpath\n";
     print  "Post download shell    $commandshell\n" if $commandshell;
@@ -358,8 +383,7 @@ $|=1;
 select(STDOUT);
 $|=1;
 
-$targetpath =~ s/^\~/$confdir/;
-$markerpath =~ s/^\~/$confdir/;
+
 $postdownloadcommand =~ s/(^|\s)\~\//$1.$confdir.'\/'/eg;
 
 # @valid_dates is a list of possible date options that can be matched against fields directory/filenames.
@@ -407,7 +431,9 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
     push( @dirparts, { re=>qr/$p/, fields=>\@fields });
 }
 
-
+my $localpath=abs_path($localdir);
+my $startdir=getcwd;
+chdir($localpath);
 downloadDir( $ftp, $ftp->basedir, \@valid_dates, \@dirparts );
 $ftp->quit();
 
@@ -540,6 +566,14 @@ sub downloadDir
     # try each one in turn
 
     return if ! ref $files;
+    my $nfiles=0;
+    # Ensure the target directory exists.. 
+    my $startdir=getcwd();
+    if( ! -d $localpath )
+    {
+        File::Path::make_path($localpath);
+        cwd($localpath);
+    }    
     foreach my $file (sort keys %$files)
     {
         $expired=1;
@@ -553,15 +587,42 @@ sub downloadDir
         # remaining, so make sure that if so they uniquely define a target name.
         # If not then fail the download.
 
+        my $size=$files->{$file}->{size};
+
         my $target=expandTarget($opts,$file,$targetpath,'target file name',"$dirname/$file");
         my $marker=expandTarget($opts,$file,$markerpath,'marker file name',"$dirname/$file");
         my $command=expandTarget($opts,$file,$postdownloadcommand,'marker file name',"$dirname/$file");
 
         next if ! $target;
 
+        my $available=0;
+        my $tgtpath=$target;
+        my $tgtname=$target;
+        $tgtpath =~ s/[^\\\/]*$//;
+        $tgtpath =~ s/[\\\/]$//;
+        $tgtname =~ s/.*[\\\/]//;
+        if( ! -d $tgtpath && ! File::Path::make_path($tgtpath) )
+        {
+            print STDERR "** Cannot create target directory at $tgtpath\n";
+            next;
+        }
+
+        if( $bucket )
+        {
+            my $filestat=$bucket->fileStats($target);
+            if( $filestat )
+            {
+                $available=$ignoresize || $filestat->{size} == $size;
+            }
+            # If not available try and get the marker file 
+            if( ! $available && $marker )
+            {
+                $bucket->getFile($marker,$marker);
+            }
+        }
 
         # Now try and download the file
-        if( -e $target )
+        elsif( -e $target )
         {
             if( ! -f $target )
             {
@@ -569,43 +630,37 @@ sub downloadDir
                 next;
             }
             # Check the size - if it matches then assume the file is up to date.
-            if( (! $ignoresize) && ($files->{$file}->{size} == -s $target) )
-            {
-                print "$target is already available and of the correct size\n" if $verbose > 1;
-                next;
-            }
+            $available=$ignoresize || -s $target == $size;
         }
-        if( ! $ignoresize && $marker && -f $marker )
+        if( $available )
         {
-            my $size=0;
-            if( open(my $mf, "<$marker") )
+            print "$target is already downloaded and of the correct size\n" if $verbose > 1;
+            next;
+        }
+
+        if( $marker && -f $marker )
+        {
+            my $markersize=$size;
+            if( ! $ignoresize )
             {
-                $size=<$mf>+0;
-                close($mf);
+                $markersize=0;
+                if( open(my $mf, "<$marker") )
+                {
+                    $markersize=<$mf>+0;
+                    close($mf);
+                }
             }
-            if( $files->{$file}->{size} == $size )
+            if( $size == $markersize )
             {
                 print "$target marker file present and shows correct size\n" if $verbose > 1;
                 next;
             }
         }
 
-        # Ensure the target directory exists.. 
-        my $tgtpath=$target;
-        my $tgtname=$target;
-        $tgtpath =~ s/[^\\\/]*$//;
-        $tgtpath =~ s/[\\\/]$//;
-        $tgtname =~ s/.*[\\\/]//;
-
-        if( ! -d $tgtpath && ! File::Path::make_path($tgtpath) )
-        {
-            print STDERR "** Cannot create target directory at $tgtpath\n";
-            next;
-        }
-
         # Download to a temporary file first to ensure failed 
         # downloads don't generate incomplete files.
 
+        $nfiles++;
         my $tmp=$tgtpath.'/.download.'.$tgtname.'.tmp';
         unlink($tmp);
 
@@ -665,10 +720,18 @@ sub downloadDir
             if( $marker )
             {
                 open(my $mf, ">$marker" );
-                print $mf $files->{$file}->{size};
+                print $mf $size;
                 close($mf);
             }
         }
+    }
+    if( $bucket && $nfiles > 0 )
+    {
+        my $error;
+        $bucket->syncToBucket($localpath,'/',delete=>1);
+        # keep_root doesn't avoid error trying to delete with cwd as root directory?
+        chdir($startdir);
+        File::Path::remove_tree($localpath,{keep_root=>1,error=>\$error});
     }
     print STDERR "** Job terminated - maximum run time expired\n" if $expired;
 }
@@ -945,7 +1008,7 @@ __END__
  # StatusFile .mirror_status
  # MinTimeSinceLastRun 7d 4
  
- # RemotePath is the path to the files to download.
+ # RemoteDir is the path to the files to download.
  #
  # Can include {yyyy},{yy},{mmmm}, {mmm},{mm},{ddd},{dd} which will map to 
  # the corresponding date strings (mmm is 3 letter month name, mmmm is the 
@@ -970,26 +1033,45 @@ __END__
  
  RemoteFileRe={code}{yyyy}\d{8}[a-z].T02
  
- # Target directory.  This can be based absolute, or relative to the location
- # of the configuration file (defined as ~).  Can include time components
- # as for RemovePath.  Can also include {filename} to use the source filename.
+ # Local base directory.  All files downloaded or created by subsequent scripts
+ # should be subdirectories of this directory. Use ~ for the directory in which
+ # the configuration script is located.  This is not used if the target is an S3
+ # bucket.  However the script will create a temporary local directory for retrieving
+ # and processing files prior to uploading to S3. 
+ #
+ # All local filenames below are relative to this (or on S3, relative to the S3 prefix)
+ # Post download script are run from this directory unless PostDownloadCommandChDir 
+ # is true.
  
- TargetPath=~/{yyyy}/{ddd}/{filename}
+ LocalBaseDirectory ~
+
+ # If an S3 bucket is defined then files are installed into the bucket using the 
+ # file structure relative to the LocalBaseDirectory.  The file names can be prefixed
+ # with a common prefix to generate the corresponding S3 bucket key.  S3 settings
+ # are as used by the LINZ::GNSS::AwsS3Bucket module.  
+
+ # s3_bucket my_bucket
+ # s3_prefix ${subdir}${subdir?/}
+
+ # Target directory relative to the base directory.
+ # Can include time components
+ # as for RemotePath.  Can also include {filename} to use the source filename.
+ 
+ TargetPath={yyyy}/{ddd}/{filename}
 
  # Marker file.  By default the script checks for the existence of the target 
- # file.  If it exists and is of the correct size it is downloaded again.  The 
- # script can instead use a marker file into which the downloaded size is written.
- # This allows the downloaded file to be removed or otherwise changed without 
- # being reprocessed.
- 
- MarkerPath=~/{yyyy}/{ddd}/{filename}.downloaded
+ # file.  If it exists and is of the correct size it is not downloaded again.  The 
+ # script can instead use a marker file defined below.  It it read to determine
+ # if the file has been downloaded and the size of the file.
 
- # Processing script. Command to run once a file has been downloaded.  The script
+ MarkerPath={yyyy}/{ddd}/{filename}.downloaded
+
+ # Processing script. Command(s) to run once a file has been downloaded.  The script
  # is run in the target directory.  The command can include parameters, and can
  # include the replacement strings for filename, code, etc.
  #
  # If PostDownloadCommandChDir evaluates to true then the script changes to the 
- # download directory to execute the command.
+ # download directory to execute the command(s).
  
  PostDownloadCommand process_downloaded_file.sh {filename}
  PostDownloadCommandChDir 1

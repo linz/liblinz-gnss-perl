@@ -62,6 +62,10 @@ using the setTime function. They are in terms of gmtime.
 Each of the variables can also be offset by a number of days, eg
 ${yyyy+14} ${ddd+14}
 
+A very limited conditional value can be defined using ${vvvv?xxx:yyy} which
+will evaluate to xxx if variable v is not empty or yyyy if it is.  xxx and
+yyy must be simple strings not including ?, :, or }.
+
 =item Date based configuration overrides
 
 The file can include a special configuration item "date_based_configuration" 
@@ -325,11 +329,14 @@ sub get
     {
         $value=$self->getRaw($key,$default);
         my $nextdepth=$depth;
-        while( $value=~ /\$\{\w+(?:[+-]\d+)?\}/)
+        while( $value=~ /\$\{\w+(?:[+-]\d+|\?[^\?\:\}]*\:?[^\?\:\}]*)?\}/)
         {
             $nextdepth++;
             $value =~ s/\$\{(\w+)\}/$self->get($1,undef,$nextdepth,0)/eg;
             $value =~ s/\$\{(\w+)([+-]\d+)\}/$self->get($1,undef,$nextdepth,$2)/eg;
+            $value=~ s/\$\{(\w+)\?([^\?\:\}]*)(?:\:([^\?\:\}]*))?\}/
+                      $self->get($1,undef,$nextdepth,0) ? ($2 || '') : ($3 || '')
+                      /xeg;
         }
         $self->setTime($timestamp) if $offset;
     };

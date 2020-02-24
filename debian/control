@@ -2,7 +2,7 @@ Source: liblinz-gnss-perl
 Section: perl
 Priority: optional
 Maintainer: Chris Crook <ccrook@linz.govt.nz>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 8.0.0), libmodule-build-perl
 Standards-Version: 3.9.2
 Homepage: 
 #Vcs-Git: git://git.debian.org/collab-maint/liblinz-gnss-perl.git
@@ -32,6 +32,7 @@ Depends: ${misc:Depends} liblinz-geodetic-perl,
     linz-coordsys,
     gzip,
     ncompress
+Recommends: awscli
 Description: LINZ::GNSS perl modules for managing GNSS data downloads
  LINZ::GNSS perl modules
  .

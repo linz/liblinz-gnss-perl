@@ -1,4 +1,4 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@
+	PERL5LIB='.':${PERL5LIB} dh $@

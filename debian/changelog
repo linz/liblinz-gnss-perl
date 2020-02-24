@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.62.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Added support for S3 bucket datacentre, using S3 for daily processing
+    results, using S3 for gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 24 Feb 2020 12:00:00 +1300
+
 liblinz-gnss-perl (1.61.0-1) xenial; urgency=medium
 
   [ Dionne Hansen ]

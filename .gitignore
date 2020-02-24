@@ -1,0 +1,9 @@
+debian/files
+debian/liblinz-gnss-perl*
+Build
+MYMETA.json
+MYMETA.yml
+_build
+blib
+debian/debhelper-build-stamp
+test

@@ -1,0 +1,338 @@
+=head1 LINZ::GNSS::AwsS3Bucket
+
+Crude module to interface applications to an Amazon web services S3 bucket.
+It is crude because this implementation simply runs the aws cliend program for 
+all its operations.  This is inefficient, but does work!
+
+Note that this was initially tried with Net::Amazon::S3 module (version 0.80), but
+at the available version on ubuntu this failed as it is using http communications
+and not using API endpoints.  
+
+For the moment building using the aws client is the simplest/quickest approach.  If this becomes
+an issue then this could be reconfigured to use the web api directly (CC 19/2/2020)
+
+The main impact will be when searching daily processing for existing files where many
+files may be tested before the required processing is identified.
+
+=cut
+
+use strict;
+
+package LINZ::GNSS::AwsS3Bucket;
+
+use IPC::Run qw(run);
+use POSIX qw(strftime);
+use Time::Local;
+use Date::Parse;
+use Carp qw(croak);
+
+our $default_awsbin='/usr/bin/aws';
+
+=head2 LINZ::GNSS::AwsS3Bucket->new( ... )
+
+Opens an S3 bucket for operating with.  Takes the following optional arguments:
+
+=over
+
+=item config: A LINZ::GNSS::Config configuration from which to retrieve parameters s3_bucket, s3_prefix, s3_aws_parameters, s3_aws_client
+
+=item bucket: The name of the bucket
+
+=item prefix: A prefix to apply to all keys passed to this module
+
+=item aws_parameters: Additional parameters passed to the aws client program
+
+=item aws_client: The location of the aws client program (if not the default location)
+
+=back
+
+=cut
+
+sub new()
+{
+    my( $class, %args ) = @_;
+    my $self=bless {}, $class;
+    $self->{aws_client}=$default_awsbin;
+    my $cfg=$args{config};
+    my $cfg_prefix=$args{config_prefix} || '';
+    foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
+    {
+        my $value=$self->{$item} || '';
+        $value=$args{$cfg_prefix.$item} if ! $value;
+        $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
+        $self->{$item}=$value;
+    }
+    my $bucket=$self->bucket;
+    croak("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
+    my $awsbin=$self->{aws_client};
+    if( ! -x $awsbin )
+    {
+        $self->error("Cannot find or use aws command $awsbin");
+        return;
+    }
+    # Check the bucket exists
+    my ($ok,$result,$error) =$self->_runAws('s3api','get-bucket-location','--bucket',$bucket);
+    if( ! $ok )
+    {
+        croak("LINZ::GNSS::AwsS3Bucket::new Cannot find or access S3 bucket $bucket\n");
+        return;
+    }
+    my $prefix=$self->prefix;
+    if( $prefix )
+    {
+        $prefix=~ s/\/*$/\//;
+        $prefix=~ s/^\///;
+        $self->{prefix}=$prefix;
+    }
+    return $self;
+}
+
+=head2 Access functions $self->... 
+
+Functions to access attributes bucket, prefix
+
+=cut
+
+sub bucket { return $_[0]->{bucket}}
+sub prefix { return $_[0]->{prefix}}
+sub _aws_client { return $_[0]->{aws_client}}
+sub _aws_parameters { return $_[0]->{aws_parameters}}
+sub _debug { my $self=shift; return $self->{debug_aws}; }
+
+sub error { shift; croak(join("",@_)."\n")}
+
+=head2 $processor->_runAws($command,$subcommand,@params)
+
+Runs an AWS command 
+
+=cut
+
+sub _runAws
+{
+    my($self,$command,$subcommand,@params)=@_;
+    my $awsbin=$self->_aws_client;
+    my $awsparams=$self->_aws_parameters;
+    my @awsparams=split(' ',$awsparams);
+    my @command=($awsbin,$command,$subcommand,@awsparams,@params);
+    my $in='';
+    my $out;
+    my $err;
+    my $ok=0;
+    eval
+    {
+        print("Running command: ",join("\n   ",@command),"\n") if $self->_debug;
+        $ok=run(\@command,\$in,\$out,\$err);
+    };
+    if( $@ )
+    {
+        $self->error("aws command failed: $@");
+        return 0;
+    }
+    return wantarray ? ($ok,$out,$err) : $ok;
+}
+
+=head2 $processor->fileKey($file)
+
+Get the key used to identify a file in S3
+
+=cut
+
+sub fileKey
+{
+    my ($self, $name) = @_;
+    $name=~s/^\///;  
+    my $key=$self->prefix.$name;
+    return $key;
+}
+
+=head2 $processor->fileUrl($file)
+
+Get the url used to identify a file in S3
+
+=cut
+
+sub fileUrl
+{
+    my ($self, $name) = @_;    
+    my $bucket=$self->bucket;
+    my $key=$self->fileKey($name);
+    my $s3url="s3://$bucket/$key";    
+    return $s3url;
+}
+
+=head2 $processor->putFile($sourcefile,$file)
+
+Copy a file to the S3 bucket store for the process.
+
+=cut
+
+sub putFile
+{
+    my($self,$sourcefile,$name)=@_;
+    if(! -f $sourcefile || ! -r $sourcefile )
+    {
+        $self->error("Cannot copy to $sourcefile to S3: not a file");
+        return 0;
+    }
+    my $s3url=$self->fileUrl($name);
+    my $timetag=(stat($sourcefile))[9];
+    my $utctag=strftime("%Y-%m-%dT%H:%M:%S",gmtime($timetag));
+    my @params=('--metadata',"mtime=$utctag",$sourcefile,$s3url);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp','--only-show-errors',@params);
+    return wantarray ? ($ok,$result,$error) : $ok;
+}
+
+=head2 $processor->getFile($name,$targetfile)
+
+Copy a file to the S3 bucket store for the process.
+
+=cut
+
+sub getFile
+{
+    my($self,$name,$targetfile)=@_;
+    unlink($targetfile) if -e $targetfile;
+    if( -e $targetfile )
+    {
+        $self->error("Cannot overwrite existing file $targetfile");
+        return 0;        
+    }
+    my $filestat=$self->fileStats($name);
+    if( ! $filestat )
+    {
+        $self->error("File $name not available S3");
+        return 0;        
+    }
+    my $s3url=$self->fileUrl($name);
+    my @params=($s3url,$targetfile);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp','--only-show-errors',@params);
+    if( ! -e $targetfile )
+    {
+        $self->error("Cannot retrieve file $name from S3: $error");
+        return 0;            
+    }
+    my $mtime=$filestat->{mtime};
+    utime($mtime,$mtime,$targetfile) if $mtime;
+    return wantarray ? ($ok,$result,$error) : $ok;
+}
+
+=head2 $processor->deleteFile($file)
+
+Copy a file to the S3 bucket store for the process.
+
+=cut
+
+sub deleteFile
+{
+    my($self,$name)=@_;
+    my $bucket=$self->bucket;
+    my $key=$self->fileKey($name);
+    my $s3url="s3://$bucket/$key";
+    return $self->_runAws('s3','rm','--only-show-errors',$s3url);
+}
+
+=head2 $processor->fileStats($file)
+
+Return {size=>size, mtime=>mtime} if a file exists, undef otherwise
+
+=cut
+
+sub fileStats
+{
+    my($self,$name)=@_;
+    my $bucket=$self->bucket;
+    my $key=$self->fileKey($name);    
+    my ($ok,$head,$err)=$self->_runAws('s3api','head-object','--bucket',$bucket,'--key',$key);
+    my $result;
+    if( $ok )
+    {
+        $result={};
+        if( $head =~ /\"ContentLength\"\s*\:\s*(\d+)[\s\,\}]/ )
+        {
+            $result->{size}=$1;
+        }
+        if( $head =~ /\"mtime\"\s*\:\s*\"(\d\d\d\d)\-(\d\d)\-(\d\d)T(\d\d)\:(\d\d)\:(\d\d)\"/s )
+        {
+            my($y,$m,$d,$hr,$mi,$sc)=($1,$2,$3,$4,$5,$6);
+            $y -= 1900;
+            $m--;
+            $result->{mtime}=timegm($sc,$mi,$hr,$d,$m,$y);
+        }
+        elsif( $head =~ /\"LastModified\"\s*\:\s*\"([^\"]+\d\d\d\d\s+\d\d\:\d\d\:\d\d[^\"]*)\"/ )
+        {
+            $result->{mtime}=str2time($1);
+
+        }
+    }
+    return $result;
+}
+
+=head2 $processor->fileExists($file)
+
+Returns true (1) if a file exists, false (0) otherwise.
+
+=cut
+
+sub fileExists { my ($self,$file)=@_; return $self->fileStats($file) ? 1 : 0; }
+
+=head2 $processor->syncToBucket($sourcedir,$targetkey,[delete=>1])
+
+Synchonise files from source directory to target "directory".  
+Runs aws s3 sync --delete unless delete=>0
+
+=cut
+
+sub syncToBucket
+{
+    my($self,$sourcedir,$targetkey,%opts)=@_;
+    if( ! -d $sourcedir )
+    {
+        $self->error("Cannot sync to S3: $sourcedir is not a directory");
+        return 0;            
+    }
+    if( ! $targetkey )
+    {
+        # In principle could sync entire directory structure but 
+        # don't want to permit this.
+        $self->error("Cannot sync to S3: target directory name cannot be empty");
+        return 0;             
+    }
+    my $s3url=$self->fileUrl($targetkey);
+    my @cmd=('s3','sync','--only-show-errors');
+    push(@cmd,'--delete') if exists $opts{delete} && ! $opts{delete};
+    push(@cmd,$sourcedir,$s3url);
+    my ($ok,$result,$error)=$self->_runAws(@cmd);
+    return wantarray ? ($ok,$result,$error) : $ok;
+}
+
+=head2 $processor->syncFromBucket($sourcekey,$targetdir,[delete=>1])
+
+Synchronise files from source directory to target "directory".  
+Runs aws s3 sync --delete unless delete=>0 
+
+=cut
+
+sub syncFromBucket
+{
+    my($self,$sourcekey,$targetdir,%opts)=@_;
+    if( ! $sourcekey )
+    {
+        # In principle could sync entire directory structure but 
+        # don't want to permit this.
+        $self->error("Cannot sync from S3: source directory name cannot be empty");
+        return 0;             
+    }
+    if( ! -d $targetdir )
+    {
+        $self->error("Cannot sync to S3: $targetdir is not a directory");
+        return 0;            
+    }
+    my $s3url=$self->fileUrl($sourcekey);
+    my @cmd=('s3','sync','--only-show-errors');
+    push(@cmd,'--delete') if exists $opts{delete} && ! $opts{delete};
+    push(@cmd,$s3url,$targetdir);
+    my ($ok,$result,$error)=$self->_runAws(@cmd);    
+    return wantarray ? ($ok,$result,$error) : $ok;
+}
+
+1;

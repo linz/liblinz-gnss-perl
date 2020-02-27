@@ -154,7 +154,9 @@ sub testProcess
         my $campdir=$targetdir.'/campaign';
         make_path($campdir.'/SOL');
         make_path($campdir.'/RAW');
-        $self->installPcfCampaignFiles($campdir);
+        make_path($campdir.'/STA');
+        my $ok=$self->installPcfCampaignFiles($campdir);
+        return 0 if ! $ok;
     }
     my @files=();
     my $lendir=length($targetdir);

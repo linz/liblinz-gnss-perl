@@ -512,13 +512,51 @@ sub installPcfCampaignFiles
     {
         next if $cfdef =~ /^\s*$/;
         $cfdef=~ s/$/ /;
+
+        # If this is a campaign zip file then extract into campaign
+        if( $cfdef =~  /^\s*ZIP\s+(\S+)\s*$/ )
+        {
+            my $filename=$1;
+            if( ! -f $filename )
+            {
+                $self->error("Cannot find campaign zip file $filename\n");
+                $return=0;
+                next;
+            }
+            my $zip=Archive::Zip->new();
+            if( $zip->read($filename) != AZ_OK )
+            {
+                $self->error("Cannot read campaign zip file $filename\n");
+                $return=0;
+                next;
+            }
+            foreach my $zf ($zip->memberNames())
+            {
+                my ($zdir,$zname) = ($1,$2) if $zf =~ /^(\w+)\/([\w\.]+)$/;
+                if( ! $zdir || ! -d "$campdir/$zdir")
+                {
+                    $self->error("Invalid file name $zf in campaign zip file $filename");
+                    $return = 0;
+                    next;
+                }
+                if( $zip->extractMember($zf,"$campdir/$zf") != AZ_OK )
+                {
+                    $self->error("Failed to extract $zf from campaign zip file $filename");
+                    $return = 0;
+                }
+            }
+            next;
+        }
+
         if( $cfdef !~ /^\s*(\w+)\s+(?:(uncompress)\s+)?((?:(?:\~\/)?\w\S*?\s+)+)$/i )
         {
             $self->error("Invalid pcf_campaign_file definition: $cfdef");
             $return=0;
             last;
         }
-        my($dir,$uncompress,$filename) = ($1,$2,$3);
+        my($dir,$uncompress,$filename) = (uc($1),lc($2),$3);
+
+        # Otherwise copy file(s) to target directory
         my $filedir=$campdir.'/'.$dir;
         if( ! -d $filedir )
         {
@@ -1648,13 +1686,18 @@ __END__
  # Files names are relative to the base directory unless they are prefixed
  # ~/, in which case they are relative to the target directory.
  # Filenames in the target directory can contain the * and ? wildcards to 
- # copy multiple files.  This facility is currently not available for files in other
+ # copy multiple files.  Wildcards are not supported for files in other
  # directories if S3 is being used for storage.
  #
  # Use the "uncompress" keyword to uncompress gzipped (.gz) 
  # or compress (.Z) files. (Assumes the file names are terminated .gz or .Z)
+ #
+ # Use the campaign dirctory ZIP to unzip a file containing a set of campaign 
+ # files with their explicit directories, eg STA/STATIONS.CLU.  Zip files are 
+ # always located on the local file system - S3 is not used.
  # 
  # eg: RAW uncompress TEST${ddd}0.${yy}O.gz
+ #     ZIP ${configdir}/station_files.zip
  
  pcf_campaign_files
 

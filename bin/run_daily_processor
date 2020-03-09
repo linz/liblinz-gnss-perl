@@ -83,6 +83,7 @@ die "Invalid test target directory $targetdir specified\n" if $targetdir && ! -d
 push(@params,'start_date='.$startdate) if $startdate;
 push(@params,'end_date='.$enddate) if $enddate;
 push(@params,'target_directory='.$targetdir) if $targetdir;
+push(@params,'base_directory=') if $targetdir;
 push(@params,'logsettings=debug') if $opts{t};
 push(@params,'rerun=1') if $opts{t};
 push(@params,'pcf_copy_dir=bernese') if $opts{T};

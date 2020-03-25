@@ -18,8 +18,8 @@ sub new
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
-    my $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
-    my $self->{ftp_passive} = $cfgdc->{ftppassive} || $LINZ::GNSS::DataCenter::ftp_passive;
+    $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
+    $self->{ftp_passive} = $cfgdc->{ftppassive} || $LINZ::GNSS::DataCenter::ftp_passive;
     return $self;
 }
 

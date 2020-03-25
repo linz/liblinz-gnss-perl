@@ -113,6 +113,20 @@ sub RefStationFile
     return $filepath;
 }
 
+=head2 my $filepath=LINZ::GNSS::RefStation::GetStation($code)
+
+Returns the station corresponding to a station code
+
+=cut
+
+sub GetStation
+{
+    my ($code)=@_;
+    my $file=LINZ::GNSS::RefStation::RefStationFile($code);
+    my $station=LINZ::GNSS::RefStation->new($file);
+    return $station;
+}
+
 =head2 my $list=LINZ::GNSS::RefStation::GetRefStations($filepattern,%options)
 
 Returns an array hash of RefStation objects.  The list is loaded from the files
@@ -612,6 +626,13 @@ sub _max
     my ($a,$b) = @_;
     return  $a < $b ? $b : $a;
 }
+
+
+=head2 my $statin=LINZ::GNSS::RefStation->new($filename)
+
+Loads the reference station data from the XML file. 
+
+=cut
 
 sub new
 {

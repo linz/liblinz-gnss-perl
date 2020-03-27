@@ -1,9 +1,15 @@
+liblinz-gnss-perl (1.64.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Adding capability to add files to GEN directory
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 27 Mar 2020 13:00:00 +1300
+
 liblinz-gnss-perl (1.63.2-1) bionic; urgency=medium
 
   [Chris Crook]
   * Fixing ftp settings again - got the wrong version of file in repo :-(
 
- -- Chris Crook <ccrook@linz.govt.nz>  Thu, 26 Mar 2020 09:00:00 +1300
 
 liblinz-gnss-perl (1.63.1-1) bionic; urgency=medium
 

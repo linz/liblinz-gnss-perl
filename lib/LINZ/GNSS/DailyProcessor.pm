@@ -379,6 +379,7 @@ sub runBernesePcf
         $targetdir=File::Spec->rel2abs($self->targetdir);
         $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
             CanOverwrite=>1,
+            CustomGenDir=>1,
             EnvironmentVariables=>{S=>$targetdir},
             CustomUserFiles=>$zipfiles,
             CpuFile=>$pcf_cpu,

@@ -98,8 +98,8 @@ Configuration from configfile.`hostname` will be merged into the
 configuration if it exists.
 
 If the environment variable LINZGNSS_DEBUG is set then scripts 
-using LINZ::GNSS will emit debug output.
-
+using LINZ::GNSS will emit debug output.  It can take values 
+warn, info, and debug.
 
 =cut
 

@@ -406,6 +406,7 @@ sub logger
     my ($self, $loggerid) = @_;
     if( ! $self->{_logger_init} )
     {
+        $self->{_logger_init}=1;
         my $logcfg=$self->get('logsettings','WARN');
         my $logfile=$self->get('logdir','');
         $logfile .= '/' if $logfile;
@@ -429,6 +430,14 @@ sub logger
             $logcfg =~ s/\[logfilename\]/$logfile/eg;
             Log::Log4perl->init(\$logcfg);
         }
+        my $debug=$ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
+        if( $debug )
+        {
+            my $level=$DEBUG;
+            $level=$WARN if lc($debug) eq 'warn';
+            $level=$INFO if lc($debug) eq 'info';
+            Log::Log4perl->easy_init( $level );
+        }        
     }
     $loggerid ||= 'LINZ::GNSS';
     return Log::Log4perl->get_logger($loggerid);

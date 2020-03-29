@@ -384,6 +384,28 @@ sub runBernesePcf
             CustomUserFiles=>$zipfiles,
             CpuFile=>$pcf_cpu,
             );
+        $self->info("Created Bernese runtime environment");
+        foreach my $e (sort(keys(%$environment)))
+        {
+            next if $e =~ /^_/;
+            $self->info(sprintf("%s: %s",$e,$environment->{$e}));
+        }
+        my $envfile=$environment->{'CLIENT_ENV'};
+        if( open(my $bh,$envfile))
+        {
+            $self->info("Environment");
+            while(my $line=<$bh>)
+            {
+                chomp($line);
+                $self->info($line);
+            }
+            close($bh)
+        }
+        else
+        {
+            $self->fail("Cannot open Bernese environment file");
+            return 0;
+        }
     };
 
     if( $@ )

@@ -177,6 +177,8 @@ sub new
     return $self;
 }
 
+sub name { return $_[0]->{args}->{configname};}
+
 sub _set
 {
     my($self,$key,$value)=@_;

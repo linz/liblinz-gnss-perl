@@ -287,7 +287,7 @@ sub runProcessor
                     die "Test file $successfile not created\n";
                 }
                 $self->createMarkerFile($completefile,1);
-                $self->info("Processing completed");
+                $self->info("Processing completed successfully");
                 $faillist=[];
             };
             my $error=$@;
@@ -1394,7 +1394,7 @@ sub clearLogBuffers
 sub _logMessage
 {
     my($self,$message)=@_;
-    return $self->year.':'.$self->day.': '.$message;
+    return $self->year.':'.$self->day.': '.$self->cfg->name.': '.$message;
 }
 
 =head2 $processor->info( $message )

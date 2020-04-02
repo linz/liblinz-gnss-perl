@@ -1,9 +1,9 @@
-liblinz-gnss-perl (1.65.0-1) bionic; urgency=medium
+liblinz-gnss-perl (1.66.0-1) bionic; urgency=medium
 
   [Chris Crook]
-  * Improving logging
+  * Adding name of config to logs to improve cloudwatch utility
 
- -- Chris Crook <ccrook@linz.govt.nz>  Mon, 30 Mar 2020 10:00:00 +1300
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 31 Mar 2020 10:00:00 +1300
 
 liblinz-gnss-perl (1.64.0-1) bionic; urgency=medium
 

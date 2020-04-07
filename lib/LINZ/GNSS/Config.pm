@@ -1,3 +1,4 @@
+
 =head1 LINZ::GNSS::Config
 
 Module to read a configuration file.  Supports the following features:
@@ -118,137 +119,127 @@ variable var-xxx to override variable var.
 
 =cut
 
-sub new
-{
-    my($class,$cfgfile,@args)=@_;
-    my %data=();
-    my %args=(); # Args are overrides
+sub new {
+    my ( $class, $cfgfile, @args ) = @_;
+    my %data = ();
+    my %keys = ();
+    my %args = ();    # Args are overrides
 
-    foreach my $a (@args)
-    {
-        $args{lc($1)}=$2 if $a =~ /^([^\=]+)\=(.*)/;
+    foreach my $a (@args) {
+        $args{ lc($1) } = $2 if $a =~ /^([^\=]+)\=(.*)/;
     }
 
-    my $configdir=$cfgfile;
-    $configdir=~ s/[^\\\/]*$//;
-    $configdir=~ s/.$//;
-    $configdir='.' if $configdir eq '';
-    $args{configdir}=$configdir;
-    my $configname=$cfgfile;
-    $configname=~ s/.*[\\\/]//;
-    $configname=~ s/\..*//;
-    $args{configname}=$configname;
-    $args{user} = getlogin if ! $args{user};
+    my $configdir = $cfgfile;
+    $configdir =~ s/[^\\\/]*$//;
+    $configdir =~ s/.$//;
+    $configdir = '.' if $configdir eq '';
+    $args{configdir} = $configdir;
+    my $configname = $cfgfile;
+    $configname =~ s/.*[\\\/]//;
+    $configname =~ s/\..*//;
+    $args{configname} = $configname;
+    $args{user} = getlogin if !$args{user};
 
-
-    croak("Configuration file $cfgfile is missing\n") if ! -f $cfgfile;
+    croak("Configuration file $cfgfile is missing\n") if !-f $cfgfile;
 
     my $errfile;
-    eval
-    {
-        my @files=($cfgfile);
-        push(@files,$cfgfile.'.'.$args{config}) 
-            if $args{config} && -f $cfgfile.'.'.$args{config};
-        foreach my $errfile (@files)
-        {
-            my %cfg=ParseConfig(-ConfigFile=>$errfile,-LowerCaseNames=>1);
-            while( my ($key,$value) = each(%cfg) )
-            {
-                $data{$key}=$value;
+    eval {
+        my @files = ($cfgfile);
+        push( @files, $cfgfile . '.' . $args{config} )
+          if $args{config} && -f $cfgfile . '.' . $args{config};
+        foreach my $errfile (@files) {
+            my %cfg = ParseConfig( -ConfigFile => $errfile );
+            while ( my ( $key, $value ) = each(%cfg) ) {
+                $keys{$key} = 1;
+                $data{ lc($key) } = $value;
             }
         }
     };
-    if( $@ )
-    {
-        my $message=$@;
+    if ($@) {
+        my $message = $@;
         $message =~ s/\s*\n.*//;
         croak("Error reading config file $errfile: $message\n");
     }
 
-    my $suffices=[];
-    push(@$suffices,'-'.$args{config}) if $args{config};
-    push(@$suffices,'');
+    my $suffices = [];
+    push( @$suffices, '-' . $args{config} ) if $args{config};
+    push( @$suffices, '' );
 
-    my $self={data=>\%data,args=>\%args,configfile=>$cfgfile,suffices=>$suffices,_logger_init=>0};
-    bless $self,$class;
+    my $self = {
+        keys         => \%keys,
+        data         => \%data,
+        args         => \%args,
+        configfile   => $cfgfile,
+        suffices     => $suffices,
+        _logger_init => 0
+    };
+    bless $self, $class;
     $self->_loadDateBasedConfiguration();
-    $self->setTime(time());
+    $self->setTime( time() );
 
     return $self;
 }
 
-sub name { return $_[0]->{args}->{configname};}
+sub name { return $_[0]->{args}->{configname}; }
 
-sub _set
-{
-    my($self,$key,$value)=@_;
-    $self->{args}->{$key}=$value;
+sub _set {
+    my ( $self, $key, $value ) = @_;
+    $self->{args}->{$key} = $value;
 }
 
-sub _loadDateBasedConfiguration
-{
-    my($self)=@_;
-    my $dbcfg=$self->getRaw('date_based_configuration','');
-    my $dateconfigs=[];
-    foreach my $cfg (split(/\n/,$dbcfg))
-    {
-        my @parts=split(' ',$cfg);
-        next if ! @parts;
-        eval
-        {
-            die "Incomplete date based configuration item\n" 
-               if $#parts < 2;
-            my $cfgcode = lc($parts[0]);
-            my $before = lc($parts[1]);
+sub _loadDateBasedConfiguration {
+    my ($self) = @_;
+    my $dbcfg = $self->getRaw( 'date_based_configuration', '' );
+    my $dateconfigs = [];
+    foreach my $cfg ( split( /\n/, $dbcfg ) ) {
+        my @parts = split( ' ', $cfg );
+        next if !@parts;
+        eval {
+            die "Incomplete date based configuration item\n"
+              if $#parts < 2;
+            my $cfgcode = lc( $parts[0] );
+            my $before  = lc( $parts[1] );
             my $datestr = $parts[2];
             die "Invalid configuration $cfgcode\n" if $cfgcode !~ /^\w+$/;
-            die "Need before/after not $before\n" if $before !~ /^(before|after)$/;
+            die "Need before/after not $before\n"
+              if $before !~ /^(before|after)$/;
             my $date;
-            eval
-            {
-                $date=parse_gnss_date($datestr);
-            };
+            eval { $date = parse_gnss_date($datestr); };
             die "Invalid date $datestr\n" if $@;
-            push(@$dateconfigs,[$before,$date,$cfgcode]);
+            push( @$dateconfigs, [ $before, $date, $cfgcode ] );
         };
-        if( $@ )
-        {
-            my $msg=$@;
+        if ($@) {
+            my $msg = $@;
             $msg =~ s/\s*$//;
             $msg .= " in date based configuration: $cfg\n";
             die $msg;
         }
     }
-    $self->{date_configuration}=$dateconfigs;
+    $self->{date_configuration} = $dateconfigs;
 }
 
-sub _setDateBasedConfiguration
-{
-    my($self,$timestamp) = @_;
-    my @configs=();
-    my @sprefix=();
-    my $arg=$self->{args}->{config};
-    push(@sprefix,'-'.$arg) if $arg;
-    push(@sprefix,'');
-    foreach my $dbc ( @{$self->{date_configuration}} )
-    {
-        my ($before,$date,$cfgcode) = @$dbc;
-        my $isok=$timestamp < $date;
-        $isok = ! $isok if $before eq 'after';
-        push(@configs,$cfgcode) if $isok;
+sub _setDateBasedConfiguration {
+    my ( $self, $timestamp ) = @_;
+    my @configs = ();
+    my @sprefix = ();
+    my $arg     = $self->{args}->{config};
+    push( @sprefix, '-' . $arg ) if $arg;
+    push( @sprefix, '' );
+    foreach my $dbc ( @{ $self->{date_configuration} } ) {
+        my ( $before, $date, $cfgcode ) = @$dbc;
+        my $isok = $timestamp < $date;
+        $isok = !$isok if $before eq 'after';
+        push( @configs, $cfgcode ) if $isok;
     }
-    my @suffices=();
-    foreach my $sp ( @sprefix )
-    {
-        foreach my $dc (@configs)
-        {
-            push( @suffices, $sp.'-'.$dc );
+    my @suffices = ();
+    foreach my $sp (@sprefix) {
+        foreach my $dc (@configs) {
+            push( @suffices, $sp . '-' . $dc );
         }
         push( @suffices, $sp );
     }
-    $self->{suffices}=\@suffices;
+    $self->{suffices} = \@suffices;
 }
-
 
 =head2 $cfg->setTime( $timestamp )
 
@@ -256,20 +247,18 @@ Sets the time used to expand ${yyyy}, ${ddd}, ${dd}, and ${mm} variables.
 
 =cut
 
-sub setTime
-{
-    my($self,$timestamp)=@_;
-    my ($year,$mon,$day,$yday)=(gmtime($timestamp))[5,4,3,7];
-    my $yyyy=sprintf("%04d",$year+1900);
-    $self->{_timestamp}=$timestamp;
-    $self->_set('yyyy',$yyyy);
-    $self->_set('yy',substr($yyyy,2));
-    $self->_set('mm',sprintf("%02d",$mon+1));
-    $self->_set('dd',sprintf("%02d",$day));
-    $self->_set('ddd',sprintf("%03d",$yday+1));
-    $self->_setDateBasedConfiguration( $timestamp );
+sub setTime {
+    my ( $self, $timestamp ) = @_;
+    my ( $year, $mon, $day, $yday ) = ( gmtime($timestamp) )[ 5, 4, 3, 7 ];
+    my $yyyy = sprintf( "%04d", $year + 1900 );
+    $self->{_timestamp} = $timestamp;
+    $self->_set( 'yyyy', $yyyy );
+    $self->_set( 'yy',   substr( $yyyy, 2 ) );
+    $self->_set( 'mm',   sprintf( "%02d", $mon + 1 ) );
+    $self->_set( 'dd',   sprintf( "%02d", $day ) );
+    $self->_set( 'ddd',  sprintf( "%03d", $yday + 1 ) );
+    $self->_setDateBasedConfiguration($timestamp);
 }
-
 
 =head2 $cfg->getRaw( $var )
 
@@ -277,25 +266,22 @@ Returns the un-interpolated value for a variable
 
 =cut
 
-sub getRaw
-{
-    my($self,$key,$default)=@_;
+sub getRaw {
+    my ( $self, $key, $default ) = @_;
 
-    my $lkey=lc($key);
+    my $lkey = lc($key);
 
     return $self->{args}->{$lkey} if exists $self->{args}->{$lkey};
 
-    foreach my $sf (@{$self->{suffices}})
-    {
-        my $cfgkey=$lkey.$sf;
+    foreach my $sf ( @{ $self->{suffices} } ) {
+        my $cfgkey = $lkey . $sf;
         return $self->{data}->{$cfgkey} if exists $self->{data}->{$cfgkey};
-    };
+    }
 
-    if( $lkey =~ /^pid_(\d)$/ )
-    {
-        my $nch=$1;
-        my $value='0000000000'.$$;
-        return substr($value,-$nch);
+    if ( $lkey =~ /^pid_(\d)$/ ) {
+        my $nch   = $1;
+        my $value = '0000000000' . $$;
+        return substr( $value, -$nch );
     }
 
     return $ENV{$key} if exists $ENV{$key};
@@ -311,44 +297,40 @@ Returns the interpolated value for a variable
 
 =cut
 
-sub get
-{
-    my( $self, $key, $default, $depth, $offset ) = @_;
-    $depth //= 0;
-    $offset //=0;
-    my $maxdepth=$self->getRaw('max_config_interpolation_depth',5);
-    if( $depth > 0 && $depth > $maxdepth )
-    {
-        die "Configuration file interpolation nesting > max_config_interpolation_depth\n";
+sub get {
+    my ( $self, $key, $default, $depth, $offset ) = @_;
+    $depth  //= 0;
+    $offset //= 0;
+    my $maxdepth = $self->getRaw( 'max_config_interpolation_depth', 5 );
+    if ( $depth > 0 && $depth > $maxdepth ) {
+        die
+"Configuration file interpolation nesting > max_config_interpolation_depth\n";
     }
-    my $timestamp=$self->{_timestamp};
-    if( $offset )
-    {
-        $self->setTime($timestamp+$offset*$SECS_PER_DAY);
+    my $timestamp = $self->{_timestamp};
+    if ($offset) {
+        $self->setTime( $timestamp + $offset * $SECS_PER_DAY );
     }
-    my $value='';
-    eval
-    {
-        $value=$self->getRaw($key,$default);
-        my $nextdepth=$depth;
-        while( $value=~ /\$\{\w+(?:[+-]\d+|\?[^\?\:\}]*\:?[^\?\:\}]*)?\}/)
-        {
+    my $value = '';
+    eval {
+        $value = $self->getRaw( $key, $default );
+        my $nextdepth = $depth;
+        while ( $value =~ /\$\{\w+(?:[+-]\d+|\?[^\?\:\}]*\:?[^\?\:\}]*)?\}/ ) {
             $nextdepth++;
             $value =~ s/\$\{(\w+)\}/$self->get($1,undef,$nextdepth,0)/eg;
-            $value =~ s/\$\{(\w+)([+-]\d+)\}/$self->get($1,undef,$nextdepth,$2)/eg;
-            $value=~ s/\$\{(\w+)\?([^\?\:\}]*)(?:\:([^\?\:\}]*))?\}/
+            $value =~
+              s/\$\{(\w+)([+-]\d+)\}/$self->get($1,undef,$nextdepth,$2)/eg;
+            $value =~ s/\$\{(\w+)\?([^\?\:\}]*)(?:\:([^\?\:\}]*))?\}/
                       $self->get($1,undef,$nextdepth,0) ? ($2 || '') : ($3 || '')
                       /xeg;
         }
         $self->setTime($timestamp) if $offset;
     };
-    if( $@ )
-    {
+    if ($@) {
         $self->setTime($timestamp) if $offset;
-        my $msg=$@;
+        my $msg = $@;
         die $msg if $depth > 0;
         $msg =~ s/\s*$//;
-        $msg .= ' evaluating '.$key.' in '.$self->{configfile}."\n";
+        $msg .= ' evaluating ' . $key . ' in ' . $self->{configfile} . "\n";
         croak($msg);
     }
     return $value;
@@ -362,17 +344,28 @@ the date as a timestamp.
 
 =cut
 
-sub getDate
-{
-    my ($self,$key)=@_;
-    my $datestr=$self->get($key);
-    my $seconds=0;
+sub getDate {
+    my ( $self, $key ) = @_;
+    my $datestr = $self->get($key);
+    my $seconds = 0;
     $datestr = "now$datestr" if $datestr =~ /^\-(\d+)$/;
-    eval
-    {
-        $seconds = parse_gnss_date($datestr);
-    };
+    eval { $seconds = parse_gnss_date($datestr); };
     return $seconds;
+}
+
+=head2 $hash = $cfg->getAll()
+
+Returns a hash of all dictionary keys after interpolating.
+
+=cut
+
+sub getAll {
+    my ($self) = @_;
+    my $expanded = {};
+    foreach my $key ( keys %{ $self->{keys} } ) {
+        $expanded->$key = $self->get($key);
+    }
+    return $expanded;
 }
 
 =head2 $logger=$cfg->logger($loggerid);
@@ -403,46 +396,41 @@ which defaults to 'LINZ::GNSS'.
 
 =cut
 
-sub logger
-{
-    my ($self, $loggerid) = @_;
-    if( ! $self->{_logger_init} )
-    {
-        $self->{_logger_init}=1;
-        my $logcfg=$self->get('logsettings','WARN');
-        my $logfile=$self->get('logdir','');
+sub logger {
+    my ( $self, $loggerid ) = @_;
+    if ( !$self->{_logger_init} ) {
+        $self->{_logger_init} = 1;
+        my $logcfg  = $self->get( 'logsettings', 'WARN' );
+        my $logfile = $self->get( 'logdir',      '' );
         $logfile .= '/' if $logfile;
-        $logfile .= $self->get('logfile','');
+        $logfile .= $self->get( 'logfile', '' );
 
-        if( $logcfg =~ /^(trace|debug|info|warn|error|fatal|)$/i )
-        {
-            my $options={};
-            if( $logfile ne '' ){ $options->{file}=$logfile; }
+        if ( $logcfg =~ /^(trace|debug|info|warn|error|fatal|)$/i ) {
+            my $options = {};
+            if ( $logfile ne '' ) { $options->{file} = $logfile; }
             $logcfg = uc($logcfg) || 'WARN';
-            if( $logcfg eq 'TRACE') { $options->{level}=$TRACE; }
-            if( $logcfg eq 'DEBUG') { $options->{level}=$DEBUG; }
-            if( $logcfg eq 'INFO') { $options->{level}=$INFO; }
-            if( $logcfg eq 'WARN') { $options->{level}=$WARN; }
-            if( $logcfg eq 'ERROR') { $options->{level}=$ERROR; }
-            if( $logcfg eq 'FATAL') { $options->{level}=$FATAL; }
+            if ( $logcfg eq 'TRACE' ) { $options->{level} = $TRACE; }
+            if ( $logcfg eq 'DEBUG' ) { $options->{level} = $DEBUG; }
+            if ( $logcfg eq 'INFO' )  { $options->{level} = $INFO; }
+            if ( $logcfg eq 'WARN' )  { $options->{level} = $WARN; }
+            if ( $logcfg eq 'ERROR' ) { $options->{level} = $ERROR; }
+            if ( $logcfg eq 'FATAL' ) { $options->{level} = $FATAL; }
             Log::Log4perl->easy_init($options);
         }
-        elsif(  $logcfg )
-        {
+        elsif ($logcfg) {
             $logcfg =~ s/\[logfilename\]/$logfile/eg;
-            Log::Log4perl->init(\$logcfg);
+            Log::Log4perl->init( \$logcfg );
         }
-        my $debug=$ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
-        if( $debug )
-        {
-            my $level=$DEBUG;
-            $level=$WARN if lc($debug) eq 'warn';
-            $level=$INFO if lc($debug) eq 'info';
-            Log::Log4perl->easy_init( $level );
-        }        
+        my $debug = $ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
+        if ($debug) {
+            my $level = $DEBUG;
+            $level = $WARN if lc($debug) eq 'warn';
+            $level = $INFO if lc($debug) eq 'info';
+            Log::Log4perl->easy_init($level);
+        }
     }
     $loggerid ||= 'LINZ::GNSS';
     return Log::Log4perl->get_logger($loggerid);
-};
+}
 
 1;

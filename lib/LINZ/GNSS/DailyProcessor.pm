@@ -1,3 +1,4 @@
+
 =head1 LINZ::GNSS::DailyProcessor
 
 Module to manage running daily processing routines into a directory 
@@ -21,15 +22,16 @@ use File::Path qw/make_path remove_tree/;
 use File::Which;
 use File::Copy;
 use File::Copy::Recursive;
+use File::Temp;
 use LINZ::GNSS::Config;
 use LINZ::GNSS::AwsS3Bucket;
 use LINZ::GNSS::Time qw/
-    $SECS_PER_DAY
-    ymdhms_seconds
-    seconds_ymdhms
-    yearday_seconds
-    seconds_yearday
-    /;
+  $SECS_PER_DAY
+  ymdhms_seconds
+  seconds_ymdhms
+  yearday_seconds
+  seconds_yearday
+  /;
 use LINZ::GNSS::Variables qw/ExpandEnv/;
 use List::Util;
 use POSIX qw(strftime);
@@ -38,10 +40,9 @@ use Log::Log4perl qw(:easy);
 
 use vars qw/$processor/;
 
-our $UNLOCKED=0;
-our $LOCKEXPIRED=1;
-our $LOCKED=2;
-
+our $UNLOCKED    = 0;
+our $LOCKEXPIRED = 1;
+our $LOCKED      = 2;
 
 =head2 $processor=LINZ::GNSS::DailyProcessor->new($cfgfile,@args)
 
@@ -54,18 +55,17 @@ may be used to identify an alternative configuration (see LINZ::GNSS::Config)
 
 =cut
 
-sub new
-{
-    my($class,$cfgfile,@args)=@_;
-    $cfgfile=abs_path($cfgfile);
-    my $cfg=LINZ::GNSS::Config->new($cfgfile,@args);
+sub new {
+    my ( $class, $cfgfile, @args ) = @_;
+    $cfgfile = abs_path($cfgfile);
+    my $cfg = LINZ::GNSS::Config->new( $cfgfile, @args );
     my $s3bucket;
-    if( $cfg->get('s3_bucket',''))
-    {
-        $s3bucket=new LINZ::GNSS::AwsS3Bucket(config=>$cfg);
+    if ( $cfg->get( 's3_bucket', '' ) ) {
+        $s3bucket = new LINZ::GNSS::AwsS3Bucket( config => $cfg );
     }
-    my $self={cfg=>$cfg,vars=>{},loggers=>{},s3bucket=>$s3bucket};
-    return bless $self,$class;
+    my $self =
+      { cfg => $cfg, vars => {}, loggers => {}, s3bucket => $s3bucket };
+    return bless $self, $class;
 }
 
 =head2 $processor->runProcessor( $func )
@@ -78,267 +78,256 @@ If $func is not defined then runs the defaultProcess function.
 
 =cut
 
-sub runProcessor
-{
-    my ($self,$func) = @_;
+sub runProcessor {
+    my ( $self, $func ) = @_;
     $func ||= \&defaultProcess;
     $func = $func eq 'test' ? \&testProcess : $func;
-    my $start_date=$self->getDate('start_date');
-    my $end_date=$self->getDate('end_date');
-    my $increment=int($self->get('date_increment',1)+0);
+    my $start_date = $self->getDate('start_date');
+    my $end_date   = $self->getDate('end_date');
+    my $increment  = int( $self->get( 'date_increment', 1 ) + 0 );
     $increment > 0 || die "date_increment must be greater than 0\n";
-    my $runtime=time();
-    my $maxruntime=$self->get('max_runtime');
-    my $maxdaysprocperrun=$self->get('max_days_processed_per_run','0');
-    $maxruntime=($1*60+$2)*60 if $maxruntime=~ /^(\d\d?)\:(\d\d)$/;
+    my $runtime           = time();
+    my $maxruntime        = $self->get('max_runtime');
+    my $maxdaysprocperrun = $self->get( 'max_days_processed_per_run', '0' );
+    $maxruntime = ( $1 * 60 + $2 ) * 60 if $maxruntime =~ /^(\d\d?)\:(\d\d)$/;
+
     # Set max run time to 1000 days if not specified or 0
-    $maxruntime=1000*$SECS_PER_DAY if $maxruntime==0;
-    my $endtime=$runtime+$maxruntime;
+    $maxruntime = 1000 * $SECS_PER_DAY if $maxruntime == 0;
+    my $endtime = $runtime + $maxruntime;
 
-    my $completefile=$self->get('complete_file');
-    my @skipfiles=split(' ',$self->get('skip_files',''));
+    my $completefile = $self->get('complete_file');
+    my @skipfiles = split( ' ', $self->get( 'skip_files', '' ) );
 
-    my $failfile=$self->get('fail_file');
-    my $retry_max_age=$self->get('retry_max_age_days')*$SECS_PER_DAY;
-    $retry_max_age=$runtime-$retry_max_age if $retry_max_age;
-    my $retry_interval_days=$self->get('retry_interval_days');
+    my $failfile      = $self->get('fail_file');
+    my $retry_max_age = $self->get('retry_max_age_days') * $SECS_PER_DAY;
+    $retry_max_age = $runtime - $retry_max_age if $retry_max_age;
+    my $retry_interval_days = $self->get('retry_interval_days');
 
-    my $rerun=$self->get('rerun','0');
-    my $procorder=lc($self->get('processing_order','backwards'));
-    my $stopfile=$self->get('stop_file','');
-    my $maxconsecutivefails=$self->get('max_consecutive_fails','0')+0;
-    my $maxconsecutiveskip=$self->get('max_consecutive_prerequisite_fails','0')+0;
-    my $faillist=[];
+    my $rerun = $self->get( 'rerun', '0' );
+    my $procorder = lc( $self->get( 'processing_order', 'backwards' ) );
+    my $stopfile            = $self->get( 'stop_file',             '' );
+    my $maxconsecutivefails = $self->get( 'max_consecutive_fails', '0' ) + 0;
+    my $maxconsecutiveskip =
+      $self->get( 'max_consecutive_prerequisite_fails', '0' ) + 0;
+    my $faillist = [];
     my $nskip;
 
-    my $runno=0;
-    my $terminate=0;
+    my $runno     = 0;
+    my $terminate = 0;
 
-    my @rundates=();
-    for( my $date=$end_date; $date >= $start_date; $date -= $SECS_PER_DAY*$increment )
+    my @rundates = ();
+    for (
+        my $date = $end_date ;
+        $date >= $start_date ;
+        $date -= $SECS_PER_DAY * $increment
+      )
     {
-        push(@rundates,$date);
+        push( @rundates, $date );
     }
 
-    if( $procorder eq 'forwards' )
-    {
-        @rundates=reverse(@rundates);
+    if ( $procorder eq 'forwards' ) {
+        @rundates = reverse(@rundates);
     }
-    elsif( $procorder eq 'random' )
-    {
+    elsif ( $procorder eq 'random' ) {
         @rundates = List::Util::shuffle(@rundates);
     }
-    elsif( $procorder eq 'binary_fill' )
-    {
-        my @dateb=();
-        foreach my $r (@rundates)
-        {
-            my $bin=unpack('B10',pack('c',int(($r-$start_date)/$SECS_PER_DAY)));
-            $bin = reverse( $bin );
-            push(@dateb,[$r,$bin]);
+    elsif ( $procorder eq 'binary_fill' ) {
+        my @dateb = ();
+        foreach my $r (@rundates) {
+            my $bin =
+              unpack( 'B10',
+                pack( 'c', int( ( $r - $start_date ) / $SECS_PER_DAY ) ) );
+            $bin = reverse($bin);
+            push( @dateb, [ $r, $bin ] );
         }
-        @dateb=sort {$a->[1] cmp $b->[1]} @dateb;
-        @rundates=map {$_->[0]} @dateb;
+        @dateb    = sort { $a->[1] cmp $b->[1] } @dateb;
+        @rundates = map  { $_->[0] } @dateb;
     }
 
-    my $basedir=$self->get('base_directory');
-    $self->set('basedir',$basedir);
-    
-    foreach my $date (@rundates)
-    {
+    my $basedir = $self->get('base_directory');
+    $self->set( 'basedir', $basedir );
+
+    foreach my $date (@rundates) {
         last if $terminate;
 
         # Test if have already done maximum number of runs..
 
-        if( $maxdaysprocperrun > 0 && $runno >= $maxdaysprocperrun )
-        {
-            $self->warn("Daily processor cancelled: max_days_processed_per_run exceeded");
+        if ( $maxdaysprocperrun > 0 && $runno >= $maxdaysprocperrun ) {
+            $self->warn(
+                "Daily processor cancelled: max_days_processed_per_run exceeded"
+            );
             last;
         }
 
         # Test for a stop file ..
-       
-        if( $stopfile && -e $stopfile )
-        {
+
+        if ( $stopfile && -e $stopfile ) {
             $self->error("Stopped by \"stop file\" $stopfile");
             last;
         }
-    
+
         # Have we run out of time
-        if( time() > $endtime )
-        {
+        if ( time() > $endtime ) {
             $self->warn("Daily processor cancelled: max_runtime expired");
             last;
         }
 
-        my($year,$day)= $self->setYearDay($date);
+        my ( $year, $day ) = $self->setYearDay($date);
 
-        my $target=$self->get('target_directory');
-        my $targetdir=$basedir ne '' ? "$basedir/$target" : $target;
-        $self->set('target',$target);
-        $self->set('targetdir',$targetdir);
+        my $target = $self->get('target_directory');
+        my $targetdir = $basedir ne '' ? "$basedir/$target" : $target;
+        $self->set( 'target',    $target );
+        $self->set( 'targetdir', $targetdir );
 
-        eval
-        {
+        eval {
             # Set up the processor enviromnent
-            $ENV{PROCESSOR_TARGET_DIR}=$targetdir;
-            $ENV{PROCESSOR_YEAR}=$year;
-            $ENV{PROCESSOR_DOY}=$day;
+            $ENV{PROCESSOR_TARGET_DIR} = $targetdir;
+            $ENV{PROCESSOR_YEAR}       = $year;
+            $ENV{PROCESSOR_DOY}        = $day;
 
             # Are we skipping this directory?
 
-            my $skipping=0;
-            foreach my $skipfile (@skipfiles)
-            {
-                next if ! $self->markerFileExists($skipfile);
-                $skipping=1;
+            my $skipping = 0;
+            foreach my $skipfile (@skipfiles) {
+                next if !$self->markerFileExists($skipfile);
+                $skipping = 1;
                 last;
             }
             next if $skipping;
 
-            $self->deleteMarkerFiles($completefile,$failfile) if $rerun;
+            $self->deleteMarkerFiles( $completefile, $failfile ) if $rerun;
 
             # Has this directory already been processed?
             next if $self->markerFileExists($completefile);
 
             # Did it fail but is not ready to rerun
-            my $failmtime=$self->markerFileExists($failfile);
-            if( $failmtime )
-            {
+            my $failmtime = $self->markerFileExists($failfile);
+            if ($failmtime) {
                 next if $date < $retry_max_age;
-                next if (time()-$failmtime) < ($retry_interval_days*60*60*24);
+                next
+                  if ( time() - $failmtime ) <
+                  ( $retry_interval_days * 60 * 60 * 24 );
                 $self->deleteMarkerFiles($failfile);
             }
-           
+
             # Do we have prerequisite files
-            my $skip=0;
-            eval
-            {
-                foreach my $prerequisite (split(' ',$self->get('prerequisite_files','')))
+            my $skip = 0;
+            eval {
+                foreach my $prerequisite (
+                    split( ' ', $self->get( 'prerequisite_files', '' ) ) )
                 {
-                    my $pfile=$prerequisite;
-                    $pfile=~ s/^\~\//$target\//;
-                    my $available=0;
-                    if( $self->bucket )
-                    {
-                        $available=$self->bucket->fileExists($pfile);
+                    my $pfile = $prerequisite;
+                    $pfile =~ s/^\~\//$target\//;
+                    my $available = 0;
+                    if ( $self->bucket ) {
+                        $available = $self->bucket->fileExists($pfile);
                     }
-                    else
-                    {
-                        $pfile=$self->basedir.'/'.$pfile if $pfile;
-                        $available=1 if -e $pfile;
+                    else {
+                        $pfile = $self->basedir . '/' . $pfile if $pfile;
+                        $available = 1 if -e $pfile;
                     }
-                    if(! $available )
-                    {
-                        $self->info("Skipping $year $day as $prerequisite not found");
-                        $skip=1;
+                    if ( !$available ) {
+                        $self->info(
+                            "Skipping $year $day as $prerequisite not found");
+                        $skip = 1;
                         last;
                     }
                 }
             };
-            if( $@ )
-            {
-                my $msg=$@;
+            if ($@) {
+                my $msg = $@;
                 $msg =~ s/\s*$//;
                 $self->info("Skipping $year $day: $msg");
-                $skip=1;
+                $skip = 1;
             }
-            if( $skip )
-            {
+            if ($skip) {
                 $nskip++;
-                if( $maxconsecutiveskip && $nskip >= $maxconsecutiveskip )
-                {
-                    $self->warn('Processing stopped as maximum number of consecutive prerequisite files missing reached');
+                if ( $maxconsecutiveskip && $nskip >= $maxconsecutiveskip ) {
+                    $self->warn(
+'Processing stopped as maximum number of consecutive prerequisite files missing reached'
+                    );
                     last;
                 }
                 next;
             }
-            $nskip=0;
+            $nskip = 0;
 
             # Can we get a lock on the file.
-            
+
             next if $self->locked() == $LOCKED;
             $runno++;
 
-
             $self->makePath($targetdir);
-            next if ! $self->lock();
-            if( $self->bucket )
-            {
-                my $syncok = $self->bucket->syncFromBucket($target,$targetdir);
-                if( ! $syncok )
-                {
+            next if !$self->lock();
+            if ( $self->bucket ) {
+                my $syncok =
+                  $self->bucket->syncFromBucket( $target, $targetdir );
+                if ( !$syncok ) {
                     $self->error("Failed to synchronize data from S3 bucket");
                 }
             }
             $self->cleanTarget();
             $self->clearLogBuffers();
             $self->info("Processing $year $day");
-            eval
-            {
-                my $result=$func->($self);
-                if( ! $result )
-                {
+            eval {
+                my $result = $func->($self);
+                if ( !$result ) {
                     die "Daily processing failed\n";
                 }
-                my $successfile=$self->get('test_success_file','');
-                if( $successfile && ! -d $self->targetdir.'/'.$successfile )
+                my $successfile = $self->get( 'test_success_file', '' );
+                if ( $successfile && !-d $self->targetdir . '/' . $successfile )
                 {
                     die "Test file $successfile not created\n";
                 }
-                $self->createMarkerFile($completefile,1);
+                $self->createMarkerFile( $completefile, 1 );
                 $self->info("Processing completed successfully");
-                $faillist=[];
+                $faillist = [];
             };
-            my $error=$@;
-            if( $self->bucket )
-            {
-                eval
-                {
-                    if( ! $self->bucket->syncToBucket($targetdir,$target) )
-                    {
-                        $error="Failed to synchronize data back to S3";
+            my $error = $@;
+            if ( $self->bucket ) {
+                eval {
+                    if ( !$self->bucket->syncToBucket( $targetdir, $target ) ) {
+                        $error = "Failed to synchronize data back to S3";
                     }
                 };
-                if( $@ )
-                {
-                    $error="Failed to synchronize back to S3: $@";
+                if ($@) {
+                    $error = "Failed to synchronize back to S3: $@";
                 }
             }
-            if( $error )
-            {
+            if ($error) {
                 $self->warn("Processing failed: $error");
-                push(@$faillist,$self->createMarkerFile($failfile,1));
-                $self->deleteMarkerFiles($completefile); # Just in case failed in sync
-                if( $maxconsecutivefails && scalar(@$faillist) >= $maxconsecutivefails )
+                push( @$faillist, $self->createMarkerFile( $failfile, 1 ) );
+                $self->deleteMarkerFiles($completefile)
+                  ;    # Just in case failed in sync
+                if ( $maxconsecutivefails
+                    && scalar(@$faillist) >= $maxconsecutivefails )
                 {
                     unlink(@$faillist);
-                    $self->warn('Processing stopped as maximum number of consecutive failures reached');
+                    $self->warn(
+'Processing stopped as maximum number of consecutive failures reached'
+                    );
                     $terminate = 1;
                 }
             }
         };
-        if( $@ )
-        {
-            my $msg=$@;
-            $msg=~s/\s*$//;
+        if ($@) {
+            my $msg = $@;
+            $msg =~ s/\s*$//;
             $self->warn("Failed $year $day: $msg");
         }
+
         # Cleaning out working directories if storing to S3 bucket
-        if( $self->bucket )
-        {
-            remove_tree($self->targetdir);
+        if ( $self->bucket ) {
+            remove_tree( $self->targetdir );
         }
         $self->unlock();
     }
 }
 
-sub setPcfParams
-{
-    my($self,$params,$varhash)=@_;
-    while ($params =~ /\b(\w+)\=(\S+)/g)
-    {
-        $varhash->{$1}=$2;
+sub setPcfParams {
+    my ( $self, $params, $varhash ) = @_;
+    while ( $params =~ /\b(\w+)\=(\S+)/g ) {
+        $varhash->{$1} = $2;
     }
 }
 
@@ -354,317 +343,213 @@ script and determines the success or failure status.
 
 =cut
 
-sub runBernesePcf
-{
-    my($self,$pcf,$pcf_params)=@_;
+sub runBernesePcf {
+    my ( $self, $pcf, $pcf_params ) = @_;
+
     # If pcf is blank then need a name
     $pcf ||= $self->get('pcf');
+
     # Skip if specified as blank or none.
     return 1 if $pcf eq '' || lc($pcf) eq 'none';
 
-    # If params is defined then use (which allows overriding default params with none)
-    $pcf_params //= $self->get('pcf_params','');
-    my $pcf_cpu=$self->get('pcf_cpufile','UNIX'); 
-    my $return=1;
+# If params is defined then use (which allows overriding default params with none)
+    $pcf_params //= $self->get( 'pcf_params', '' );
+    my $pcf_cpu = $self->get( 'pcf_cpufile', 'UNIX' );
+    my $return = 1;
 
     require LINZ::BERN::BernUtil;
 
-    # Create a Bernese environment.  Ensrue that the SAVEDISK area is redirected
+    # Create a Bernese environment.  Ensure that the SAVEDISK area is redirected
     # to the target directory for the daily processing.
 
-    my ($targetdir,$environment);
-    eval
-    {
-        my $zipfiles=$self->get('pcf_user_zip_file','');
-        $targetdir=File::Spec->rel2abs($self->targetdir);
-        $environment=LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
-            CanOverwrite=>1,
-            CustomGenDir=>1,
-            EnvironmentVariables=>{S=>$targetdir},
-            CustomUserFiles=>$zipfiles,
-            CpuFile=>$pcf_cpu,
-            );
+    my ( $targetdir, $environment );
+    eval {
+        my $zipfiles = $self->get( 'pcf_user_zip_file', '' );
+        $targetdir   = File::Spec->rel2abs( $self->targetdir );
+        $environment = LINZ::BERN::BernUtil::CreateRuntimeEnvironment(
+            CanOverwrite    => 1,
+            CustomGenDir    => 1,
+            SaveDir         => $targetdir,
+            CustomUserFiles => $zipfiles,
+            CpuFile         => $pcf_cpu,
+        );
         $self->info("Created Bernese runtime environment");
-        foreach my $e (sort(keys(%$environment)))
-        {
+        foreach my $e ( sort( keys(%$environment) ) ) {
             next if $e =~ /^_/;
-            $self->info(sprintf("%s: %s",$e,$environment->{$e}));
+            $self->info( sprintf( "%s: %s", $e, $environment->{$e} ) );
         }
-        my $envfile=$environment->{'CLIENT_ENV'};
-        if( open(my $bh,$envfile))
-        {
+        my $envfile = $environment->{'CLIENT_ENV'};
+        if ( open( my $bh, $envfile ) ) {
             $self->info("Environment");
-            while(my $line=<$bh>)
-            {
+            while ( my $line = <$bh> ) {
                 chomp($line);
                 $self->info($line);
             }
-            close($bh)
+            close($bh);
         }
-        else
-        {
+        else {
             $self->fail("Cannot open Bernese environment file");
             return 0;
         }
     };
 
-    if( $@ )
-    {
+    if ($@) {
         $self->fail($@);
-        $return=0;
+        $return = 0;
     }
 
     # If OK, then create a campaign and run the PCF
 
-    my( $start,$end,$campaign,$campdir);
-    if( $return )
-    {
-        $start=$self->timestamp;
-        $end=$start+$SECS_PER_DAY-1;
-        $campaign=LINZ::BERN::BernUtil::CreateCampaign(
+    my ( $start, $end, $campaign, $campdir );
+    if ($return) {
+        $start    = $self->timestamp;
+        $end      = $start + $SECS_PER_DAY - 1;
+        $campaign = LINZ::BERN::BernUtil::CreateCampaign(
             $pcf,
-            CanOverwrite=>1,
-            SetSession=>[$start,$end],
-            MakeSessionFile=>1,  # Daily session file
-            UseStandardSessions=>1,
-            );
-        $ENV{PROCESSOR_CAMPAIGN}=$campaign->{JOBID};
-        $campdir = ExpandEnv($campaign->{CAMPAIGN},'for campaign directory');
-        $ENV{PROCESSOR_CAMPAIGN_DIR}=$campdir;
-        $self->setPcfParams($pcf_params,$campaign->{variables});
+            CanOverwrite        => 1,
+            SetSession          => [ $start, $end ],
+            MakeSessionFile     => 1,                  # Daily session file
+            UseStandardSessions => 1,
+        );
+        $ENV{PROCESSOR_CAMPAIGN} = $campaign->{JOBID};
+        $campdir = ExpandEnv( $campaign->{CAMPAIGN}, 'for campaign directory' );
+        $ENV{PROCESSOR_CAMPAIGN_DIR} = $campdir;
+        $self->setPcfParams( $pcf_params, $campaign->{variables} );
         $self->info("Campaign dir: $campdir");
         $self->info("Target dir: $ENV{S}");
     }
 
-    if( $return )
-    {
-        $return = $self->installPcfCampaignFiles($campdir);
+    if ($return) {
+        $return = $self->installPcfCampaignFiles($campaign);
     }
 
-    if( $return )
-    {
-        my $result=LINZ::BERN::BernUtil::RunPcf($campaign,$pcf,$environment);
-        my $status=LINZ::BERN::BernUtil::RunPcfStatus($campaign);
-        $self->info("Bernese result status: ".$status->{status});
-        $self->{pcfstatus}=$status;
+    if ($return) {
+        my $result =
+          LINZ::BERN::BernUtil::RunPcf( $campaign, $pcf, $environment );
+        my $status = LINZ::BERN::BernUtil::RunPcfStatus($campaign);
+        $self->info( "Bernese result status: " . $status->{status} );
+        $self->{pcfstatus} = $status;
 
-        my $testfile=$self->get('pcf_test_success_file','');
+        my $testfile = $self->get( 'pcf_test_success_file', '' );
 
-        if( $status->{status} eq 'OK' && $testfile && ! -e "$campdir/$testfile" )
+        if (   $status->{status} eq 'OK'
+            && $testfile
+            && !-e "$campdir/$testfile" )
         {
             $status->{status} = 'FAIL';
-            $self->warn("PCF required output file $testfile not built - run failed");
-            $return=0;
+            $self->warn(
+                "PCF required output file $testfile not built - run failed");
+            $return = 0;
         }
-        elsif( $status->{status} ne 'OK' )
-        {
-            $self->warn(join(': ',"Bernese PCF $pcf failed",
-                $status->{fail_pid},
-                $status->{fail_script},
-                $status->{fail_prog},
-                $status->{fail_message}
-            ));
-            $return=0;
+        elsif ( $status->{status} ne 'OK' ) {
+            $self->warn(
+                join( ': ',
+                    "Bernese PCF $pcf failed", $status->{fail_pid},
+                    $status->{fail_script},    $status->{fail_prog},
+                    $status->{fail_message} )
+            );
+            $return = 0;
         }
-        else
-        {
+        else {
             $self->info("Bernese PCF $pcf successfully run");
         }
 
-        my $fail=$return ? '' : '_fail';
-        my $copydir=$self->get('pcf'.$fail.'_copy_dir','');
-        my $copyfiles=$self->get('pcf'.$fail.'_save_files','');
+        my $fail = $return ? '' : '_fail';
+        my $copydir   = $self->get( 'pcf' . $fail . '_copy_dir',   '' );
+        my $copyfiles = $self->get( 'pcf' . $fail . '_save_files', '' );
 
-        if( $copydir )
-        {
-            my $copytarget=$targetdir.'/'.$copydir;
-            my $copysource=$campdir;
-            if( ! File::Copy::Recursive::dircopy($copysource,$copytarget) )
-            {
+        if ($copydir) {
+            my $copytarget = $targetdir . '/' . $copydir;
+            my $copysource = $campdir;
+            if ( !File::Copy::Recursive::dircopy( $copysource, $copytarget ) ) {
                 $self->error("Failed to copy $copysource to $copytarget");
             }
         }
-        
-        if( $copyfiles )
-        {
-            foreach my $file (split(' ',$copyfiles))
-            {
+
+        if ($copyfiles) {
+            foreach my $file ( split( ' ', $copyfiles ) ) {
                 $file =~ /(.*?)(?:\:(gzip|compress))?$/i;
-                my ($filename,$compress)=($1,$2);
-                my $src="$campdir/$filename";
-                my $target=$filename;
+                my ( $filename, $compress ) = ( $1, $2 );
+                my $src    = "$campdir/$filename";
+                my $target = $filename;
                 $target =~ s/.*[\\\/]//;
-                $target="$targetdir/$target";
-                File::Copy::copy($src,$target) if -e $src;
-                if( $compress )
-                {
-                    my $prog=lc($compress) eq 'gzip' ? 'gzip' : 'compress';
-                    my $progexe=File::Which::which($prog);
-                    if( $progexe )
-                    {
-                        system($progexe,$target);
+                $target = "$targetdir/$target";
+                File::Copy::copy( $src, $target ) if -e $src;
+                if ($compress) {
+                    my $prog = lc($compress) eq 'gzip' ? 'gzip' : 'compress';
+                    my $progexe = File::Which::which($prog);
+                    if ($progexe) {
+                        system( $progexe, $target );
                     }
                 }
             }
         }
     }
-    my $save_campaign=$self->get('pcf_save_campaign_dir','');
-    if( ! $save_campaign )
-    {
+    my $save_campaign = $self->get( 'pcf_save_campaign_dir', '' );
+    if ( !$save_campaign ) {
         LINZ::BERN::BernUtil::DeleteRuntimeEnvironment($environment);
     }
-    $ENV{PROCESSOR_BERNESE_STATUS}=$return;
+    $ENV{PROCESSOR_BERNESE_STATUS} = $return;
     return $return;
 }
 
-=head2 $processor->installPcfCampaignFiles($campaign_dir)
+=head2 $processor->installCampaignFiles($campaign_dir)
 
-Utility routine for running a script.  This looks for an executable script
-matching the supplied name in the configuration directory, then as an
-absolute path name, then in the system path.
+Install PCF campaign files, installs files into the campaign directory.  
 
 =cut
 
-sub installPcfCampaignFiles
-{
-    my($self,$campdir)=@_;
-    my $return=1;
+sub installCampaignFiles {
+    my ( $self, $campaign ) = @_;
+    my $return = 1;
+
+    my $campfiles = $self->get( 'pcf_campaign_files', '' );
+    return if $campfiles eq '';
 
     # Install campaign files
-    foreach my $cfdef (split(/\n/,$self->get('pcf_campaign_files','')))
-    {
-        next if $cfdef =~ /^\s*$/;
-        $cfdef=~ s/$/ /;
+    my @filespecs = [];
+    my $srcdir    = $self->targetdir;
 
-        # If this is a campaign zip file then extract into campaign
-        if( $cfdef =~  /^\s*ZIP\s+(\S+)\s*$/ )
-        {
-            my $filename=$1;
-            if( ! -f $filename )
-            {
-                $self->error("Cannot find campaign zip file $filename\n");
-                $return=0;
-                next;
-            }
-            my $zip=Archive::Zip->new();
-            if( $zip->read($filename) != AZ_OK )
-            {
-                $self->error("Cannot read campaign zip file $filename\n");
-                $return=0;
-                next;
-            }
-            foreach my $zf ($zip->memberNames())
-            {
-                my ($zdir,$zname) = ($1,$2) if $zf =~ /^(\w+)\/([\w\.]+)$/;
-                if( ! $zdir || ! -d "$campdir/$zdir")
-                {
-                    $self->error("Invalid file name $zf in campaign zip file $filename");
-                    $return = 0;
-                    next;
-                }
-                if( $zip->extractMember($zf,"$campdir/$zf") != AZ_OK )
-                {
-                    $self->error("Failed to extract $zf from campaign zip file $filename");
-                    $return = 0;
-                }
-            }
-            next;
-        }
+    # If using an S3 bucket then copy any required files from the bucket to
+    # a temporary directory
 
-        if( $cfdef !~ /^\s*(\w+)\s+(?:(uncompress)\s+)?((?:(?:\~\/)?\w\S*?\s+)+)$/i )
-        {
-            $self->error("Invalid pcf_campaign_file definition: $cfdef");
-            $return=0;
-            last;
-        }
-        my($dir,$uncompress,$filename) = (uc($1),lc($2),$3);
+    my $tmpdir;
+    eval {
+        if ( $self->{bucket} ) {
+            foreach my $cfdef ( split( /\n/, $campfiles ) ) {
+                next if $cfdef =~ /^\s*$/;
+                $cfdef =~ s/^\s+(([A-Z]+)(\s+uncompress)\s+)(.*?)\s*$//;
+                my $prefix    = $1;
+                my $filenames = $2;
 
-        # Otherwise copy file(s) to target directory
-        my $filedir=$campdir.'/'.$dir;
-        if( ! -d $filedir )
-        {
-            $self->error("Invalid target directory $dir in pcf_campaign_file definition: $cfdef");
-            $return=0;
-        }
-        my @filenames=split(' ',$filename); 
-        my @pcffiles=();
-
-        foreach my $filename (@filenames)
-        {
-            my $intargetdir = $filename =~ /^\~\//;
-            if( $self->bucket && ! $intargetdir )
-            {
-                my $name=$filename;
-                $name =~ s/.*[\\\/]//;
-                my $pcffile=$filedir.'/'.$name;
-                if( ! $self->bucket->getFile($filename,$pcffile))
-                {
-                    $self->error("Cannot retrieve pcf_campaign_file $filename from S3");
-                    return 0;
-                }
-                push(@pcffiles,$pcffile);
-                next;
-            }
-            if( $filename =~ /^\~\/(.*)/ )
-            {
-                $filename = $self->targetdir.'/'.$1;
-            }
-            elsif( $self->basedir )
-            {
-                $filename = $self->basedir.'/'.$filename;
-            }
-            my @files=($filename);
-            if( $filename =~ /[\*\?]/ )
-            { 
-                @files=glob($filename);
-            }
-            foreach my $file (@files )
-            {
-            if( ! -f $file )
-            {
-                $self->error("Cannot find pcf_campaign_file $file");
-                $return=0;
-                next;
-            }
-            my $pcffile=$file;
-            $pcffile=~ s/.*[\\\/]//;
-            $pcffile=$filedir.'/'.$pcffile;
-            if( ! copy($file,$pcffile) )
-            {
-                $self->error("Cannot copy pcf_campaign_file $file to $dir");
-                $return=0;
-            }
-            push(@pcffiles,$pcffile)
-            }
-        }
-
-        foreach my $pcffile (@pcffiles)
-        {
-            if( $uncompress && $pcffile =~ /^(.*)\.(gz|Z)$/ )
-            {
-                my ($uncompfile,$type)=($1,$2);
-                my $prog=$type eq 'gz' ? 'gzip' : 'compress';
-                my $progexe=File::Which::which($prog);
-                if( ! $prog )
-                {
-                    $self->error("Cannot find compression program $prog");
-                    $return=0;
-                    next;
-                }
-                system($progexe,'-d',$pcffile);
-                $pcffile=$uncompfile;
-                if( ! -f $pcffile )
-                {
-                    $self->error("Failed to uncompress $pcffile");
-                    $return=0;
-                    next;
+                # If the filename is not in
+                foreach my $filename ( split( ' ', $filenames ) ) {
+                    if (   $filename !~ /^\~\//
+                        && $filename !~ /[\?\*]/
+                        && !-e $filename )
+                    {
+                        $tmpdir = File::Temp->newdir();
+                        my $tmpfile = $filename;
+                        $tmpfile =~ s/^.*[\\\/]//;
+                        $tmpfile = "$tmpdir/$tmpfile";
+                        if ( !$self->bucket->getFile( $filename, $tmpfile ) ) {
+                            $self->error(
+"Cannot retrieve pcf_campaign_file $filename from S3"
+                            );
+                            return 0;
+                        }
+                        $filename = $tmpfile;
+                    }
+                    push( @filespecs, $prefix . $filename );
                 }
             }
-            $pcffile =~ s/.*[\\\/]//;
-            $self->info("Installed $pcffile into campaign $dir directory"); 
         }
-    }
-    return $return;
+        else {
+            @filespecs = split( /\n/, $campfiles );
+        }
+    };
+    LINZ::BERN::BernUtil::InstallCampaignFiles( $campaign, \@filespecs,
+        SourceDirectory => $srcdir );
 }
 
 =head2 $processor->runProcessorScript($scriptname,$param,$param)
@@ -675,41 +560,35 @@ absolute path name, then in the system path.
 
 =cut
 
-sub runProcessorScript
-{
-    my($self,$script,@params)=@_;
-    
-    my $cfgdir=$self->cfg->get('configdir');
+sub runProcessorScript {
+    my ( $self, $script, @params ) = @_;
+
+    my $cfgdir = $self->cfg->get('configdir');
     my $exe;
-    
-    if( -x "$cfgdir/$script" )
-    {
-        $exe="$cfgdir/$script";
+
+    if ( -x "$cfgdir/$script" ) {
+        $exe = "$cfgdir/$script";
     }
-    elsif( -x $script )
-    {
-        $exe=$script;
+    elsif ( -x $script ) {
+        $exe = $script;
     }
-    else
-    {
-        $exe=File::Which::which($script);
+    else {
+        $exe = File::Which::which($script);
     }
     my $result;
-    if( -x $exe )
-    {
+    if ( -x $exe ) {
         require IPC::Run;
-        my ($in,$out,$err);
+        my ( $in, $out, $err );
         $self->info("Running script $script\n");
-        my @cmd=($exe,@params);
-        IPC::Run::run(\@cmd,\$in,\$out,\$err);
-        $self->info($out) if $out;
+        my @cmd = ( $exe, @params );
+        IPC::Run::run( \@cmd, \$in, \$out, \$err );
+        $self->info($out)  if $out;
         $self->error($err) if $err;
-        $result=1;
+        $result = 1;
     }
-    else
-    {
+    else {
         $self->error("Cannot find script $script\n");
-        $result=0;
+        $result = 0;
     }
     return $result;
 }
@@ -726,38 +605,32 @@ to this routine.
 
 =cut
 
-sub runPerlScript
-{
-    my($self,$script,@params)=@_;
-    
-    my $cfgdir=$self->cfg->get('configdir');
+sub runPerlScript {
+    my ( $self, $script, @params ) = @_;
+
+    my $cfgdir = $self->cfg->get('configdir');
     my $scriptfile;
-    
-    if( -e "$cfgdir/$script" )
-    {
-        $scriptfile="$cfgdir/$script";
+
+    if ( -e "$cfgdir/$script" ) {
+        $scriptfile = "$cfgdir/$script";
     }
-    elsif( -e $script )
-    {
-        $scriptfile=$script;
+    elsif ( -e $script ) {
+        $scriptfile = $script;
     }
     my $result;
-    if( -e $scriptfile )
-    {
+    if ( -e $scriptfile ) {
         $self->info("Running perl script $script\n");
-        $processor=$self;
-        @ARGV=@params;
+        $processor = $self;
+        @ARGV      = @params;
         do $scriptfile;
-        if( $@ )
-        {
+        if ($@) {
             $self->error($@);
         }
-        $result=1;
+        $result = 1;
     }
-    else
-    {
+    else {
         $self->error("Cannot find perl script $script\n");
-        $result=0;
+        $result = 0;
     }
     return $result;
 }
@@ -774,26 +647,22 @@ otherwise will return 1.
 
 =cut
 
-sub runScripts
-{
-    my ($self,@scripts)=@_;
-    @scripts=map { split(/\n/,$_) } @scripts;
-    my $result=1;
-    foreach my $scriptdef (@scripts)
-    {
-        my($scriptname,@params)=split(' ',$scriptdef);
-        next if ! $scriptname;
+sub runScripts {
+    my ( $self, @scripts ) = @_;
+    @scripts = map { split( /\n/, $_ ) } @scripts;
+    my $result = 1;
+    foreach my $scriptdef (@scripts) {
+        my ( $scriptname, @params ) = split( ' ', $scriptdef );
+        next if !$scriptname;
         $self->info("Running script: $scriptdef");
-        if( $scriptname =~ /^perl\:/ )
-        {
-            $scriptname=$';
-            my $result=$self->runPerlScript($scriptname,@params);
-            last if ! $result;
+        if ( $scriptname =~ /^perl\:/ ) {
+            $scriptname = $';
+            my $result = $self->runPerlScript( $scriptname, @params );
+            last if !$result;
         }
-        else
-        {
-            my $result=$self->runProcessorScript($scriptname,@params);
-            last if ! $result;
+        else {
+            my $result = $self->runProcessorScript( $scriptname, @params );
+            last if !$result;
         }
     }
     return $result;
@@ -808,55 +677,52 @@ is a corresponding subject line defined).
 
 =cut
 
-sub sendNotification
-{
-    my($self,$success,$text) = @_;
+sub sendNotification {
+    my ( $self, $success, $text ) = @_;
 
-    my $server=$self->get('notification_smtp_server','');
-    my $auth_file=$self->get('notification_auth_file','');
-    my $timeout=$self->get('notification_smtp_timeout','30');
-    my $email=$self->get('notification_email_address','');
-    my $from=$self->get('notification_from_address','daily_processor@linz.govt.nz');
-    my $subject=$self->get('notification_subject_'.($success ? 'success' : 'fail'),
-                $self->get('notification_subject',''));
-    my $emailtext= $self->get('notification_text_'.($success ? 'success' : 'fail'),
-                $self->get('notification_text',''));
+    my $server    = $self->get( 'notification_smtp_server',   '' );
+    my $auth_file = $self->get( 'notification_auth_file',     '' );
+    my $timeout   = $self->get( 'notification_smtp_timeout',  '30' );
+    my $email     = $self->get( 'notification_email_address', '' );
+    my $from =
+      $self->get( 'notification_from_address', 'daily_processor@linz.govt.nz' );
+    my $subject =
+      $self->get( 'notification_subject_' . ( $success ? 'success' : 'fail' ),
+        $self->get( 'notification_subject', '' ) );
+    my $emailtext =
+      $self->get( 'notification_text_' . ( $success ? 'success' : 'fail' ),
+        $self->get( 'notification_text', '' ) );
 
     return if $subject eq '';
 
-
     # Construct the email message
 
-    my $emailheader="To: $email\nFrom: $from\nSubject: $subject\n\n";
+    my $emailheader = "To: $email\nFrom: $from\nSubject: $subject\n\n";
 
     $emailtext =~ s/\[text\]/$text/;
-    my $info=join("\n",@{$self->{info_buffer}});
-    my $warn=join("\n",@{$self->{warn_buffer}});
-    my $error=join("\n",@{$self->{error_buffer}});
+    my $info  = join( "\n", @{ $self->{info_buffer} } );
+    my $warn  = join( "\n", @{ $self->{warn_buffer} } );
+    my $error = join( "\n", @{ $self->{error_buffer} } );
 
     $emailtext =~ s/\[info\]/$info/;
     $emailtext =~ s/\[warning\]/$warn/;
     $emailtext =~ s/\[error\]/$error/;
 
     # Read authentication..
-    my $user='';
-    my $pwd='';
-    if( $auth_file )
-    {
+    my $user = '';
+    my $pwd  = '';
+    if ($auth_file) {
         my $af;
-        if( ! open($af,"<",$auth_file) )
-        {
+        if ( !open( $af, "<", $auth_file ) ) {
             $self->warn("Cannot open notification_auth_file $auth_file");
         }
-        else
-        {
-            while( my $line=<$af> )
-            {
-                my @parts=split(' ',$line);
-                my $item=lc($parts[0]);
-                $server=$parts[1] if $item eq 'server';
-                $user=$parts[1] if $item eq 'user';
-                $pwd=$parts[1] if $item eq 'password';
+        else {
+            while ( my $line = <$af> ) {
+                my @parts = split( ' ', $line );
+                my $item = lc( $parts[0] );
+                $server = $parts[1] if $item eq 'server';
+                $user   = $parts[1] if $item eq 'user';
+                $pwd    = $parts[1] if $item eq 'password';
                 last if $user ne '' && $pwd ne '';
             }
             close($af);
@@ -866,48 +732,46 @@ sub sendNotification
     # Split out the port from the server name
 
     my $port;
-    ($server,$port)=split(/\:/,$server);
+    ( $server, $port ) = split( /\:/, $server );
     $port //= '25';
 
     # Have we got a server defined ...
 
-    if( ! $server || lc($server) eq 'none' )
-    {
-        $self->error("Cannot send notification as notification_smtp_server is not defined\n".
-            "$emailheader$emailtext");
+    if ( !$server || lc($server) eq 'none' ) {
+        $self->error(
+"Cannot send notification as notification_smtp_server is not defined\n"
+              . "$emailheader$emailtext" );
         return;
     }
 
     # Split out recipients
-    
-    my @recipients=split(/\,/,$email);
+
+    my @recipients = split( /\,/, $email );
     foreach my $r (@recipients) { $r =~ s/^\s+//; $r =~ s/\s+$//; }
 
     # Attempt to connect to the server
 
-    eval
-    {
+    eval {
         require Net::SMTP;
-        my $smtp=Net::SMTP->new(
-            Host=>$server,
-            Port=>$port,
-            Timeout=>$timeout,
-            );
-        die "Cannot connect to SMTP server $server: $@\n" if ! $smtp;
-        $smtp->auth($user,$pwd) if $user ne '';
+        my $smtp = Net::SMTP->new(
+            Host    => $server,
+            Port    => $port,
+            Timeout => $timeout,
+        );
+        die "Cannot connect to SMTP server $server: $@\n" if !$smtp;
+        $smtp->auth( $user, $pwd ) if $user ne '';
 
         # Set the recipient(s)
-        
+
         $smtp->mail($from);
-        $smtp->to(@recipients,{SkipBad=>1});
+        $smtp->to( @recipients, { SkipBad => 1 } );
         $smtp->data();
         $smtp->datasend($emailheader);
         $smtp->datasend($emailtext);
         $smtp->dataend();
         $smtp->quit();
     };
-    if( $@ )
-    {
+    if ($@) {
         $self->error("Error in sendNotification: $@\n");
         $self->error("Failed to send:\n$emailheader$emailtext");
     }
@@ -934,35 +798,32 @@ If the prescripts fail then the PCF and post scripts are not run.
 
 =cut
 
-sub defaultProcess
-{
-    my($self)=@_;
-    my $ok=0;
-    eval
-    {
-        $ok=1;
-        my $prescripts=$self->get('prerun_script','none');
-        $ok=$self->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
+sub defaultProcess {
+    my ($self) = @_;
+    my $ok = 0;
+    eval {
+        $ok = 1;
+        my $prescripts = $self->get( 'prerun_script', 'none' );
+        $ok = $self->runScripts($prescripts) if $prescripts !~ /^\s*none\s*$/i;
 
-        if( $ok )
-        {
-            my $bernok=1;
-            if( $self->get('pcf'))
-            {
-                $bernok=$self->runBernesePcf();
+        if ($ok) {
+            my $bernok = 1;
+            if ( $self->get('pcf') ) {
+                $bernok = $self->runBernesePcf();
             }
-            my $status=$bernok ? '_success' : '_fail';
-            my $postscripts=$self->get("postrun_script$status",
-                $self->get("postrun_script","none"));
-            $ok=$self->runScripts($postscripts) if $postscripts !~ /^\s*(none\s*)?$/i;
+            my $status = $bernok ? '_success' : '_fail';
+            my $postscripts =
+              $self->get( "postrun_script$status",
+                $self->get( "postrun_script", "none" ) );
+            $ok = $self->runScripts($postscripts)
+              if $postscripts !~ /^\s*(none\s*)?$/i;
             $ok = $bernok && $ok;
         }
     };
-    if( $@ )
-    {
-        $ok=0;
+    if ($@) {
+        $ok = 0;
     }
-    $self->sendNotification( $ok );
+    $self->sendNotification($ok);
 
     return $ok;
 }
@@ -973,14 +834,12 @@ Test process - just writes log the current variables
 
 =cut
 
-sub testProcess
-{
-    my($self)=@_;
-    my $vars=$self->{vars};
+sub testProcess {
+    my ($self) = @_;
+    my $vars = $self->{vars};
     $self->info('Running testProcess');
-    foreach my $k (sort keys %$vars)
-    {
-        my $varstr=sprintf("  %s=%s",$k,$vars->{$k});
+    foreach my $k ( sort keys %$vars ) {
+        my $varstr = sprintf( "  %s=%s", $k, $vars->{$k} );
         $self->info($varstr);
     }
     return 1;
@@ -992,9 +851,8 @@ Returns the processor configuration file used by the script
 
 =cut
 
-sub cfg
-{
-    my ($self)=@_;
+sub cfg {
+    my ($self) = @_;
     return $self->{cfg};
 }
 
@@ -1011,62 +869,57 @@ to values for the range of date offsets from ## to ##
 
 =cut
 
-sub getRaw
-{
-    my( $self, $key, $default ) = @_;
-    my $result=exists $self->{vars}->{$key} ?
-           $self->{vars}->{$key} :
-           $self->cfg->get($key,$default);
+sub getRaw {
+    my ( $self, $key, $default ) = @_;
+    my $result =
+      exists $self->{vars}->{$key}
+      ? $self->{vars}->{$key}
+      : $self->cfg->get( $key, $default );
     $result //= '';
 
-    if( $result =~ /(for\s+(\-?\d+)\s+to\s+(\-?\d+)(?:\s+step\s+(\d+))?(?:\s+if\s+(exists))?(?:\s+need\s+(\d+))?\s+)\S/ )
+    if ( $result =~
+/(for\s+(\-?\d+)\s+to\s+(\-?\d+)(?:\s+step\s+(\d+))?(?:\s+if\s+(exists))?(?:\s+need\s+(\d+))?\s+)\S/
+      )
     {
-        my($prefix,$start,$end,$step,$check,$need)=($1,$2,$3,$4 // 1, $5 // 0, $6 // 0);
-        my @values=();
-        my $pfxlen=length($prefix);
-        my $timestamp=$self->get('timestamp');
+        my ( $prefix, $start, $end, $step, $check, $need ) =
+          ( $1, $2, $3, $4 // 1, $5 // 0, $6 // 0 );
+        my @values    = ();
+        my $pfxlen    = length($prefix);
+        my $timestamp = $self->get('timestamp');
         $step = 1 if $step < 1;
-        eval
-        {
-            while( $start <= $end )
-            {
-                $self->setYearDay($timestamp+$start*$SECS_PER_DAY);
+        eval {
+            while ( $start <= $end ) {
+                $self->setYearDay( $timestamp + $start * $SECS_PER_DAY );
                 $start += $step;
-                my $value=$self->cfg->get($key);
-                $value=substr($value,$pfxlen);
-                if( $check )
-                {
-                    if( $self->bucket )
-                    {
-                        next if ! $self->bucket->fileExists($value);
+                my $value = $self->cfg->get($key);
+                $value = substr( $value, $pfxlen );
+                if ($check) {
+                    if ( $self->bucket ) {
+                        next if !$self->bucket->fileExists($value);
                     }
-                    else
-                    {
-                        my $file=$value;
-                        $file=$self->basedir.'/'.$file if $self->basedir;
-                        next if ! -e $value;
+                    else {
+                        my $file = $value;
+                        $file = $self->basedir . '/' . $file if $self->basedir;
+                        next if !-e $value;
                     }
                 }
-                push(@values,$value);
+                push( @values, $value );
             }
         };
         $self->setYearDay($timestamp);
-        if( $need > 0 && scalar(@values) < $need )
-        {
+        if ( $need > 0 && scalar(@values) < $need ) {
             die "Not enough files found for $key\n";
         }
-        $result=join(' ',@values);
+        $result = join( ' ', @values );
     }
     return $result;
 }
 
-sub get
-{
-    my( $self, $key, $default ) = @_;
-    my $value=$self->getRaw($key,$default);
-    my $maxexpand=5;
-    while( $value=~ /\$\[\w+\]/ && $maxexpand-- > 0)
-    {
+sub get {
+    my ( $self, $key, $default ) = @_;
+    my $value = $self->getRaw( $key, $default );
+    my $maxexpand = 5;
+    while ( $value =~ /\$\[\w+\]/ && $maxexpand-- > 0 ) {
         $value =~ s/\$\[(\w+)\]/$self->getRaw($1)/eg;
     }
     return $value;
@@ -1078,10 +931,9 @@ Set a value that may be used by the processor (or scripts it runs)
 
 =cut
 
-sub set
-{
-    my( $self, $key, $value ) = @_;
-    $self->{vars}->{$key}=$value;
+sub set {
+    my ( $self, $key, $value ) = @_;
+    $self->{vars}->{$key} = $value;
     return $self;
 }
 
@@ -1091,9 +943,8 @@ Returns a date defined by the configuration file as a timestamp
 
 =cut
 
-sub getDate
-{
-    my ($self,$key)=@_;
+sub getDate {
+    my ( $self, $key ) = @_;
     return $self->cfg->getDate($key);
 }
 
@@ -1105,12 +956,11 @@ and $processor->get('ddd').
 
 =cut
 
-sub setYearDay
-{
-    my($self,$timestamp)=@_;
-    $self->set('timestamp',$timestamp);
+sub setYearDay {
+    my ( $self, $timestamp ) = @_;
+    $self->set( 'timestamp', $timestamp );
     $self->cfg->setTime($timestamp);
-    return ($self->get('yyyy'),$self->get('ddd'));
+    return ( $self->get('yyyy'), $self->get('ddd') );
 }
 
 =head2 $processor->logger
@@ -1119,14 +969,12 @@ Returns a Log::Log4perl logger associated with the processor.
 
 =cut
 
-sub logger
-{
-    my ($self, $loggerid) = @_;
+sub logger {
+    my ( $self, $loggerid ) = @_;
     $self->{loggers}->{$loggerid} = $self->cfg->logger($loggerid)
-        if ! exists $self->{loggers}->{$loggerid};
+      if !exists $self->{loggers}->{$loggerid};
     return $self->{loggers}->{$loggerid};
-};
-
+}
 
 =head2 $processor->makePath
 
@@ -1134,14 +982,12 @@ Creates a path, including all components to it, if it does not exist
 
 =cut
 
-sub makePath
-{
-    my($self,$path)=@_;
+sub makePath {
+    my ( $self, $path ) = @_;
     return 1 if -d $path;
-    eval
-    {
+    eval {
         my $errors;
-        make_path($path,{error=>\$errors});
+        make_path( $path, { error => \$errors } );
     };
     return -d $path ? 1 : 0;
 }
@@ -1153,38 +999,33 @@ Writes any messages from the message buffers to the file
 
 =cut
 
-sub createMarkerFile
-{
-    my($self,$file)=@_;
-    my $marker=$self->target.'/'.$file;
-    my $markerfile=$self->targetdir.'/'.$file;
-    open(my $mf,">",$markerfile);
+sub createMarkerFile {
+    my ( $self, $file ) = @_;
+    my $marker     = $self->target . '/' . $file;
+    my $markerfile = $self->targetdir . '/' . $file;
+    open( my $mf, ">", $markerfile );
 
-    if( scalar(@{$self->{error_buffer}}))
-    {
+    if ( scalar( @{ $self->{error_buffer} } ) ) {
         print $mf "\nErrors:\n  ";
-        print $mf join("\n  ",@{$self->{error_buffer}});
+        print $mf join( "\n  ", @{ $self->{error_buffer} } );
         print $mf "\n";
     }
 
-    if( scalar(@{$self->{warn_buffer}}))
-    {
+    if ( scalar( @{ $self->{warn_buffer} } ) ) {
         print $mf "\nWarnings:\n  ";
-        print $mf join("\n  ",@{$self->{warn_buffer}});
+        print $mf join( "\n  ", @{ $self->{warn_buffer} } );
         print $mf "\n";
     }
 
-    if( scalar(@{$self->{info_buffer}}))
-    {
+    if ( scalar( @{ $self->{info_buffer} } ) ) {
         print $mf "\nProcessing notes:\n  ";
-        print $mf join("\n  ",@{$self->{info_buffer}});
+        print $mf join( "\n  ", @{ $self->{info_buffer} } );
         print $mf "\n";
     }
 
     close($mf);
-    if( $self->bucket )
-    {
-        $self->bucket->putFile($markerfile,$marker);
+    if ( $self->bucket ) {
+        $self->bucket->putFile( $markerfile, $marker );
     }
     return $marker;
 }
@@ -1196,20 +1037,17 @@ its mtime if it exists, else undef
 
 =cut
 
-sub markerFileExists
-{
-    my($self,$file)=@_;
+sub markerFileExists {
+    my ( $self, $file ) = @_;
     my $ok;
-    if( $self->bucket )
-    {
-        my $marker=$self->target.'/'.$file;
-        my $filestat=$self->bucket->fileStats($marker);
-        $ok=$filestat->{mtime} if $filestat;
+    if ( $self->bucket ) {
+        my $marker   = $self->target . '/' . $file;
+        my $filestat = $self->bucket->fileStats($marker);
+        $ok = $filestat->{mtime} if $filestat;
     }
-    else
-    {
-        my $marker=$self->targetdir.'/'.$file;
-        $ok=(stat($marker))[9];
+    else {
+        my $marker = $self->targetdir . '/' . $file;
+        $ok = ( stat($marker) )[9];
     }
     return $ok;
 }
@@ -1220,21 +1058,17 @@ Delete one or more marker files
 
 =cut
 
-sub deleteMarkerFiles
-{
-    my ($self,@files)=@_;
-    my $target=$self->target;
-    my $targetdir=$self->targetdir;    
-    foreach my $file (@files)
-    {
+sub deleteMarkerFiles {
+    my ( $self, @files ) = @_;
+    my $target    = $self->target;
+    my $targetdir = $self->targetdir;
+    foreach my $file (@files) {
         unlink("$targetdir/$file");
-        if( $self->bucket )
-        {
+        if ( $self->bucket ) {
             $self->bucket->deleteFile("$target/$file");
         }
     }
 }
-
 
 =head2 $processor->lock
 
@@ -1243,33 +1077,31 @@ Returns 1 if successful or 0 otherwise.
 
 =cut
 
-sub lock
-{
-    my($self)=@_;
-    my $target=$self->target;
-    my $lockfilename=$self->get('lock_file');
-    my $lockfile=$self->targetdir.'/'.$lockfilename;
-    my $lockkey="$target/$lockfilename";
-    my $lockexpiry=$self->get('lock_expiry_days');
-    my $locked=$self->locked;
+sub lock {
+    my ($self)       = @_;
+    my $target       = $self->target;
+    my $lockfilename = $self->get('lock_file');
+    my $lockfile     = $self->targetdir . '/' . $lockfilename;
+    my $lockkey      = "$target/$lockfilename";
+    my $lockexpiry   = $self->get('lock_expiry_days');
+    my $locked       = $self->locked;
     return 0 if $locked == $LOCKED;
     $self->warn("Overriding expired lock") if $locked == $LOCKEXPIRED;
 
     # Making local lockfile
-    return 0 if ! -d $self->targetdir && ! $self->makePath($self->targetdir);
-    open(my $lf,">",$lockfile);
-    if( ! $lf )
-    {
+    return 0 if !-d $self->targetdir && !$self->makePath( $self->targetdir );
+    open( my $lf, ">", $lockfile );
+    if ( !$lf ) {
         $self->error("Cannot create lockfile $lockfile\n");
         return 0;
     }
-    my $time=time();
-    my $lockmessage="PID:$$:$time";
+    my $time        = time();
+    my $lockmessage = "PID:$$:$time";
     print $lf $lockmessage;
     close($lf);
-    $self->bucket->putFile($lockfile,$lockkey) if $self->bucket;
+    $self->bucket->putFile( $lockfile, $lockkey ) if $self->bucket;
 
-    # # Check we actually got the lock - disabled as not really working, 
+    # # Check we actually got the lock - disabled as not really working,
     # # even local file system let alone S3
     # my $check;
     # open($lf,"<",$lockfile);
@@ -1293,26 +1125,23 @@ Check if there is a lock on the current target
 
 =cut
 
-sub locked
-{
-    my( $self )=@_;
-    my $target=$self->target;
-    my $lockfilename=$self->get('lock_file');
-    my $lockfile=$self->targetdir.'/'.$lockfilename;
-    my $lockkey="$target/$lockfilename";
-    my $lockexpiry=$self->get('lock_expiry_days');
-    my $time=time();
-    if( $self->bucket )
-    {
-        my $filestats=$self->bucket->fileStats($lockkey);
-        if( $filestats )
-        {
-            return $LOCKEXPIRED if ($time-$filestats->{mtime}) > $lockexpiry*60*60*24;
+sub locked {
+    my ($self)       = @_;
+    my $target       = $self->target;
+    my $lockfilename = $self->get('lock_file');
+    my $lockfile     = $self->targetdir . '/' . $lockfilename;
+    my $lockkey      = "$target/$lockfilename";
+    my $lockexpiry   = $self->get('lock_expiry_days');
+    my $time         = time();
+    if ( $self->bucket ) {
+        my $filestats = $self->bucket->fileStats($lockkey);
+        if ($filestats) {
+            return $LOCKEXPIRED
+              if ( $time - $filestats->{mtime} ) > $lockexpiry * 60 * 60 * 24;
             return $LOCKED;
         }
     }
-    elsif( -e $lockfile )
-    {
+    elsif ( -e $lockfile ) {
         return $LOCKEXPIRED if -M $lockfile > $lockexpiry;
         return $LOCKED;
     }
@@ -1325,17 +1154,15 @@ Release the lock on the current target
 
 =cut
 
-sub unlock
-{
-    my($self)=@_;
-    my $targetdir=$self->targetdir;
-    my $lockfilename=$self->get('lock_file');
-    my $lockfile="$targetdir/$lockfilename";
+sub unlock {
+    my ($self)       = @_;
+    my $targetdir    = $self->targetdir;
+    my $lockfilename = $self->get('lock_file');
+    my $lockfile     = "$targetdir/$lockfilename";
     unlink($lockfile);
-    if( $self->bucket )
-    {
-        my $target=$self->target;
-        my $lockkey="$target/$lockfilename";
+    if ( $self->bucket ) {
+        my $target  = $self->target;
+        my $lockkey = "$target/$lockfilename";
         $self->bucket->deleteFile($lockkey);
     }
 }
@@ -1347,30 +1174,25 @@ is defined.
 
 =cut
 
-sub cleanTarget
-{
-    my($self)=@_;
-    my $cleanfiles=$self->get('clean_on_start');
+sub cleanTarget {
+    my ($self) = @_;
+    my $cleanfiles = $self->get('clean_on_start');
     return if $cleanfiles eq '' || lc($cleanfiles) eq 'none';
-    $cleanfiles='*' if lc($cleanfiles) eq 'all';
+    $cleanfiles = '*' if lc($cleanfiles) eq 'all';
 
-    my $targetdir=$self->target;
-    my $lockfile=$self->get('lock_file');
-    $lockfile="$targetdir/$lockfile";
+    my $targetdir = $self->target;
+    my $lockfile  = $self->get('lock_file');
+    $lockfile = "$targetdir/$lockfile";
 
-    foreach my $spec (split(' ',$cleanfiles))
-    {
-        foreach my $rmf (glob("$targetdir/$spec"))
-        {
+    foreach my $spec ( split( ' ', $cleanfiles ) ) {
+        foreach my $rmf ( glob("$targetdir/$spec") ) {
             next if $rmf eq $lockfile;
-            if( -f $rmf )
-            {
+            if ( -f $rmf ) {
                 unlink($rmf);
             }
-            elsif( -d $rmf )
-            {
+            elsif ( -d $rmf ) {
                 my $errors;
-                remove_tree($rmf,{error=>\$errors});
+                remove_tree( $rmf, { error => \$errors } );
             }
         }
     }
@@ -1383,18 +1205,20 @@ emails, etc.
 
 =cut
 
-sub clearLogBuffers
-{
-    my($self)=@_;
-    $self->{info_buffer}=[];
-    $self->{warn_buffer}=[];
-    $self->{error_buffer}=[];
+sub clearLogBuffers {
+    my ($self) = @_;
+    $self->{info_buffer}  = [];
+    $self->{warn_buffer}  = [];
+    $self->{error_buffer} = [];
 }
 
-sub _logMessage
-{
-    my($self,$message)=@_;
-    return $self->year.':'.$self->day.': '.$self->cfg->name.': '.$message;
+sub _logMessage {
+    my ( $self, $message ) = @_;
+    return
+        $self->year . ':'
+      . $self->day . ': '
+      . $self->cfg->name . ': '
+      . $message;
 }
 
 =head2 $processor->info( $message )
@@ -1403,12 +1227,11 @@ Writes an info message to the log
 
 =cut
 
-sub info
-{
-    my($self,$message)=@_;
-    $message=$self->_logMessage($message);
+sub info {
+    my ( $self, $message ) = @_;
+    $message = $self->_logMessage($message);
     $self->logger->info($message);
-    push(@{$self->{info_buffer}},$message);
+    push( @{ $self->{info_buffer} }, $message );
 }
 
 =head2 $processor->warn( $message )
@@ -1417,12 +1240,11 @@ Writes an warning message to the log
 
 =cut
 
-sub warn
-{
-    my($self,$message)=@_;
-    $message=$self->_logMessage($message);
+sub warn {
+    my ( $self, $message ) = @_;
+    $message = $self->_logMessage($message);
     $self->logger->warn($message);
-    push(@{$self->{warn_buffer}},$message);
+    push( @{ $self->{warn_buffer} }, $message );
 }
 
 =head2 $processor->error( $message )
@@ -1431,12 +1253,11 @@ Writes an error message to the log
 
 =cut
 
-sub error
-{
-    my($self,$message)=@_;
-    $message=$self->_logMessage($message);
+sub error {
+    my ( $self, $message ) = @_;
+    $message = $self->_logMessage($message);
     $self->logger->error($message);
-    push(@{$self->{error_buffer}},$message);
+    push( @{ $self->{error_buffer} }, $message );
 }
 
 =head2 $processor->year
@@ -1501,29 +1322,25 @@ Returns an example configuration file as a string.
 
 =cut
 
-sub ExampleConfig
-{
-    open(my $f,__FILE__) || return '';
+sub ExampleConfig {
+    open( my $f, __FILE__ ) || return '';
     my $config;
-    my $copy=0;
-    while( my $line=<$f> )
-    {
-        if( ! $copy )
-        {
-            $copy=$line =~ /^\s*\#start_config\s*$/;
+    my $copy = 0;
+    while ( my $line = <$f> ) {
+        if ( !$copy ) {
+            $copy = $line =~ /^\s*\#start_config\s*$/;
         }
-        else
-        {
+        else {
             last if $line =~ /^\s*\#end_config\s*$/;
-            $line=~ s/^\s*//;
-            $line=~ s/\s*$/\n/;
+            $line =~ s/^\s*//;
+            $line =~ s/\s*$/\n/;
             $config .= $line;
         }
     }
     close($f);
     return $config;
 }
-          
+
 1;
 
 __END__

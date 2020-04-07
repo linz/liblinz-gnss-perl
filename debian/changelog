@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.67.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Refactoring to use LINZ::BERN::BernUtil::InstallCampaignFiles
+  * Added Config getAll function to retrieve full set of keys with
+    original capitalisation
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 6 Apr 2020 13:00:00 +1200
 liblinz-gnss-perl (1.66.0-1) bionic; urgency=medium
 
   [Chris Crook]

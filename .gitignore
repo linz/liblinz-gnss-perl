@@ -7,3 +7,6 @@ _build
 blib
 debian/debhelper-build-stamp
 test
+temp
+debian/.debhelper
+.vscode

@@ -54,6 +54,7 @@ sub new
 {
     my($self,$datacenter_name) = @_;
     $self=fields::new($self) unless ref $self;
+    return $self if $ENV{LINZGNSS_NO_CACHE};
     my $datacenter;
     if( $ENV{LINZGNSS_CACHE_DIR} )
     {
@@ -749,6 +750,11 @@ sub getData
     my($self,$request,$target,%options) = @_;
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     $target = LINZ::GNSS::DataCenter::LocalDirectory($target) if $target && ! ref ($target);
+    # Download directly if datacenter not defined (ie not using cache)
+    if( ! $self->datacenter )
+    {
+        return LINZ::GNSS::DataCenter::FillRequest($request,$target);
+    }
     my ($lodged) = $self->getRequests(request=>$request);
     my $download= exists($options{download}) ? $options{download} : 1;
     my $queue= exists($options{queue}) ? $options{queue} : 1;

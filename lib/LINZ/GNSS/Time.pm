@@ -494,6 +494,11 @@ sub parse_gnss_date
         {
             $seconds=gnssweek_seconds($1)+$2*$SECS_PER_DAY;
         }
+        # yyyy.yyy
+        elsif( $datestr =~ /^[12]\d\d\d\.\d+$/ )
+        {
+            $seconds=decimal_year_seconds($datestr);
+        }        
         # yyyy ddd
         elsif( $datestr=~/^((?:19|20)\d\d)\W+(\d{1,3})$/ )
         {
@@ -509,11 +514,7 @@ sub parse_gnss_date
         {
             $seconds=julianday_seconds($datestr);
         }
-        # yyyy.yyy
-        elsif( $datestr =~ /^[12]\d\d\d\.\d+$/ )
-        {
-            $seconds=decimal_year_seconds($datestr);
-        }
+
         # now-#
         elsif( lc($datestr) =~ /^now(?:\-(\d+))?$/ )
         {

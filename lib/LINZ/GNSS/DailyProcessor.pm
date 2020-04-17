@@ -493,13 +493,13 @@ sub runBernesePcf {
     return $return;
 }
 
-=head2 $processor->installCampaignFiles($campaign_dir)
+=head2 $processor->installPcfCampaignFiles($campaign_dir)
 
 Install PCF campaign files, installs files into the campaign directory.  
 
 =cut
 
-sub installCampaignFiles {
+sub installPcfCampaignFiles {
     my ( $self, $campaign ) = @_;
     my $return = 1;
 

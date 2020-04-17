@@ -10,7 +10,7 @@ use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
-getopts('hHcCfs:e:t:T:m:',\%opts);
+getopts('hHcCfs:e:d:t:T:m:',\%opts);
 
 if( $opts{c} || $opts{C} )
 {
@@ -37,6 +37,7 @@ Options can include
                (retry_max_age_days=0, retry_interval_days=0)
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
+   -d yyyy-ddd Just run one day
    -t yyyy-ddd Test specific day - outputs to current directory, outputs debug info
    -T dir      Test target directory - also copies bernese processing directory to dir/bernese
    -m #        Maximum number of days to process
@@ -45,7 +46,7 @@ Options can include
 
 EOD
 
-my $configfile=shift @ARGV;
+my $configfile;
 my @params;
 foreach my $prm (@ARGV)
 {
@@ -57,14 +58,18 @@ foreach my $prm (@ARGV)
     {
         $opts{H}=1;
     }
-    elsif($prm !~ /^\w+\=/)
+    elsif ($prm =~ /^\w+\=/)
     {
-        print "Invalid option $prm: options must be entered as option=value\n";
-        exit();
+        push(@params,$prm);
+    }
+    elsif( ! $configfile )
+    {
+        $configfile=$prm;
     }
     else
     {
-        push(@params,$prm) if $prm =~ /\=/;
+        print "Invalid option $prm: options must be entered as option=value\n";
+        exit();
     }
 }
  
@@ -75,8 +80,8 @@ if( $opts{f} )
 {
     push(@params,'retry_max_age_days=0','retry_interval_days=0');
 }
-my $startdate=$opts{t} || $opts{s};
-my $enddate=$opts{t} || $opts{e};
+my $startdate=$opts{t} || $opts{d} || $opts{s};
+my $enddate=$opts{t} || $opts{d} || $opts{e};
 my $targetdir=$opts{T} || ($opts{t} ? '.' : '');
 die "Invalid test target directory $targetdir specified\n" if $targetdir && ! -d $targetdir;
 

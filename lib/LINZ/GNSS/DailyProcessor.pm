@@ -507,7 +507,7 @@ sub installPcfCampaignFiles {
     return if $campfiles eq '';
 
     # Install campaign files
-    my @filespecs = [];
+    my @filespecs = ();
     my $srcdir    = $self->targetdir;
 
     # If using an S3 bucket then copy any required files from the bucket to
@@ -515,12 +515,13 @@ sub installPcfCampaignFiles {
 
     my $tmpdir;
     eval {
-        if ( $self->{bucket} ) {
+        if ( $self->bucket ) {
             foreach my $cfdef ( split( /\n/, $campfiles ) ) {
                 next if $cfdef =~ /^\s*$/;
-                $cfdef =~ s/^\s+(([A-Z]+)(\s+uncompress)\s+)(.*?)\s*$//;
+                $cfdef =~ /^\s*([A-Z]+(?:\s+uncompress)?\s+)(.*?)\s*$/;
                 my $prefix    = $1;
                 my $filenames = $2;
+                die "Invalid campaign file definition $cfdef\n" if ! $prefix;
 
                 # If the filename is not in
                 foreach my $filename ( split( ' ', $filenames ) ) {
@@ -533,10 +534,7 @@ sub installPcfCampaignFiles {
                         $tmpfile =~ s/^.*[\\\/]//;
                         $tmpfile = "$tmpdir/$tmpfile";
                         if ( !$self->bucket->getFile( $filename, $tmpfile ) ) {
-                            $self->error(
-"Cannot retrieve pcf_campaign_file $filename from S3"
-                            );
-                            return 0;
+                            die "Cannot retrieve pcf_campaign_file $filename from S3\n";
                         }
                         $filename = $tmpfile;
                     }
@@ -547,9 +545,15 @@ sub installPcfCampaignFiles {
         else {
             @filespecs = split( /\n/, $campfiles );
         }
+        LINZ::BERN::BernUtil::InstallCampaignFiles( $campaign, \@filespecs,
+            SourceDirectory => $srcdir );
     };
-    LINZ::BERN::BernUtil::InstallCampaignFiles( $campaign, \@filespecs,
-        SourceDirectory => $srcdir );
+    if( $@ )
+    {
+        $self->error("Cannot install campaign files: $@");
+        $return = 0;
+    }
+    return $return;
 }
 
 =head2 $processor->runProcessorScript($scriptname,$param,$param)
@@ -1138,6 +1142,7 @@ sub locked {
         if ($filestats) {
             return $LOCKEXPIRED
               if ( $time - $filestats->{mtime} ) > $lockexpiry * 60 * 60 * 24;
+            return $LOCKEXPIRED if $self->get('override_lock');
             return $LOCKED;
         }
     }

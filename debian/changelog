@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.68.2-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Fixing bug in DailyProcessor handling campaign files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 17 Apr 2020 09:00:00 +1200
+
 liblinz-gnss-perl (1.68.1-1) bionic; urgency=medium
 
   [Chris Crook]

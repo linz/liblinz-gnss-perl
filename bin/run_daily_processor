@@ -10,7 +10,7 @@ use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
-getopts('hHcCfs:e:d:t:T:m:',\%opts);
+getopts('hHcCfFs:e:d:t:T:m:',\%opts);
 
 if( $opts{c} || $opts{C} )
 {
@@ -76,10 +76,11 @@ foreach my $prm (@ARGV)
 # Fix up parameters accidentally entered without '='
 
 
-if( $opts{f} )
+if( $opts{f} || $opts{F} )
 {
     push(@params,'retry_max_age_days=0','retry_interval_days=0');
 }
+push(@params,'override_lock=1') if $opts{F};
 my $startdate=$opts{t} || $opts{d} || $opts{s};
 my $enddate=$opts{t} || $opts{d} || $opts{e};
 my $targetdir=$opts{T} || ($opts{t} ? '.' : '');

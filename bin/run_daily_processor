@@ -81,6 +81,7 @@ if( $opts{f} || $opts{F} )
     push(@params,'retry_max_age_days=0','retry_interval_days=0');
 }
 push(@params,'override_lock=1') if $opts{F};
+undef $opts{d} if $opts{d} eq 'auto';
 my $startdate=$opts{t} || $opts{d} || $opts{s};
 my $enddate=$opts{t} || $opts{d} || $opts{e};
 my $targetdir=$opts{T} || ($opts{t} ? '.' : '');

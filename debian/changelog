@@ -1,9 +1,9 @@
-liblinz-gnss-perl (1.68.2-1) bionic; urgency=medium
+liblinz-gnss-perl (1.69.0-1) bionic; urgency=medium
 
   [Chris Crook]
-  * Fixing bug in DailyProcessor handling campaign files
+  * Modifying parameters to suit AWS Batch implementation
 
- -- Chris Crook <ccrook@linz.govt.nz>  Fri, 17 Apr 2020 09:00:00 +1200
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 6 May 2020 09:00:00 +1200
 
 liblinz-gnss-perl (1.68.1-1) bionic; urgency=medium
 

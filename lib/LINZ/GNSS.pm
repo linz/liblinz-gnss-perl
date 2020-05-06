@@ -48,6 +48,38 @@ to an SQLite database.
 
 =back
 
+=head2 Environment variables
+
+The LINZ::GNSS modules use a number of environment variables:
+
+=over
+
+=item LINZGNSS_CONFIG_FILE 
+
+Replaces the default configuration file used by scripts (eg getdata.conf)
+
+=item LINZGNSS_LOG_DIR
+
+Overwrites the directory used for logging
+
+=item LINZGNSS_LOG_FILE
+
+Overwrites the full file path used for logging (including the directory)
+
+=item LINZGNSS_DEBUG
+
+Sets the debugging options - can be one of trace, debug, info, warn, error, or fatal.  
+
+=item LINZGNSS_NO_CACHE
+
+Disables caching of GNSS data by data retrieval scripts
+
+=item LINZGNSS_CACHE_DIR
+
+Ses the directory used for caching of GNSS data.  The default is the bernese datapool
+
+=back
+
 =head2 See Also
 
 =over

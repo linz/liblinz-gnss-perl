@@ -401,13 +401,18 @@ sub logger {
     if ( !$self->{_logger_init} ) {
         $self->{_logger_init} = 1;
         my $logcfg  = $self->get( 'logsettings', 'WARN' );
-        my $logdir = $self->get( 'logdir', $ENV{LINZGNSS_LOG_DIR} );
-        $logdir =~ s/([^\/])$/$1\//;
-        my $logfile .= $self->get( 'logfile', '' );
+        my $logfile=$ENV{LINZGNSS_LOG_FILE};
+        if( ! $logfile )
+        {
+            my $logdir =  $ENV{LINZGNSS_LOG_DIR} || $self->get( 'logdir', '' );
+            $logdir =~ s/([^\/])$/$1\//;
+            $logfile .= $self->get( 'logfile', '' );
+            $logfile = $logdir.$logfile if $logfile;
+        }
 
         if ( $logcfg =~ /^(trace|debug|info|warn|error|fatal|)$/i ) {
             my $options = {};
-            if ( $logfile ne '' ) { $options->{file} = $logdir.$logfile; }
+            if ( $logfile ne '' ) { $options->{file} = $logfile; }
             $logcfg = uc($logcfg) || 'WARN';
             if ( $logcfg eq 'TRACE' ) { $options->{level} = $TRACE; }
             if ( $logcfg eq 'DEBUG' ) { $options->{level} = $DEBUG; }

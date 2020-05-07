@@ -974,10 +974,8 @@ Returns a Log::Log4perl logger associated with the processor.
 =cut
 
 sub logger {
-    my ( $self, $loggerid ) = @_;
-    $self->{loggers}->{$loggerid} = $self->cfg->logger($loggerid)
-      if !exists $self->{loggers}->{$loggerid};
-    return $self->{loggers}->{$loggerid};
+    my($self) = @_;
+    return $self->cfg->logger('LINZ::GNSS::DailyProcessor');
 }
 
 =head2 $processor->makePath

@@ -366,7 +366,7 @@ sub LocalDirectory
     if( ! $name )
     {
         $name='local';
-        $ntry=0;
+        my $ntry=0;
         while(1)
         {
             last if ! LINZ::GNSS::DataCenter::GetCenter($name);

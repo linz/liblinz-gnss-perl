@@ -24,6 +24,7 @@ use IPC::Run qw(run);
 use POSIX qw(strftime);
 use Time::Local;
 use Date::Parse;
+use Log::Log4perl;
 use Carp qw(croak);
 
 our $default_awsbin='/usr/bin/aws';
@@ -54,6 +55,7 @@ sub new()
     my $self=bless {}, $class;
     $self->{aws_client}=$default_awsbin;
     my $cfg=$args{config};
+    $self->{logger}=$cfg->logger('LINZ.GNSS.AwsS3Bucket');
     my $cfg_prefix=$args{config_prefix} || '';
     foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
     {
@@ -95,11 +97,19 @@ Functions to access attributes bucket, prefix
 
 sub bucket { return $_[0]->{bucket}}
 sub prefix { return $_[0]->{prefix}}
+sub logger { return $_[0]->{logger}}
 sub _aws_client { return $_[0]->{aws_client}}
 sub _aws_parameters { return $_[0]->{aws_parameters}}
 sub _debug { my $self=shift; return $self->{debug_aws}; }
 
-sub error { shift; croak(join("",@_)."\n")}
+sub error 
+{ 
+    my($self,@msg)=@_;
+    my $errmsg=join("",@msg);
+    $self->debug($errmsg); 
+    croak($errmsg."\n");
+}
+
 
 =head2 $processor->_runAws($command,$subcommand,@params)
 
@@ -120,6 +130,12 @@ sub _runAws
     my $ok=0;
     eval
     {
+        my $cmdstr=join(" ",@command);
+        foreach my $k (sort keys %ENV)
+        {
+            $cmdstr .= "\n$k=$ENV{$k}" if $k =~ /^AWS/;
+        }
+        $self->logger->debug($cmdstr);
         print("Running command: ",join("\n   ",@command),"\n") if $self->_debug;
         $ok=run(\@command,\$in,\$out,\$err);
     };

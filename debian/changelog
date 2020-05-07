@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.71.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Adding more logging output
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 8 May 2020 09:00:00 +1200
+
+
 liblinz-gnss-perl (1.70.0-1) bionic; urgency=medium
 
   [Chris Crook]

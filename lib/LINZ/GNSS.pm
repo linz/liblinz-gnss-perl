@@ -76,7 +76,23 @@ Disables caching of GNSS data by data retrieval scripts
 
 =item LINZGNSS_CACHE_DIR
 
-Ses the directory used for caching of GNSS data.  The default is the bernese datapool
+Sets the directory used for caching of GNSS data.  The default is the bernese datapool
+
+=item LINZGNSS_TMP_DIR
+
+Sets the directory for storing scratch files
+
+=item POSITIONZ_REFSTATION_DIR
+
+The directory holding PositioNZ station coordinate models
+
+=item POSITIONZ_REFSTATION_NO_CACHE
+
+Disables caching of PositioNZ reference station information
+
+=item POSITIONZ_REFSTATION_CACHE_DIR
+
+The directory used for caching PositioNZ reference station information
 
 =back
 
@@ -113,6 +129,7 @@ use LINZ::GNSS::DataCenter;
 use LINZ::GNSS::FileCache;
 use LINZ::GNSS::RefStation;
 use LINZ::Geodetic::CoordSysList;
+use LINZ::GNSS::Variables qw(ExpandEnv);
 use Sys::Hostname;
 use Config::General qw(ParseConfig);
 use Log::Log4perl qw(:easy);
@@ -217,6 +234,16 @@ sub LoadConfig
         my $logger=Log::Log4perl::get_logger('LINZ.GNSS');
         $logger->error($errmsg);
     }
+
+    # Create the scratch directory
+    my $scratchdir=$ENV{LINZGNSS_TMP_DIR};
+    $scratchdir=ExpandEnv($config->{scratchdir},"for temporary directory") if ! $scratchdir;
+    $scratchdir='/tmp' if ! $scratchdir;
+    _makepath($scratchdir) ||
+        croak "Cannot create LINZ::GNSS scratch directory $scratchdir\n" ;
+    $config->{scratchdir} = $scratchdir;
+
+    # Configuration information used by all centres
     LINZ::GNSS::FileCompression::LoadCompressionTypes( $config );
     LINZ::GNSS::FileTypeList::LoadDefaultTypes( $config );
     LINZ::GNSS::DataCenter::LoadDataCenters( $config );

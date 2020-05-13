@@ -1,10 +1,17 @@
+liblinz-gnss-perl (1.72.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Adding and more consistent handling of environment variables.
+  * Fixing S3 bucket to not require bucket ownership (use head-object on bucket)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 14 May 2020 09:00:00 +1200
+
 liblinz-gnss-perl (1.71.0-1) bionic; urgency=medium
 
   [Chris Crook]
   * Adding more logging output
 
  -- Chris Crook <ccrook@linz.govt.nz>  Fri, 8 May 2020 09:00:00 +1200
-
 
 liblinz-gnss-perl (1.70.0-1) bionic; urgency=medium
 
@@ -55,6 +62,8 @@ liblinz-gnss-perl (1.63.2-1) bionic; urgency=medium
 
   [Chris Crook]
   * Fixing ftp settings again - got the wrong version of file in repo :-(
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 25 Mar 2020 15:00:00 +1300
 
 
 liblinz-gnss-perl (1.63.1-1) bionic; urgency=medium

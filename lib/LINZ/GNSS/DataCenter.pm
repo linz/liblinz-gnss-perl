@@ -280,10 +280,7 @@ sub LoadDataCenters
     $logger->debug("Loading data centres");
 
     # Configuration information used by all centres
-    my $scratchdir=$cfg->{scratchdir} || '/tmp';
-    _makepath($scratchdir) ||
-        croak "Cannot create LINZ::GNSS::DataCenter::scratchdir $scratchdir\n" ;
-    $LINZ::GNSS::DataCenter::scratchdir=$scratchdir;
+    $LINZ::GNSS::DataCenter::scratchdir=$cfg->{scratchdir};
 
     # Default login information
     my $pwd=$cfg->{anonymousftppassword};

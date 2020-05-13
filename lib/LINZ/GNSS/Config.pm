@@ -105,6 +105,7 @@ package LINZ::GNSS::Config;
 use Carp;
 use Config::General qw/ParseConfig/;
 use Log::Log4perl qw(:easy);
+use LINZ::GNSS::Variables qw/ExpandEnv/;
 use LINZ::GNSS::Time qw/parse_gnss_date $SECS_PER_DAY/;
 
 =head2 $cfg=LINZ::GNSS::Config->new($cfgfile,@overrides)
@@ -404,7 +405,8 @@ sub logger {
         my $logfile=$ENV{LINZGNSS_LOG_FILE};
         if( ! $logfile )
         {
-            my $logdir =  $ENV{LINZGNSS_LOG_DIR} || $self->get( 'logdir', '' );
+            my $logdir =  $ENV{LINZGNSS_LOG_DIR};
+            $logdir=ExpandEnv($self->get( 'logdir', '' ),' for log directory') if ! $logdir;
             $logdir =~ s/([^\/])$/$1\//;
             $logfile .= $self->get( 'logfile', '' );
             $logfile = $logdir.$logfile if $logfile;

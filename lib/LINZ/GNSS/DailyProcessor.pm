@@ -179,6 +179,7 @@ sub runProcessor {
         $self->set( 'target',    $target );
         $self->set( 'targetdir', $targetdir );
 
+        my $started = 0;
         eval {
             # Set up the processor enviromnent
             $ENV{PROCESSOR_TARGET_DIR} = $targetdir;
@@ -255,6 +256,7 @@ sub runProcessor {
             # Can we get a lock on the file.
 
             next if $self->locked() == $LOCKED;
+            $started = 1;
             $runno++;
 
             $self->makePath($targetdir);
@@ -303,8 +305,7 @@ sub runProcessor {
                     && scalar(@$faillist) >= $maxconsecutivefails )
                 {
                     unlink(@$faillist);
-                    $self->warn(
-'Processing stopped as maximum number of consecutive failures reached'
+                    $self->warn('Processing stopped as maximum number of consecutive failures reached'
                     );
                     $terminate = 1;
                 }
@@ -316,11 +317,14 @@ sub runProcessor {
             $self->warn("Failed $year $day: $msg");
         }
 
-        # Cleaning out working directories if storing to S3 bucket
-        if ( $self->bucket ) {
-            remove_tree( $self->targetdir );
+        if( $started )
+        {
+            # Cleaning out working directories if storing to S3 bucket
+            if ( $self->bucket ) {
+                remove_tree( $self->targetdir );
+            }
+            $self->unlock();
         }
-        $self->unlock();
     }
 }
 
@@ -1140,7 +1144,7 @@ sub locked {
         if ($filestats) {
             return $LOCKEXPIRED
               if ( $time - $filestats->{mtime} ) > $lockexpiry * 60 * 60 * 24;
-            return $LOCKEXPIRED if $self->get('override_lock');
+            return $LOCKEXPIRED if $self->get('override_lock','');
             return $LOCKED;
         }
     }

@@ -73,7 +73,7 @@ sub new()
         return;
     }
     # Check the bucket exists
-    my ($ok,$result,$error) =$self->_runAws('s3api','get-bucket-location','--bucket',$bucket);
+    my ($ok,$result,$error) =$self->_runAws('s3api','head-bucket','--bucket',$bucket);
     if( ! $ok )
     {
         croak("LINZ::GNSS::AwsS3Bucket::new Cannot find or access S3 bucket $bucket\n");

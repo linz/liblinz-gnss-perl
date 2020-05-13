@@ -58,28 +58,24 @@ Looks for a configuration items RefStationFilename and RefStationCacheDir.
 
 sub LoadConfig
 {
-   my ($cfg) = @_;
-   if( ! exists $cfg->{refstationfilename} )
-   {
-       croak("RefStationFilename is not defined in the configuration");
-   }
-
-    $refstn_filename = $cfg->{refstationfilename};
-    $refstn_filename = ExpandEnv($refstn_filename, 'for reference station filename');
-    if( $refstn_filename !~ /\[ssss\]/)
-    {
-        croak("Reference station filename in configuration must include [ssss] as code placeholder");
-    }
-
-    my $dir=$refstn_filename;
-    $dir =~ s/[\\\/][^\\\/]*$//;
+    my ($cfg) = @_;
+    my $filename = $cfg->{refstationfilename};
+    croak("RefStationFilename is not defined in the configuration") if ! $filename;
+    croak("Reference station filename in configuration must include [ssss] as code placeholder")
+        if $refstn_filename !~ /\[ssss\]/; 
+   
+    my $dir=$ENV{POSITIONZ_REFSTATION_DIR};
+    $dir = ExpandEnv($cfg->{refstationdir}) if ! defined $dir;
+    croak("RefStationDir is not defined in the configuration") if ! $dir;
     croak("Reference station directory $dir doesn't exist") if ! -d $dir;
-    undef($refstn_list);
 
-    if( exists( $cfg->{refstationcachedir} ) )
+    my $refstn_filename = "$dir/$filename";
+
+    if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
     {
-        $refstn_cachedir = $cfg->{refstationcachedir};
-        $refstn_cachedir = ExpandEnv($refstn_cachedir, 'for reference station cache directory');
+        my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
+        $cache_dir=$cfg->{scratchdir}.'/'.($cfg->{refstationcachedir} || 'refstn_cache');
+        $refstn_cachedir = $cache_dir;
     }
 
     if( exists($cfg->{rankdistancefactor}) )

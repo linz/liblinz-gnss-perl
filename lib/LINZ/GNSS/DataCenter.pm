@@ -71,7 +71,7 @@ our $ftp_password='none';
 our $ftp_timeout=30;
 our $ftp_passive='default';
 
-sub _makepath
+sub makepublicpath
 {
     my ($path)=@_;
     return 1 if -d $path;
@@ -941,7 +941,7 @@ sub getData
     if( ! -d $scratchdir )
     {
         my $errval;
-        if( ! _makepath($scratchdir) )
+        if( ! makepublicpath($scratchdir) )
         {
             $self->_logger->fatal("Cannot make download directory $scratchdir");
             croak "Cannot make download directory $scratchdir\n";

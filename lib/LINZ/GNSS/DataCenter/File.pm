@@ -47,7 +47,7 @@ sub putfile
     my ($self,$source,$spec) = @_;
     my $target=$spec->{path};
     $target = $self->{basepath}.'/'.$target if $self->{basepath};
-    LINZ::GNSS::DataCenter::_makepath($target) || croak "Cannot create target directory $target\n"; 
+    LINZ::GNSS::DataCenter::makepublicpath($target) || croak "Cannot create target directory $target\n"; 
     $target=$target.'/'.$spec->{filename};
     move($source,$target) || croak "Cannot copy file to $target\n";
 }

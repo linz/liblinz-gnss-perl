@@ -201,21 +201,11 @@ sub _expandvar
 sub LoadConfig
 {
     my($filename) = @_;
+    # Note: ideally this can be merged with LINZ::Config
     my $config=_Config($filename);
 
     eval
     {
-        if( exists $config->{logsettings} )
-        {
-            my $logcfg=$config->{logsettings};
-            my $logfile=_expandvar($config->{logdir}).'/'._expandvar($config->{logfile});
-            $logcfg =~ s/\[logfilename\]/$logfile/eg;
-            Log::Log4perl->init(\$logcfg);
-        }
-        else
-        {
-            Log::Log4perl->easy_init($WARN);
-        }
         # DEBUG_LINZGNSS variable deprecated - retained for backward compatibility
         my $debug=$ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
         if( $debug )
@@ -224,6 +214,23 @@ sub LoadConfig
             $level=$WARN if lc($debug) eq 'warn';
             $level=$INFO if lc($debug) eq 'info';
             Log::Log4perl->easy_init( $level );
+        }
+        elsif( exists $config->{logsettings} )
+        {
+            my $logcfg=$config->{logsettings};
+            my $logfile=$ENV{LINZGNSS_LOG_FILE};
+            if( ! $logfile )
+            {
+                my $logdir=$ENV{LINZGNSS_LOG_DIR};
+                $logdir=_expandvar($config->{logdir}) if ! $logdir;
+                $logfile="$logdir"."/"._expandvar($config->{logfile});
+            }
+            $logcfg =~ s/\[logfilename\]/$logfile/eg;
+            Log::Log4perl->init(\$logcfg);
+        }
+        else
+        {
+            Log::Log4perl->easy_init($WARN);
         }
     };
     # Set up default logger if fail to init

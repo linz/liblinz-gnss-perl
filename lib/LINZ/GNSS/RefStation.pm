@@ -44,6 +44,7 @@ our $default_distance_factors=[
 
 our $default_cos_factor=35;
 
+our $refstn_dir;
 our $refstn_filename;
 our $refstn_cachedir;
 our $refstn_list;
@@ -62,14 +63,14 @@ sub LoadConfig
     my $filename = $cfg->{refstationfilename};
     croak("RefStationFilename is not defined in the configuration") if ! $filename;
     croak("Reference station filename in configuration must include [ssss] as code placeholder")
-        if $refstn_filename !~ /\[ssss\]/; 
+        if $filename !~ /\[ssss\]/; 
    
     my $dir=$ENV{POSITIONZ_REFSTATION_DIR};
     $dir = ExpandEnv($cfg->{refstationdir}) if ! defined $dir;
     croak("RefStationDir is not defined in the configuration") if ! $dir;
-    croak("Reference station directory $dir doesn't exist") if ! -d $dir;
 
-    my $refstn_filename = "$dir/$filename";
+    $refstn_dir = $dir;
+    $refstn_filename = "$dir/$filename";
 
     if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
     {
@@ -103,6 +104,7 @@ Returns the filepath in which a reference station definition file is stored
 sub RefStationFile
 {
     my ($code)=@_;
+    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
     $code=uc($code);
     my $filepath=$refstn_filename;
     $filepath=~s/\[ssss\]/$code/g;
@@ -173,6 +175,8 @@ sub _cachefile
 sub GetRefStations
 {
     my ($filename,%options) = @_;
+    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
+
     my $savelist = 0;
     if( ! @_ )
     {

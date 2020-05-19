@@ -75,7 +75,8 @@ sub LoadConfig
     if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
     {
         my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
-        $cache_dir=$cfg->{scratchdir}.'/'.($cfg->{refstationcachedir} || 'refstn_cache');
+        $cache_dir=$cfg->{refstationcachedir} || 'refstn_cache' if ! $cache_dir;
+        $cache_dir=$refstn_dir.'/'.$cache_dir if $cache_dir !~ /^\//;
         $refstn_cachedir = $cache_dir;
     }
 
@@ -628,7 +629,7 @@ sub _max
 }
 
 
-=head2 my $statin=LINZ::GNSS::RefStation->new($filename)
+=head2 my $station=LINZ::GNSS::RefStation->new($filename)
 
 Loads the reference station data from the XML file. 
 

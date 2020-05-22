@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.73.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Adding support for smb:// in gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Sat, 23 May 2020 09:00:00 +1200
+
 liblinz-gnss-perl (1.72.0-1) bionic; urgency=medium
 
   [Chris Crook]

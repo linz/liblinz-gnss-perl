@@ -85,7 +85,7 @@ use Time::HiRes;
 use Config::General;
 use POSIX qw/strftime/;
 use LINZ::RunBatch;
-use LINZ::GNSS::Time qw/parse_gnss_date seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
+use LINZ::GNSS::Time qw/parse_gnss_date datetime_seconds seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
 
 my $syntax=<<EOD;
 
@@ -268,7 +268,7 @@ my $endage=$opts{e} // $config{endage};
 
 $config{maxruntime} = ($opts{r}+0) if $opts{r};
 $config{pause} = $opts{p} if exists $opts{p};
-$config{verbose} = 1 if $verbose;
+$config{verbose} = $verbose if $verbose;
 
 my $codes=$config{codes};
 $codes = join(' ',@$codes) if ref($codes) eq 'ARRAY';
@@ -311,7 +311,16 @@ if( $mintimesincerun )
     $mintimesincefail=timeToSeconds($minfail);
 }
 
-my $ftp=new FtpConnection( %config );
+my $ftp;
+my $remoteuri=$config{remoteuri};
+if( $remoteuri =~ /^smb:/ )
+{
+    $ftp=new SmbConnection( %config );
+}
+else
+{
+    $ftp=new FtpConnection( %config );
+}
 
 if( $verbose )
 {
@@ -667,7 +676,7 @@ sub downloadDir
         if( ! $ftp->get($file,$tmp) )
         {
             print STDERR "** Failed to download $dirname/$file\n";
-            print STDERR $ftp->message,"\n";
+            # print STDERR $ftp->message,"\n";
             unlink($tmp);
         }
         elsif( ! move($tmp,$target) )
@@ -872,12 +881,6 @@ sub dirList
     return $self->parseDir( $self->ftp->dir() );
 }
 
-sub size
-{
-    my ($self,$file) = @_;
-    return $self->ftp->size($file);
-}
-
 sub get
 {
     my ($self,$file,$target) = @_;
@@ -938,6 +941,158 @@ sub parseDir
             my $sizecol =  $l =~ /^\d\d/ ? -2 : 4;
             my $size=(split(' ',$l))[$sizecol];
             $files->{$name}={size=>$size, dir=>$l };
+        }
+    }
+    return $dirs,$files;
+}
+
+#========================================================================
+
+package SmbConnection;
+
+use IPC::Run qw(run);
+use LINZ::GNSS::Time qw/datetime_seconds/;
+
+
+BEGIN
+{
+    $SmbConnection::smbclient='/usr/bin/smbclient';
+}
+
+sub new
+{
+    my ($class, %config) = @_;
+
+    my $self={};
+    $self->{verbose}=$config{verbose};
+    $self->{remoteuri}=$config{remoteuri};
+    $self->{user}=$config{remoteuser};
+    $self->{password}=$config{remotepassword};
+
+    my $remoteuri=$self->{remoteuri};
+
+    $remoteuri =~ /^smb:(\/\/[^\/]+\/[^\/]+)(\/.*)?$/ 
+        || die "RemoteUri $remoteuri is not a valid samba share smb://host/sharename\n";
+    my ($share,$basedir)=($1,$2);
+
+    $self->{share}=$share;
+    $self->{basedir}=$basedir;
+    $self->{_dir} = $basedir;
+    $self->{_dirlist} = {};
+
+    return $self=bless $self, $class;
+}
+
+sub verbose { return $_[0]->{verbose}; }
+sub remoteuri { return $_[0]->{remoteuri}; }
+sub host { return $_[0]->{host}; }
+sub share { return $_[0]->{share}; }
+sub user { return $_[0]->{user}; }
+sub password { return $_[0]->{password}; }
+sub basedir { return $_[0]->{basedir}; }
+sub timeout { return 0; }
+
+sub _run
+{
+    my($self,@smbcommand)=@_;
+    my $share = $self->{share};
+    my $pwd=$self->{password};
+    my $user=$self->{user};
+    my $cmdstr=join(" ",@smbcommand);
+    my @command=($SmbConnection::smbclient,$share);
+    push(@command,$pwd) if $pwd;
+    push(@command,'-U',$user,'-c',$cmdstr);
+    my $ok = 0;
+    my ($in, $out, $err);
+    eval
+    {
+        print("Running command: ",join("\n   ",@command),"\n") if $self->verbose > 1;
+        $ok=run(\@command,\$in,\$out,\$err);
+        print("Samba client error message: $err\n") if $err && $self->verbose;
+        print("Output: $out\n") if $self->verbose > 1;
+    };
+    if( $@ )
+    {
+        print("smbclient command failed: $@");
+        return 0;
+    }
+    return wantarray ? ($ok,$out,$err) : $ok;
+}
+
+sub quit
+{
+    my( $self)=@_;
+}
+
+sub cwd
+{
+    my( $self, $dir) = @_;
+    $self->{_dir} = $dir;
+    return 1;
+}
+
+sub dirList
+{
+    my ($self) = @_;
+    my $dir=$self->{_dir};
+    print("Getting directory of $dir\n") if $self->verbose > 1;
+    my($ok,$out,$err) = $self->_run("dir",$dir."/*");
+    my($dirs,$files)=$self->parseDir( $out );
+    $self->{_dirlist}->{$self->{_dir}}=$files;
+    return $dirs,$files;
+}
+
+sub get
+{
+    my ($self,$file,$target) = @_;
+    unlink($target) if -f $target;
+    if( -e $target )
+    {
+        print "Cannot overwrite $target\n";
+        return 0;
+    }
+    my $remote = $self->{_dir}.'/'.$file;
+    my($ok,$out,$err) = $self->_run('get',$remote, $target);
+    if( ! $ok || ! -f $target )
+    {
+        if( -f $target ) 
+        {
+            print("Download $remote returned error status - deleting $target\n");
+            unlink($target); 
+        }
+        return 0;
+    }
+    my $mtime=$self->{_dirlist}->{$self->{_dir}}->{$file}->{mtime};
+    utime $mtime,$mtime,$target if $mtime;
+    return 1;
+}    
+
+sub parseDir
+{
+    my($self,$listing)=@_;
+    my $dirs=[];
+    my $files={};
+    foreach my $l (split(/\n/,$listing))
+    {
+        next if $l !~ /^\s*(\S.*?)\s+([\w])\s+(\d+)\s+(\w\w\w)\s+(\w\w\w)\s+(\d+)\s+(\d\d?\:\d\d\:\d\d)\s+(\d\d\d\d)\s*$/;
+        my ($name,$type,$size,$wday,$month,$mday,$time,$year)=($1,$2,$3,$4,$5,$6,$7,$8);
+        next if $wday !~ /mon|tue|wed|thu|fri|sat|sun/i;
+        my $mon=index('jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec',lc($month));
+        next if $mon < 0;
+        $mon=int($mon/4)+1;
+        my $mtime=datetime_seconds(sprintf("%04d-%02d-%02d%%s",$year,$mon,$mday,$time));
+        if( $type eq 'D' )
+        {
+            print("Found directory $name\n") if $self->verbose > 1;
+            push(@$dirs,$name);
+        }
+        else
+        {
+            print("Found file $name\n") if $self->verbose > 1;
+            # Select column based on unix or MS format listing
+            my $sizecol =  $l =~ /^\d\d/ ? -2 : 4;
+            my $size=(split(' ',$l))[$sizecol];
+            $files->{$name}={size=>$size, dir=>$l, mtime=>$mtime };
         }
     }
     return $dirs,$files;
@@ -1053,7 +1208,7 @@ __END__
  # s3_bucket my_bucket
  # s3_prefix ${subdir}${subdir?/}
 
- # Target directory relative to the base directory.
+ # Target directory relative to the local base directory.
  # Can include time components
  # as for RemotePath.  Can also include {filename} to use the source filename.
  

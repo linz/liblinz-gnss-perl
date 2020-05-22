@@ -248,8 +248,8 @@ sub GetRefStations
                         push(@$stations,$value) if $value;
                         next;
                     }
+                    unlink($cachefile);
                 };
-                unlink($cachefile);
             }
         }
         my $m;
@@ -271,7 +271,10 @@ sub GetRefStations
         if( $cachedir )
         {
             my $ref={key=>$cachekey,value=>$m};
-            store($ref,$cachefile);
+            eval
+            {
+                store($ref,$cachefile);
+            };
         }
     }
     if( $savelist ) { $refstn_list=$stations; }

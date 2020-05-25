@@ -1005,8 +1005,10 @@ sub _run
 {
     my($self,@smbcommand)=@_;
     my $share = $self->{share};
-    my $pwd=$self->{password};
     my $user=$self->{user};
+    my $pwd=$self->{password};
+    $pwd=$ENV{PASSWD} if ! $pwd;
+    die "Password not defined for samba user $user\n" if ! $pwd;
     my $cmdstr=join(" ",@smbcommand);
     my @command=($SmbConnection::smbclient,$share);
     push(@command,$pwd) if $pwd;

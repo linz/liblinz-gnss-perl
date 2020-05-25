@@ -250,8 +250,17 @@ my $localsrc;
 if( $bucketname )
 {
     require LINZ::GNSS::AwsS3Bucket;
-    $bucketprefix = $config{s3_prefix};
-    $bucket = LINZ::GNSS::AwsS3Bucket->new(config_prefix=>'s3_',%config);
+    require LINZ::GNSS::Config;
+    my @args=(
+        "s3_bucket=".$bucketname,
+        "s3_prefix=".$config{s3_prefix},
+        "s3_aws_parameters=".$config{s3_aws_parameters},
+        "s3_aws_client=".$config{aws_client},
+        "s3_debug_aws=".($verbose > 1 ? 1 : 0),
+        "logsettings=".($verbose > 1 ? 'DEBUG' : ($verbose > 0 ? 'INFO' : 'FATAL'))
+    );
+    my $cfg=new LINZ::GNSS::Config('',@args);
+    $bucket = LINZ::GNSS::AwsS3Bucket->new(config=>$cfg);
     $localsrc='temporary working directory';
     $localdir=tempdir(CLEANUP=>1)
 }

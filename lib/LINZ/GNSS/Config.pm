@@ -141,13 +141,17 @@ sub new {
     $args{configname} = $configname;
     $args{user} = getlogin if !$args{user};
 
-    croak("Configuration file $cfgfile is missing\n") if !-f $cfgfile;
+    croak("Configuration file $cfgfile is missing\n") if $cfgfile && !-f $cfgfile;
 
     my $errfile;
     eval {
-        my @files = ($cfgfile);
-        push( @files, $cfgfile . '.' . $args{config} )
-          if $args{config} && -f $cfgfile . '.' . $args{config};
+        my @files = ();
+        if( $cfgfile )
+        {
+            push(@files,$cfgfile);
+            push( @files, $cfgfile . '.' . $args{config} )
+            if $args{config} && -f $cfgfile . '.' . $args{config};
+        }
         foreach my $errfile (@files) {
             my %cfg = ParseConfig( -ConfigFile => $errfile );
             while ( my ( $key, $value ) = each(%cfg) ) {

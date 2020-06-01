@@ -188,16 +188,25 @@ my $ignoresize=$opts{i};
 
 @ARGV >= 1 || die $syntax;
 
-my $conffile=shift @ARGV;
-die "Cannot find config file $conffile\n" if ! -e $conffile;
-
 my %argconfig=();
+my $conffile;
 foreach my $arg (@ARGV)
 {
-    die "Invalid configuration argument $arg: should be xxx=yyy"
-        if $arg !~ /^(\w+)\=(.*)/;
-    $argconfig{lc($1)} = $2;
+    if($arg =~ /^(\w+)\=(.*)/)
+    {
+        $argconfig{lc($1)} = $2;
+    }
+    elsif( ! $conffile )
+    {
+        $conffile=$arg;
+    }
+    else
+    {
+        die "Invalid configuration argument $arg: should be xxx=yyy\n";
+    }
 }
+die "Configuration file not defined\n" if ! $conffile;
+die "Cannot find config file $conffile\n" if ! -f $conffile;
 
 my $confdir=abs_path($conffile);
 $confdir =~ s/[^\\\/]*$//;
@@ -214,6 +223,9 @@ foreach my $k (keys %argconfig)
 {
     $config{$k}=$argconfig{$k};
 }
+
+$config{configdir} = $confdir;
+$config{configfile} = $conffile;
 
 # Expand references in configuration
 
@@ -272,6 +284,8 @@ else
     die "LocalBaseDirectory $localsrc is not a directory\n" if ! -d $localdir;
 }
 
+undef $opts{s} if $opts{s} eq 'default';
+undef $opts{e} if $opts{e} eq 'default';
 my $startage=$opts{s} // $config{startage};
 my $endage=$opts{e} // $config{endage};
 
@@ -701,7 +715,8 @@ sub downloadDir
             {
                 my $cwd=getcwd;
                 chdir($tgtpath) if $dochdir;
-                print "Running postdownload script with $commandshell";
+                print "Running postdownload script with $commandshell" if $verbose;
+                print "Script:\n$command\n" if $verbose > 1;
                 eval
                 {
                     open(my $shell, "| $commandshell" ) || die "Cannot execute $commandshell\n";
@@ -1125,6 +1140,9 @@ __END__
  # replaced with components of the file path.
  #
  # {ENV:xxx} can be used to explicitly replace environment variables.
+ # 
+ # {ConfigDir} and {ConfigFile} refer to the directory of this configuration
+ # file and the full path of the configuration file.
  #
  # Configuration items can be included from another file using:
  #

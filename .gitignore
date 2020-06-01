@@ -8,5 +8,6 @@ blib
 debian/debhelper-build-stamp
 test
 temp
+config
 debian/.debhelper
 .vscode

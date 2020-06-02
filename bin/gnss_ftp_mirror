@@ -987,7 +987,7 @@ sub new
 {
     my ($class, %config) = @_;
 
-    my $self={};
+    my $self=bless {}, $class;
     $self->{verbose}=$config{verbose};
     $self->{remoteuri}=$config{remoteuri};
     $self->{user}=$config{remoteuser};
@@ -1004,7 +1004,14 @@ sub new
     $self->{_dir} = $basedir;
     $self->{_dirlist} = {};
 
-    return $self=bless $self, $class;
+    # Haven't got reliable errors from smbclient program, plus seem to get error information
+    # in stdout, so do a crude check that there is something in the root directory :-(
+    my($in,$out,$err)=$self->_run("dir","*");
+    my($dirs,$files)=$self->parseDir($out);
+    die "Cannot access samba $remoteuri: $err $out\n"
+        if ! @$dirs && ! %$files;
+        
+    return $self;
 }
 
 sub verbose { return $_[0]->{verbose}; }

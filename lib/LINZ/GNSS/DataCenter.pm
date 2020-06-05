@@ -87,10 +87,10 @@ sub _getnameuri
     my ($cfgdc)=@_;
     my $name=$cfgdc->{name} || croak "Name missing for datacenter\n";
     my $uri=$cfgdc->{uri} || croak "Uri missing for datacenter $name\n";
-    $uri = ExpandEnv($uri,"for datacenter $name");
+    $uri = ExpandEnv($uri,"uri of datacenter $name");
     my $uriobj=URI->new($uri);
     my $scheme=$uriobj->scheme || 'file';
-    return $name,$uri, $scheme;
+    return $name,$uri,$scheme;
 }
 
 =head2 LINZ::GNSS::DataCenter::Create($cfgdc)
@@ -108,6 +108,7 @@ sub Create
     my ($name,$uri,$scheme)=_getnameuri($cfgdc);
     $scheme='http' if $scheme eq 'https';
     my $class=$cfgdc->{type} || ucfirst(lc($scheme));
+    $class='S3Bucket' if $class eq 'S3';
     $class="LINZ::GNSS::DataCenter::$class";
     my $location=$class;
     $location =~ s/\:\:/\//g;
@@ -173,9 +174,17 @@ sub new
     $stnlist = ref($stnlist) eq 'ARRAY' ? join(' ',@$stnlist) : $stnlist;
     my $stncodes = {};
     my $allstations=0;
+    my $stationlists=$cfgdc->{stationlists} || {};
     foreach my $s (split(' ',$stnlist))
     {
         if( $s eq '*' ) { $allstations=1; }
+        elsif( $s =~ /^\@(\w+)$/ )
+        {
+            foreach my $s (@{$stationlists->{lc($1)}})
+            {
+                $stncodes->{uc($s)}=$s;
+            }
+        }
         else { $stncodes->{uc($s)}=$s; }
     }
     my $notstnlist=$cfgdc->{notstations} || [];
@@ -183,7 +192,14 @@ sub new
     my $excludestations={};
     foreach my $s (split(' ',$notstnlist))
     {
-        $excludestations->{uc($s)}=$s; 
+        if( $s =~ /^\@(\w+)$/ )
+        {
+            foreach my $s (@{$stationlists->{lc($1)}})
+            {
+                $excludestations->{uc($s)}=$s;
+            }
+        }
+        else { $excludestations->{uc($s)}=$s; }
     }
     my $priority=$cfgdc->{priority} || 0;
 
@@ -195,7 +211,10 @@ sub new
 
     # Process the object
     $uri = ExpandEnv($uri,"for datacenter $name");
-    my $uriobj=URI->new($uri);
+    # Crude handling for S3 urls
+    my $testuri=$uri;
+    $testuri =~ s/^s3\:/ftp:/;
+    my $uriobj=URI->new($testuri);
     my $host='';
     my ($user,$pwd);
     if( $scheme ne 'file' )
@@ -295,10 +314,21 @@ sub LoadDataCenters
     $dcs = ref($dcs) eq 'ARRAY' ? $dcs : [$dcs];
     my $centers=[];
     my @prioritized_centers=();
+    my $stationlists={};
+    my $sourcelists=$cfg->{stationlists};
+    if( $sourcelists )
+    {
+       foreach my $list (keys %$sourcelists)
+       {
+           my @stations=split(' ',$sourcelists->{$list});
+           $stationlists->{lc($list)}=\@stations;
+       }
+    }
     foreach my $cfgdc (@$dcs)
     {
         eval
         {
+            $cfgdc->{stationlists}=$stationlists;
             my $center = LINZ::GNSS::DataCenter::Create($cfgdc);
             push(@$centers,$center);
             push(@prioritized_centers,$center) if $center->priority > 0;
@@ -600,6 +630,8 @@ Accessor functions for attributes of the data centre. Attributes are:
 
 =item scheme
 
+=item host
+
 =item basepath
 
 =back
@@ -613,6 +645,7 @@ sub stations { return sort(keys(%{$_[0]->{stncodes}})); }
 sub excludestations { return sort(keys(%{$_[0]->{excludestations}})); }
 sub priority { return $_[0]->{priority}; }
 sub scheme { return $_[0]->{scheme}; }
+sub host { return $_[0]->{host}; }
 sub basepath { return $_[0]->{basepath}; }
 sub _logger { return $_[0]->{_logger}; }
 
@@ -638,6 +671,11 @@ sub description
     if( $usestn )
     {
         $prefix="      Stations: ";
+        if( $self->{allstations} )
+        {
+            $dsc .= $prefix."Any station code.";
+            $prefix="  Explicitly supports the following codes\n                ";  
+        }
         my $nst=0;
         foreach my $st ($self->stations)
         {
@@ -652,7 +690,7 @@ sub description
         }
         $dsc .= "\n";
         my @excludestations=$self->excludestations;
-        if( @excludestations )
+        if( $self->{allstations} && @excludestations )
         {
             $prefix="  Not stations: ";
             my $nst=0;

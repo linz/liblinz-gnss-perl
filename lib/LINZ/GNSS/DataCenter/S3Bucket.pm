@@ -10,21 +10,18 @@ use fields qw (
     bucket
     );
 
+use URI;
 use LINZ::GNSS::DataCenter;
 use LINZ::GNSS::AwsS3Bucket;
+use LINZ::GNSS::Variables qw(ExpandEnv);
 
 sub new
 {
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
-    $self->{bucketname}=$cfgdc->{s3bucket};
-    $self->{bucketprefix}=$cfgdc->{s3prefix};
-    $self->{bucketawsparams}=$cfgdc->{s3awsparameters};
-    if( ! $self->{bucketname} )
-    {
-        croak("GNSSArchive datacenter ".$self->name." needs S3Bucket defined\n");
-    }
+    my $name=$self->name;
+    $self->{bucketawsparams}=ExpandEnv($cfgdc->{s3awsparameters},"s3awsparameters of datacenter $name");
     return $self;
 }
 
@@ -37,13 +34,16 @@ Connect to S3 bucket
 sub connect
 {
     my($self) = @_;
-    my $bucketname=$self->{bucketname};
+    my $bucketname=$self->host;
+    my ($user,$pwd) = $self->credentials(0);
     eval
     {
         $self->{bucket}=LINZ::GNSS::AwsS3Bucket->new(
             bucket=>$bucketname,
-            prefix=>$self->{bucketprefix},
-            aws_parameters=>$self->{bucketawsparameters}
+            prefix=>$self->basepath,
+            aws_parameters=>$self->{bucketawsparams},
+            access_key_id=>$user,
+            secret_access_key=>$pwd
             );
         die "Failed to connect to S3 bucket $bucketname\n"
             if ! $self->{bucket};
@@ -51,7 +51,7 @@ sub connect
     if( $@ )
     {
         my $error=$@;
-        $self->_logger->warn("Connection to ".$self->name." S3 bucket failed: ".
+        $self->{_logger}->warn("Connection to ".$self->name." S3 bucket failed: ".
             $error);
         croak("Connection to ".$self->name." S3 bucket failed: ".
             $error);
@@ -67,7 +67,7 @@ sub getfile
     $self->{bucket}->getFile("$path/$file",$target);
     my $size=-s $target;
     my $name=$self->{name};
-    $self->_logger->info("Retrieved $file ($size bytes) from $name");
+    $self->{_logger}->info("Retrieved $file ($size bytes) from $name");
 }
 
 1;

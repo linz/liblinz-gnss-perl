@@ -54,7 +54,7 @@ sub _expand
     {
         $errmsg='Environment variable '.$vars[0].' not defined';
     }
-    $errmsg .= ' '.$context if $context;
+    $errmsg .= ' for '.$context if $context;
     $errmsg .= "\n";
     croak $errmsg;
 }

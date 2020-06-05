@@ -28,6 +28,8 @@ use Log::Log4perl;
 use Carp qw(croak);
 
 our $default_awsbin='/usr/bin/aws';
+our $idenv='AWS_ACCESS_KEY_ID';
+our $keyenv='AWS_SECRET_ACCESS_KEY';
 
 =head2 LINZ::GNSS::AwsS3Bucket->new( ... )
 
@@ -55,7 +57,9 @@ sub new()
     my $self=bless {}, $class;
     $self->{aws_client}=$default_awsbin;
     my $cfg=$args{config};
-    $self->{logger}=$cfg->logger('LINZ.GNSS.AwsS3Bucket');
+    $self->{logger}=Log::Log4perl->get_logger('LINZ.GNSS.AwsS3Bucket');
+    $self->{aws_access_key_id}=$args{access_key_id};
+    $self->{aws_secret_access_key}=$args{secret_access_key};
     my $cfg_prefix=$args{config_prefix} || '';
     foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
     {
@@ -106,7 +110,7 @@ sub error
 { 
     my($self,@msg)=@_;
     my $errmsg=join("",@msg);
-    $self->debug($errmsg); 
+    $self->logger->error($errmsg); 
     croak($errmsg."\n");
 }
 
@@ -128,12 +132,19 @@ sub _runAws
     my $out;
     my $err;
     my $ok=0;
+    my $oldid=$ENV{$idenv};
+    my $oldkey=$ENV{$keyenv};
     eval
     {
         my $cmdstr=join(" ",@command);
+        my $access_key_id=$self->{access_key_id};
+        my $secret_access_key=$self->{secret_access_key};
+        $ENV{$idenv}=$access_key_id if $access_key_id;
+        $ENV{$keyenv}=$secret_access_key if $secret_access_key;
         foreach my $k (sort keys %ENV)
         {
-            $cmdstr .= "\n$k=$ENV{$k}" if $k =~ /^AWS/;
+            next if $k eq $idenv || $k eq $keyenv || $k !~ /^AWS_/;
+            $cmdstr .= "\n$k=$ENV{$k}";
         }
         $self->logger->debug($cmdstr);
         print("Running command: ",join("\n   ",@command),"\n") if $self->_debug;
@@ -144,6 +155,10 @@ sub _runAws
         $self->error("aws command failed: $@");
         return 0;
     }
+    undef $ENV{$idenv};
+    undef $ENV{$keyenv};
+    $ENV{$idenv}=$oldid if $oldid;
+    $ENV{$keyenv}=$oldkey if $oldkey;
     return wantarray ? ($ok,$out,$err) : $ok;
 }
 

@@ -105,7 +105,7 @@ sub prefix { return $_[0]->{prefix}}
 sub logger { return $_[0]->{logger}}
 sub _aws_client { return $_[0]->{aws_client}}
 sub _aws_parameters { return $_[0]->{aws_parameters}}
-sub _debug { my $self=shift; return $self->{debug_aws}; }
+sub _debug_aws { my $self=shift; return $self->{debug_aws}; }
 
 sub error 
 { 
@@ -128,7 +128,9 @@ sub _runAws
     my $awsbin=$self->_aws_client;
     my $awsparams=$self->_aws_parameters;
     my @awsparams=split(' ',$awsparams);
-    my @command=($awsbin,$command,$subcommand,@awsparams,@params);
+    my @command=($awsbin);
+    push(@command,'--debug') if $self->_debug_aws;
+    push(@command,$command,$subcommand,@awsparams,@params);
     my $in='';
     my $out;
     my $err;

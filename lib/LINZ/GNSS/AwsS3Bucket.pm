@@ -68,6 +68,7 @@ sub new()
         $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
         $self->{$item}=$value;
     }
+    $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
     croak("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
     my $awsbin=$self->{aws_client};
@@ -139,24 +140,29 @@ sub _runAws
         my $cmdstr=join(" ",@command);
         my $access_key_id=$self->{access_key_id};
         my $secret_access_key=$self->{secret_access_key};
-        $ENV{$idenv}=$access_key_id if $access_key_id;
-        $ENV{$keyenv}=$secret_access_key if $secret_access_key;
+        if( $access_key_id && $secret_access_key )
+        {
+            $ENV{$idenv}=$access_key_id if $access_key_id;
+            $ENV{$keyenv}=$secret_access_key if $secret_access_key;
+        }
         foreach my $k (sort keys %ENV)
         {
-            next if $k eq $idenv || $k eq $keyenv || $k !~ /^AWS_/;
+            next if $k !~ /^AWS/;
+            next if $k eq $idenv || $k eq $keyenv;
             $cmdstr .= "\n$k=$ENV{$k}";
         }
         $self->logger->debug($cmdstr);
-        print("Running command: ",join("\n   ",@command),"\n") if $self->_debug;
         $ok=run(\@command,\$in,\$out,\$err);
+        $self->logger->debug("Output: $out");
+        $self->logger->debug("Error: $err")
     };
     if( $@ )
     {
         $self->error("aws command failed: $@");
         return 0;
     }
-    undef $ENV{$idenv};
-    undef $ENV{$keyenv};
+    delete $ENV{$idenv};
+    delete $ENV{$keyenv};
     $ENV{$idenv}=$oldid if $oldid;
     $ENV{$keyenv}=$oldkey if $oldkey;
     return wantarray ? ($ok,$out,$err) : $ok;

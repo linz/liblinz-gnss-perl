@@ -761,7 +761,7 @@ sub downloadDir
     if( $bucket && $nfiles > 0 )
     {
         my $error;
-        $bucket->syncToBucket($localpath,'/',delete=>1);
+        $bucket->syncToBucket($localpath,'/');
         # keep_root doesn't avoid error trying to delete with cwd as root directory?
         chdir($startdir);
         File::Path::remove_tree($localpath,{keep_root=>1,error=>\$error});

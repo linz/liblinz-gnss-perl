@@ -761,6 +761,7 @@ sub downloadDir
     if( $bucket && $nfiles > 0 )
     {
         my $error;
+        print "Uploading $localpath to S3 $bucket/$bucketprefix/\n" if $verbose;
         $bucket->syncToBucket($localpath,'/');
         # keep_root doesn't avoid error trying to delete with cwd as root directory?
         chdir($startdir);

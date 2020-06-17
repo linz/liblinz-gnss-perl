@@ -70,7 +70,7 @@ sub new()
     }
     $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
-    croak("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
+    $self->error("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
     my $awsbin=$self->{aws_client};
     if( ! -x $awsbin )
     {
@@ -81,7 +81,7 @@ sub new()
     my ($ok,$result,$error) =$self->_runAws('s3api','head-bucket','--bucket',$bucket);
     if( ! $ok )
     {
-        croak("LINZ::GNSS::AwsS3Bucket::new Cannot find or access S3 bucket $bucket\n");
+        $self->error("LINZ::GNSS::AwsS3Bucket::new Cannot find or access S3 bucket $bucket\n");
         return;
     }
     my $prefix=$self->prefix;
@@ -111,10 +111,17 @@ sub error
 { 
     my($self,@msg)=@_;
     my $errmsg=join("",@msg);
-    $self->logger->error($errmsg); 
+    $self->logger->error($errmsg) if $self->logger; 
     croak($errmsg."\n");
 }
 
+sub debug 
+{ 
+    my($self,@msg)=@_;
+    return if ! $self->logger;
+    my $errmsg=join("",@msg);
+    $self->logger->debug($errmsg); 
+}
 
 =head2 $processor->_runAws($command,$subcommand,@params)
 
@@ -153,10 +160,10 @@ sub _runAws
             next if $k eq $idenv || $k eq $keyenv;
             $cmdstr .= "\n$k=$ENV{$k}";
         }
-        $self->logger->debug($cmdstr);
+        $self->debug($cmdstr);
         $ok=run(\@command,\$in,\$out,\$err);
-        $self->logger->debug("Output: $out");
-        $self->logger->debug("Error: $err")
+        $self->debug("Output: $out");
+        $self->debug("Error: $err")
     };
     if( $@ )
     {
@@ -201,7 +208,8 @@ sub fileUrl
 
 =head2 $processor->putFile($sourcefile,$file)
 
-Copy a file to the S3 bucket store for the process.
+Copy a file to the S3 bucket store for the process. Also adds
+metadata for file modification date
 
 =cut
 
@@ -218,6 +226,29 @@ sub putFile
     my $utctag=strftime("%Y-%m-%dT%H:%M:%S",gmtime($timetag));
     my @params=('--metadata',"mtime=$utctag",$sourcefile,$s3url);
     my ($ok,$result,$error)=$self->_runAws('s3','cp','--only-show-errors',@params);
+    return wantarray ? ($ok,$result,$error) : $ok;
+}
+
+
+=head2 $processor->putDir($sourcedir,$dir)
+
+Recursively copy a directory contents to the bucket.  (Note 
+this does not include modification time metadata)
+
+=cut
+
+sub putDir
+{
+    my($self,$sourcedir,$dir)=@_;
+    if(! -d $sourcedir )
+    {
+        $self->error("Cannot copy directory to $sourcedir to S3: not a directory");
+        return 0;
+    }
+    $dir .= '/' if $dir =~ /[^\/]$/;
+    my $s3url=$self->fileUrl($dir);
+    my @params=($sourcedir.'/',$s3url);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp','--recursive','--only-show-errors',@params);
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
@@ -338,7 +369,7 @@ sub syncToBucket
     }
     my $s3url=$self->fileUrl($targetkey);
     my @cmd=('s3','sync','--only-show-errors');
-    push(@cmd,'--delete') if exists $opts{delete} && ! $opts{delete};
+    push(@cmd,'--delete') unless exists $opts{delete} && ! $opts{delete};
     push(@cmd,$sourcedir,$s3url);
     my ($ok,$result,$error)=$self->_runAws(@cmd);
     return wantarray ? ($ok,$result,$error) : $ok;
@@ -368,7 +399,7 @@ sub syncFromBucket
     }
     my $s3url=$self->fileUrl($sourcekey);
     my @cmd=('s3','sync','--only-show-errors');
-    push(@cmd,'--delete') if exists $opts{delete} && ! $opts{delete};
+    push(@cmd,'--delete') unless exists $opts{delete} && ! $opts{delete};
     push(@cmd,$s3url,$targetdir);
     my ($ok,$result,$error)=$self->_runAws(@cmd);    
     return wantarray ? ($ok,$result,$error) : $ok;

@@ -238,7 +238,7 @@ sub LoadConfig
     {
         my $errmsg=$@;
         Log::Log4perl->easy_init($DEBUG);
-        my $logger=Log::Log4perl::get_logger('LINZ.GNSS');
+        my $logger=Log::Log4perl::get_logger('LINZ::GNSS');
         $logger->error($errmsg);
     }
 

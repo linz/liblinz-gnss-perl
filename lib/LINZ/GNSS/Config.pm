@@ -373,9 +373,9 @@ sub getAll {
     return $expanded;
 }
 
-=head2 $logger=$cfg->logger($loggerid);
+=head2 $logger=$cfg-initLogger();
 
-Gets a Log::Log4perl logger based on configuration settings. The logger
+Configures Log::Log4perl logger output on configuration settings. The logger
 is initiallized to the warning level if log settings are not defined.
 
 The log settings are defined by variables 
@@ -396,26 +396,31 @@ with the name built from logdir and logfile.
 Instead of a full Log::Log4perl definition logsettings can simply be the log level,
 one of trace, debug, info, warn, error, or fatal.
 
-The logger is initiallized with an id specified by the $loggerid parameter,
-which defaults to 'LINZ::GNSS'.
-
 =cut
 
-sub logger {
-    my ( $self, $loggerid ) = @_;
-    if ( !$self->{_logger_init} ) {
-        $self->{_logger_init} = 1;
-        my $logcfg  = $self->get( 'logsettings', 'WARN' );
-        my $logfile=$ENV{LINZGNSS_LOG_FILE};
-        if( ! $logfile )
-        {
-            my $logdir =  $ENV{LINZGNSS_LOG_DIR};
-            $logdir=ExpandEnv($self->get( 'logdir', '' ),' for log directory') if ! $logdir;
-            $logdir =~ s/([^\/])$/$1\//;
-            $logfile .= $self->get( 'logfile', '' );
-            $logfile = $logdir.$logfile if $logfile;
-        }
-
+sub initLogger {
+    my ( $self ) = @_;
+    return if $self->{_logger_init};
+    $self->{_logger_init} = 1;
+    my $logcfg  = $self->get( 'logsettings', 'WARN' );
+    my $debug = $ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
+    if ($debug) {
+        my $level = lc($debug);
+        $level = 'debug' if $level !~ /^(trace|debug|info|warn|error|fatal)$/;
+        $logcfg=$level;
+    }
+    my $logfile=$ENV{LINZGNSS_LOG_FILE};
+    if( ! $logfile )
+    {
+        my $logdir =  $ENV{LINZGNSS_LOG_DIR};
+        $logdir=ExpandEnv($self->get( 'logdir', '' ),' for log directory') if ! $logdir;
+        $logdir =~ s/([^\/])$/$1\//;
+        $logfile .= $self->get( 'logfile', '' );
+        $logfile = $logdir.$logfile if $logfile;
+    }
+    
+    eval
+    {
         if ( $logcfg =~ /^(trace|debug|info|warn|error|fatal|)$/i ) {
             my $options = {};
             if ( $logfile ne '' ) { $options->{file} = $logfile; }
@@ -432,16 +437,15 @@ sub logger {
             $logcfg =~ s/\[logfilename\]/$logfile/eg;
             Log::Log4perl->init( \$logcfg );
         }
-        my $debug = $ENV{LINZGNSS_DEBUG} || $ENV{DEBUG_LINZGNSS};
-        if ($debug) {
-            my $level = $DEBUG;
-            $level = $WARN if lc($debug) eq 'warn';
-            $level = $INFO if lc($debug) eq 'info';
-            Log::Log4perl->easy_init($level);
-        }
-    }
-    $loggerid ||= 'LINZ::GNSS';
-    return Log::Log4perl->get_logger($loggerid);
+    };
+    if( $@ )
+    {
+        my $errmsg=$@;
+        Log::Log4perl->easy_init($DEBUG);
+        my $logger=Log::Log4perl::get_logger('LINZ::GNSS');
+        $logger->error($errmsg);
+    }        
+    return;
 }
 
 1;

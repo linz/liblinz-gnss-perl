@@ -85,6 +85,7 @@ use Time::HiRes;
 use Config::General;
 use POSIX qw/strftime/;
 use LINZ::RunBatch;
+use LINZ::GNSS::Config;
 use LINZ::GNSS::Time qw/parse_gnss_date datetime_seconds seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
 
 my $syntax=<<EOD;
@@ -259,19 +260,20 @@ my $bucketprefix;
 my $bucket;
 my $localdir;
 my $localsrc;
+require LINZ::GNSS::Config;
+my @args=(
+    "s3_bucket=".$bucketname,
+    "s3_prefix=".$config{s3_prefix},
+    "s3_aws_parameters=".$config{s3_aws_parameters},
+    "s3_aws_client=".$config{aws_client},
+    "s3_debug_aws=".($verbose > 1 ? 1 : 0),
+    "logsettings=".($verbose > 1 ? 'DEBUG' : ($verbose > 0 ? 'INFO' : 'FATAL'))
+);
+my $cfg=new LINZ::GNSS::Config('',@args);
+$cfg->initLogger();
 if( $bucketname )
 {
     require LINZ::GNSS::AwsS3Bucket;
-    require LINZ::GNSS::Config;
-    my @args=(
-        "s3_bucket=".$bucketname,
-        "s3_prefix=".$config{s3_prefix},
-        "s3_aws_parameters=".$config{s3_aws_parameters},
-        "s3_aws_client=".$config{aws_client},
-        "s3_debug_aws=".($verbose > 1 ? 1 : 0),
-        "logsettings=".($verbose > 1 ? 'DEBUG' : ($verbose > 0 ? 'INFO' : 'FATAL'))
-    );
-    my $cfg=new LINZ::GNSS::Config('',@args);
     $bucket = LINZ::GNSS::AwsS3Bucket->new(config=>$cfg);
     $localsrc='temporary working directory';
     $localdir=tempdir(CLEANUP=>1)
@@ -644,7 +646,9 @@ sub downloadDir
             my $filestat=$bucket->fileStats($target);
             if( $filestat )
             {
-                $available=$ignoresize || $filestat->{size} == $size;
+                my $bsize=$filestat->{size};
+                $available=$ignoresize || $bsize == $size;
+                print "Reloading $tgtname ($bsize != $size)\n" if $verbose && ! $available;
             }
             # If not available try and get the marker file 
             if( ! $available && $marker )
@@ -761,8 +765,8 @@ sub downloadDir
     if( $bucket && $nfiles > 0 )
     {
         my $error;
-        print "Uploading $localpath to S3 $bucket/$bucketprefix/\n" if $verbose;
-        $bucket->syncToBucket($localpath,'/');
+        print "Uploading $localpath to S3 ".$bucket->bucket."/".$bucket->prefix."\n" if $verbose;
+        $bucket->putDir($localpath,'');
         # keep_root doesn't avoid error trying to delete with cwd as root directory?
         chdir($startdir);
         File::Path::remove_tree($localpath,{keep_root=>1,error=>\$error});
@@ -993,6 +997,9 @@ sub new
     $self->{remoteuri}=$config{remoteuri};
     $self->{user}=$config{remoteuser};
     $self->{password}=$config{remotepassword};
+    $self->{timeout}=$config{smbtimeout} || 20;
+    $self->{retries}=$config{smbretries} || 3;
+    $self->{retrywait}=$config{smbretrywait} || 5;
 
     my $remoteuri=$self->{remoteuri};
 
@@ -1022,7 +1029,9 @@ sub share { return $_[0]->{share}; }
 sub user { return $_[0]->{user}; }
 sub password { return $_[0]->{password}; }
 sub basedir { return $_[0]->{basedir}; }
-sub timeout { return 0; }
+sub timeout { return $_[0]->{timeout}; }
+sub retries { return $_[0]->{retries}; }
+sub retrywait { return $_[0]->{retrywait}; }
 
 sub _run
 {
@@ -1033,17 +1042,25 @@ sub _run
     $pwd=$ENV{PASSWD} if ! $pwd;
     die "Password not defined for samba user $user\n" if ! $pwd;
     my $cmdstr=join(" ",@smbcommand);
-    my @command=($SmbConnection::smbclient,$share);
+    my @command=($SmbConnection::smbclient,'-t',$self->timeout,$share);
     push(@command,$pwd) if $pwd;
     push(@command,'-U',$user,'-c',$cmdstr);
     my $ok = 0;
+    my $tries=$self->retries;
     my ($in, $out, $err);
     eval
     {
-        print("Running command: ",join("\n   ",@command),"\n") if $self->verbose > 1;
-        $ok=run(\@command,\$in,\$out,\$err);
-        print("Samba client error message: $err\n") if $err && $self->verbose;
-        print("Output: $out\n") if $self->verbose > 1;
+        while(1) 
+        {
+            print("Running command: ",join("\n   ",@command),"\n") if $self->verbose > 1;
+            $ok=run(\@command,\$in,\$out,\$err);
+            print("Samba client error message: $err\n") if $err && $self->verbose;
+            print("Output: $out\n") if $self->verbose > 1;
+            last if $ok;
+            last if $tries-- <= 0;
+            print("Retrying smbclient ...") if $self->verbose;
+            sleep($self->retrywait);
+        };
     };
     if( $@ )
     {
@@ -1122,10 +1139,10 @@ sub parseDir
         }
         else
         {
-            print("Found file $name\n") if $self->verbose > 1;
+            print("Found file $name: $l\n") if $self->verbose > 1;
             # Select column based on unix or MS format listing
-            my $sizecol =  $l =~ /^\d\d/ ? -2 : 4;
-            my $size=(split(' ',$l))[$sizecol];
+            #my $sizecol =  $l =~ /^\d\d/ ? -2 : 4;
+            #my $size=(split(' ',$l))[$sizecol];
             $files->{$name}={size=>$size, dir=>$l, mtime=>$mtime };
         }
     }

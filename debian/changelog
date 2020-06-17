@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.75.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Fixing Samba handling, S3 upload from gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 18 Jun 2020 15:00:00 +1200
+
 liblinz-gnss-perl (1.74.0-1) bionic; urgency=medium
 
   [Chris Crook]

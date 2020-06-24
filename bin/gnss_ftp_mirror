@@ -136,13 +136,15 @@ foreach my $mon (@fullmonths)
 my %patterns=(
     'yyyy' => '\d\d\d\d',
     'yy' =>   '\d\d',
-    'hh' =>   '\d\d',
-    'mm' =>   '\d\d',
+    'hh' =>   '([01]\d|2[0-3])',
+    'h' => '[a-x]',
+    'H' => '[A-X]',
+    'mm' =>   '(0[1-9]|1[0-2])',
     'mmm' =>  '('.join('|',@months).')',
     'Mmm' =>  '('.join('|',@ccmonths).')',
     'MMM' =>  '('.join('|',@umonths).')',
-    'dd'  =>  '\d\d',
-    'ddd' =>  '\d\d\d',
+    'dd'  =>  '[0-3]\d',
+    'ddd' =>  '[0-3]\d\d',
     'code' => '[a-z0-9]{4}',
     'CODE' => '[A-Z0-9]{4}',
     'Code' => '[A-Za-z0-9]{4}',
@@ -342,6 +344,10 @@ if( $remoteuri =~ /^smb:/ )
 {
     $ftp=new SmbConnection( %config );
 }
+elsif( $remoteuri =~ /^file:/ )
+{
+    $ftp=new FileConnection(%config);
+}
 else
 {
     $ftp=new FtpConnection( %config );
@@ -495,6 +501,7 @@ if( $verbose )
 #  value in the option then it passes. Options that pass have any other fields in the name added to them.
 #  
 #  The field "code" is treated specially and is additionally matched against valid codes
+#  The fields "h" and "hh" are handled to provide alternative representations of hour
 
 sub filteredOptions
 {
@@ -514,6 +521,19 @@ sub filteredOptions
             $fieldvalues{code}=lc($fieldvalues{$f});
             $fieldvalues{Code}=$fieldvalues{$f};
             $code=$fieldvalues{CODE};
+        }
+        elsif( lc($f) eq 'h' )
+        {
+            $fieldvalues{H}=uc($fieldvalues{$f});
+            $fieldvalues{h}=lc($fieldvalues{$f});
+            $fieldvalues{hh}=sprintf("%02d",ord($fieldvalues{h})-ord('a'));
+        }
+        elsif( lc($f) eq 'hh' )
+        {
+            my $hour=int($fieldvalues{$f});
+            return [] if $hour < 0 || $hour > 23;
+            $fieldvalues{h}=chr(ord('a')+$hour);
+            $fieldvalues{H}=chr(ord('A')+$hour);
         }
     }
 
@@ -1057,14 +1077,18 @@ sub _run
             print("Samba client error message: $err\n") if $err && $self->verbose;
             print("Output: $out\n") if $self->verbose > 1;
             last if $ok;
-            last if $tries-- <= 0;
+            if( $tries-- <= 0 )
+            {
+                print("smbclient command failed: ".join(" ",@command)) if $self->verbose;
+                last;
+            }
             print("Retrying smbclient ...") if $self->verbose;
             sleep($self->retrywait);
         };
     };
     if( $@ )
     {
-        print("smbclient command failed: $@");
+        print("smbclient command failed: $@\n");
         return 0;
     }
     return wantarray ? ($ok,$out,$err) : $ok;
@@ -1090,6 +1114,8 @@ sub dirList
     my($ok,$out,$err) = $self->_run("dir",$dir."/*");
     my($dirs,$files)=$self->parseDir( $out );
     $self->{_dirlist}->{$self->{_dir}}=$files;
+    printf("$dir contains: %d directories %d files\n",
+        scalar(@$dirs),scalar(keys %$files)) if $self->verbose > 1;
     return $dirs,$files;
 }
 
@@ -1131,7 +1157,7 @@ sub parseDir
         my $mon=index('jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec',lc($month));
         next if $mon < 0;
         $mon=int($mon/4)+1;
-        my $mtime=datetime_seconds(sprintf("%04d-%02d-%02d%%s",$year,$mon,$mday,$time));
+        my $mtime=datetime_seconds(sprintf("%04d-%02d-%02dT%s",$year,$mon,$mday,$time));
         if( $type eq 'D' )
         {
             print("Found directory $name\n") if $self->verbose > 1;
@@ -1148,6 +1174,105 @@ sub parseDir
     }
     return $dirs,$files;
 }
+
+#========================================================================
+# File connection for testing.
+
+package FileConnection;
+
+use POSIX qw/strftime/;
+use File::Copy;
+use File::Spec;
+use Cwd;
+
+sub new
+{
+    my ($class, %config) = @_;
+
+    my $remoteuri=$config{remoteuri};
+    $remoteuri =~ s/^file:(\/\/)?//;
+
+    my $self=bless {cwd=>getcwd, remoteuri=>$remoteuri, _dir=>'' }, $class;
+    return $self;
+}
+
+sub verbose { return $_[0]->{verbose}; }
+sub remoteuri { return $_[0]->{remoteuri}; }
+sub host { return $_[0]->{host}; }
+sub share { return $_[0]->{share}; }
+sub user { return $_[0]->{user}; }
+sub password { return $_[0]->{password}; }
+sub basedir { return $_[0]->{remoteuri}; }
+sub timeout { return $_[0]->{timeout}; }
+sub retries { return $_[0]->{retries}; }
+sub retrywait { return $_[0]->{retrywait}; }
+
+sub quit
+{
+    my( $self)=@_;
+}
+
+sub cwd
+{
+    my( $self, $dir) = @_;
+    $self->{_dir} = $dir;
+    return 1;
+}
+
+sub _dirname
+{
+    my ($self) = @_;
+    my $dir=$self->{_dir};
+    $dir='.' if $dir eq '';
+    $dir = File::Spec->rel2abs($dir,$self->{cwd}) if $dir !~ '^/';
+    return $dir;
+}
+
+sub dirList
+{
+    my ($self) = @_;
+    my $dir=$self->_dirname;
+    print("Getting directory of $dir\n") if $self->verbose > 1;
+    my $files={};
+    my $dirs=[];
+    if( -d $dir && opendir(my $dh, $dir))
+    {
+        while( my $file=readdir($dh))
+        {
+            next if $file =~ /^\./;
+            my $filepath=$dir.'/'.$file;
+            if( -d $filepath )
+            {
+                push(@$dirs,$file);
+            }
+            else
+            {
+                my ($size,$mtime) = (stat($filepath))[7,9];
+                my $mdate=POSIX::strftime('%Y-%m-%dT%H:%M:%S',gmtime($mtime));
+                my $dir="$file $size $mdate";
+                $files->{$file}={size=>$size, dir=>$dir, mtime=>$mdate };
+            }
+        }
+        closedir($dh);
+    }
+    $self->{_dirlist}->{$self->{_dir}}=$files;
+    printf("$dir contains: %d directories %d files\n",
+        scalar(@$dirs),scalar(keys %{$files})) if $self->verbose > 1;
+    return $dirs,$files;
+}
+
+sub get
+{
+    my ($self,$file,$target) = @_;
+    unlink($target) if -f $target;
+    if( -e $target )
+    {
+        print "Cannot overwrite $target\n";
+        return 0;
+    }
+    my $remote = $self->_dirname.'/'.$file;
+    return copy($remote,$target);
+}    
 
 #========================================================================
 __END__

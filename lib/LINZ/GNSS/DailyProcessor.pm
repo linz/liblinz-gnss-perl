@@ -980,7 +980,7 @@ Returns a Log::Log4perl logger associated with the processor.
 
 sub logger {
     my($self) = @_;
-    return $self-->{'logger'};
+    return $self->{'logger'};
 }
 
 =head2 $processor->makePath

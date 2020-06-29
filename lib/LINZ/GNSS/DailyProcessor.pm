@@ -63,8 +63,9 @@ sub new {
     if ( $cfg->get( 's3_bucket', '' ) ) {
         $s3bucket = new LINZ::GNSS::AwsS3Bucket( config => $cfg );
     }
+    my $logger=Log::Log4perl->get_logger('LINZ::GNSS::DailyProcessor');
     my $self =
-      { cfg => $cfg, vars => {}, loggers => {}, s3bucket => $s3bucket };
+      { cfg => $cfg, vars => {}, logger => $logger, s3bucket => $s3bucket };
     return bless $self, $class;
 }
 
@@ -979,7 +980,7 @@ Returns a Log::Log4perl logger associated with the processor.
 
 sub logger {
     my($self) = @_;
-    return $self->cfg->logger('LINZ::GNSS::DailyProcessor');
+    return $self-->{'logger'};
 }
 
 =head2 $processor->makePath

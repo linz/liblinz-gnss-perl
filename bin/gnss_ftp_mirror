@@ -135,6 +135,7 @@ foreach my $mon (@fullmonths)
 
 my %patterns=(
     'yyyy' => '\d\d\d\d',
+    'yyyy1' => '\d\d\d\d',
     'yy' =>   '\d\d',
     'hh' =>   '([01]\d|2[0-3])',
     'h' => '[a-x]',
@@ -145,6 +146,7 @@ my %patterns=(
     'MMM' =>  '('.join('|',@umonths).')',
     'dd'  =>  '[0-3]\d',
     'ddd' =>  '[0-3]\d\d',
+    'ddd1' =>  '[0-3]\d\d',
     'code' => '[a-z0-9]{4}',
     'CODE' => '[A-Z0-9]{4}',
     'Code' => '[A-Za-z0-9]{4}',
@@ -434,7 +436,7 @@ for( my $i = $startdate; $i <= $enddate; $i += $SECS_PER_DAY )
 {
     my($yy,$mm,$dd)=(seconds_ymdhms($i));
     my($yy2,$skip,$ddd)=(time_elements($i));
-    push(@valid_dates,{
+    my $filter= {
             yyyy=>sprintf("%04d",$yy),
             yy=>sprintf("%02d",$yy%100),
             mm=>sprintf("%02d",$mm),
@@ -446,7 +448,14 @@ for( my $i = $startdate; $i <= $enddate; $i += $SECS_PER_DAY )
             mmmm=>$fullmonths[$mm-1],
             MMMM=>$ufmonths[$mm-1],
             Mmmm=>$cfmonths[$mm-1],
-        });
+        };
+    # Crude fix for Synergy files loaded into directory matching
+    # following day
+    ($yy,$mm,$dd)=(seconds_ymdhms($i+$SECS_PER_DAY));
+    ($yy2,$skip,$ddd)=(time_elements($i+$SECS_PER_DAY));
+    $filter->{yyyy1}=sprintf("%04d",$yy);
+    $filter->{ddd1}=sprintf("%03d",$ddd);
+    push(@valid_dates,$filter);
 }
 
 # @dirparts is an array of components of the remote file path.  Each in turn

@@ -63,6 +63,7 @@ sub new {
     if ( $cfg->get( 's3_bucket', '' ) ) {
         $s3bucket = new LINZ::GNSS::AwsS3Bucket( config => $cfg );
     }
+    $cfg->initLogger();
     my $logger=Log::Log4perl->get_logger('LINZ::GNSS::DailyProcessor');
     my $self =
       { cfg => $cfg, vars => {}, logger => $logger, s3bucket => $s3bucket };

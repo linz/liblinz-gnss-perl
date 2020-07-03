@@ -101,8 +101,9 @@ sub runProcessor {
     my @skipfiles = split( ' ', $self->get( 'skip_files', '' ) );
 
     my $failfile      = $self->get('fail_file');
-    my $retry_max_age = $self->get('retry_max_age_days') * $SECS_PER_DAY;
-    $retry_max_age = $runtime - $retry_max_age if $retry_max_age;
+    my $retry_max_age_days = $self->get('retry_max_age_days');
+    my $retry_max_age=0;
+    $retry_max_age = $runtime - $retry_max_age_days*$SECS_PER_DAY if $retry_max_age_days;
     my $retry_interval_days = $self->get('retry_interval_days');
 
     my $rerun = $self->get( 'rerun', '0' );
@@ -206,10 +207,18 @@ sub runProcessor {
             # Did it fail but is not ready to rerun
             my $failmtime = $self->markerFileExists($failfile);
             if ($failmtime) {
-                next if $date < $retry_max_age;
-                next
-                  if ( time() - $failmtime ) <
-                  ( $retry_interval_days * 60 * 60 * 24 );
+                if( $date < $retry_max_age )
+                {
+                    $self->info(sprintf("Not processing $year:$day as failed more than %d days ago (retry_max_age_days)",
+                       $retry_max_age_days));
+                    next
+                }
+                if (( time() - $failmtime ) < ( $retry_interval_days * $SECS_PER_DAY ))
+                {
+                    $self->info(sprintf("Not processing $year:$day as last failed less than %d days ago (retry_interval_days)",
+                       $retry_interval_days));
+                    next;
+                };
                 $self->deleteMarkerFiles($failfile);
             }
 
@@ -689,7 +698,7 @@ is a corresponding subject line defined).
 
 sub sendNotification {
     my ( $self, $success, $text ) = @_;
-
+    return if $self->get('notifications') eq 'off';
     my $server    = $self->get( 'notification_smtp_server',   '' );
     my $auth_file = $self->get( 'notification_auth_file',     '' );
     my $timeout   = $self->get( 'notification_smtp_timeout',  '30' );
@@ -1223,11 +1232,11 @@ sub clearLogBuffers {
 
 sub _logMessage {
     my ( $self, $message ) = @_;
-    return
-        $self->year . ':'
-      . $self->day . ': '
-      . $self->cfg->name . ': '
-      . $message;
+    my $prefix=$self->year.': '.$self->day.': '.$self->cfg->name.': ';
+    $message = $prefix.$message;
+    $prefix .= 'cont) ';
+    $message =~ s/\n(.)/\n$prefix$1/g;
+    return $message;
 }
 
 =head2 $processor->info( $message )
@@ -1638,8 +1647,15 @@ __END__
  # =======================================================================
  # The following items may be used by the sendNotification function
  #
- # Email configuration.  Defines how messages are sent
- # 
+ # To ignore notifications altogether set to off
+
+ notifications on
+
+ # Email server configuration.  Defines how messages are sent
+ # If the server configuration is "none", or a connection to the 
+ # server cannot be established, then the notification email is sent
+ # to the logger.
+ #
  # SMTP server to use (can include :port)
  
  notification_smtp_server

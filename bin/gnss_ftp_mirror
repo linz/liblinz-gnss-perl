@@ -1192,7 +1192,7 @@ package FileConnection;
 use POSIX qw/strftime/;
 use File::Copy;
 use File::Spec;
-use Cwd;
+use Cwd qw/getcwd/;
 
 sub new
 {

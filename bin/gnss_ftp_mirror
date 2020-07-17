@@ -122,7 +122,7 @@ foreach my $mon (@months)
     push(@umonths,uc($mon));
     my $ccmon=$mon;
     substr($ccmon,0,1)=uc(substr($ccmon,0,1));
-    push(@ccmonths,uc($mon));
+    push(@ccmonths,$ccmon);
 }
 
 foreach my $mon (@fullmonths) 
@@ -130,7 +130,7 @@ foreach my $mon (@fullmonths)
     push(@ufmonths,uc($mon));
     my $ccmon=$mon;
     substr($ccmon,0,1)=uc(substr($ccmon,0,1));
-    push(@cfmonths,uc($mon));
+    push(@cfmonths,$ccmon);
 }
 
 my %patterns=(

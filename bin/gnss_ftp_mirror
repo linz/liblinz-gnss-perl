@@ -83,6 +83,7 @@ use File::Copy;
 use File::Temp qw(tempdir);
 use Time::HiRes;
 use Config::General;
+use Data::Dumper;
 use POSIX qw/strftime/;
 use LINZ::RunBatch;
 use LINZ::GNSS::Config;
@@ -179,7 +180,7 @@ sub timeToSeconds
 #=================================================================
 # Get options
 my %opts;
-getopts('Vvncis:e:p:r:',\%opts);
+getopts('gVvncis:e:p:r:',\%opts);
 
 if( $opts{c} )
 {
@@ -187,9 +188,12 @@ if( $opts{c} )
     exit();
 }
 
-my $verbose=$opts{V} ? 2 : $opts{v} ? 1 : 0;
+my $verbose=$opts{g} ? 3 : $opts{V} ? 2 : $opts{v} ? 1 : 0;
 my $listfiles=$opts{n};
 my $ignoresize=$opts{i};
+$verbose=3 if $ENV{LINZGNSS_DEBUG} eq 'debug';
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
 
 @ARGV >= 1 || die $syntax;
 
@@ -602,6 +606,7 @@ sub downloadDir
         return;
     }
     my ($dirs, $files) = $ftp->dirList();
+    print Data::Dumper->Dump([$options],['options']) if $verbose > 2;
     my @parts=@$dirparts;
     my $dirpart=shift(@parts);
 

@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.76.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Fix handling of placeholder strings in site logs
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 4 Aug 2020 9:00:00 +1200
+
 liblinz-gnss-perl (1.75.0-1) bionic; urgency=medium
 
   [Chris Crook]

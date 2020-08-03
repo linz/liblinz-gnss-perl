@@ -96,11 +96,14 @@ sub readAscii
         }
         next if $line !~ /\s*(\S.*?)?\s*\:\s*(\S.*?)?\s*$/;
         my ($key,$value)=(lc($1),$2);
-        if( $key eq '' )
+        # Placeholder values eg (A9) are ignored
+        $value='' if $key && $value =~ /^\(.*\)/;
+
+        if( $key eq '' && $lastkey )
         {
             $sections->{$section}->{$lastkey} .= "\n".$value if $lastkey;
         }
-        else
+        elsif( $key )
         {
             $key =~ s/\s*\(.*\)//g;
             $key =~ s/\s+(\w)/uc($1)/eg;
@@ -114,13 +117,13 @@ sub readAscii
             $key =~ s/^elevation$/elevation-m_ellips./;
             $key =~ s/^marker\-\>arp(Up|North|East).*$/marker-arp$1Ecc./;
             $key =~ s/^additionalInformation$/notes/;
-            $sections->{$section}->{$key}=$value;
             $lastkey=$key;
+            $sections->{$section}->{$key}=$value;
         }
     }
     foreach my $key ('1.','2.','3.1','4.1')
     {
-        croak("$filename does not appear to be a valid IGS site log\n") 
+        croak("$filename does not appear to be a valid IGS site log: missing section $key\n") 
             if ! exists $sections->{$key};
     }
     my $id=$sections->{'1.'};

@@ -374,8 +374,6 @@ if( $verbose )
     print  "S3 prefix:             $bucketprefix\n" if $bucketprefix;
     print  "Target file path:      $targetpath\n";
     print  "Marker file path:      $markerpath\n";
-    print  "Post download shell    $commandshell\n" if $commandshell;
-    print  "Post download command: $postdownloadcommand\n";
     printf "Change dir for pdc   : %s\n",$dochdir ? 'yes' : 'no';
     printf "Start date:            %04d:%03d\n",seconds_yearday($startdate);
     printf "End date:              %04d:%03d\n",seconds_yearday($enddate);
@@ -397,6 +395,8 @@ if( $verbose )
         printf "Min time since last successful run: %.1f minutes\n",$mintimesincesuccess/60;
         printf "Min time since last failed run:     %.1f minutes\n",$mintimesincefail/60;
     }
+    print  "Post download shell    $commandshell\n" if $commandshell;
+    print  "Post download command: $postdownloadcommand\n";
 }
 
 # Test status file
@@ -481,6 +481,7 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
     $p = '^'.$p.'$';
 
     my @fields=( $p =~ /\(\?\<(\w+)\>/g );
+    printf("Directory level: Re /%s/: fields %s\n",$p,join(", ",@fields)) if $verbose > 2;
     push( @dirparts, { re=>qr/$p/, fields=>\@fields });
 }
 
@@ -641,7 +642,8 @@ sub downloadDir
     {
         File::Path::make_path($localpath);
         cwd($localpath);
-    }    
+    }   
+    print Data::Dumper->Dump([$options],['options']) if $verbose > 2;     
     foreach my $file (sort keys %$files)
     {
         $expired=1;
@@ -649,6 +651,7 @@ sub downloadDir
         $expired=0;
         # Does it match the current filtered options
         my $opts=filteredOptions($options,$file,$dirpart);
+        print Data::Dumper->Dump([$file,$opts],['filename','opts']) if $verbose > 2;     
         next if ! @$opts;
 
         # Build the target name. There may be more than one filtered option

@@ -1,0 +1,219 @@
+#!/usr/bin/perl
+#
+# Script to convert a RINEX file to RINEX2, and optionally change the code.  Used to 
+# support processing if uploaded RINEX data.  
+
+use LINZ::GNSS::RinexFile;
+use Getopt::Std;
+use File::Path qw(make_path remove_tree);
+use File::Copy;
+use File::Temp;
+use File::Which;
+use IO::Uncompress::Gunzip qw(gunzip);
+use IO::Compress::Gzip qw(gzip);
+
+my $syntax=<<EOD;
+
+make_rinex2 [-r rename] input_file [output_file]
+
+Modifies the input file to RINEX 2 with the output file name.  The output
+file name can include {code} for the marker code (or {CODE} for upper case).
+The output file suffix will be used to determine compression (d=hatanaka, .gz
+means gzipped).  Requires gfzrnx, crx2rnx, rnx2crx, and gzip external software.
+
+Options:
+   -r xxxx   Renames markers.  Format xxx1:yyy1+xxx2:yyy2+ ... Renames
+             xxx1 to yyy1, xxx2 to yyy2, and so on.  Other names are left 
+             unchanged.
+   -p        Print output filename
+   -v        Verbose
+
+EOD
+
+my $crx2rnx=which 'crx2rnx' || die "Cannot find crx2rnx\n";
+my $rnx2crx=which 'rnx2crx' || die "Cannot find rnx2crx\n";
+my $gfzrnx=which 'gfzrnx' || die "Cannot find gfzrnx\n";
+
+my $opts={};
+getopts('pvkr:',$opts);
+my $renameopt=$opts->{r};
+my $printname=$opts->{p};
+my $verbose=$opts->{v};
+my $keep=$opts->{k};
+my $cleanup=$keep ? 0 : 1;
+
+die $syntax if @ARGV < 1 || @ARGV > 2;
+
+my ($inrnx,$outrnx)=@ARGV;
+$outrnx = $inrnx if ! $outrnx;
+
+print "Input file: $inrnx\n" if $verbose;
+print "Output file: $outrnx\n" if $verbose;
+print "Renames: $renameopt\n" if $verbose;
+print "Using crx2rnx: $crx2rnx\n" if $verbose;
+print "Using rnx2crx: $rnx2crx\n" if $verbose;
+print "Using gfzrnx: $gfzrnx\n" if $verbose;
+
+die "Invalid rename option $renameopt\n" if $renameopt !~ /^(\w+\:\w+(\+\w+\:\w+)*)?$/;
+my %rename;
+{
+    my @rparts=split(/\+/,$renameopt);
+    foreach my $r (@rparts)
+    {
+        my($from,$to)=split(/\:/,$r);
+        $rename{uc($from)}=uc($to);
+    }
+}
+my $append=$opts->{a};
+my $sqldb=$opts->{d};
+my $skipobs=$opts->{x};
+
+my $rnx=new LINZ::GNSS::RinexFile($inrnx,skip_obs=>1);
+my $gzipped=$rnx->gzipped ? 1 : 0;
+my $hatanaka=$rnx->hatanaka ? 1 : 0;
+my $version=$rnx->version;
+my $markname=$rnx->markname;
+my $marknum=$rnx->marknumber;
+
+my $outname=exists $rename{uc($markname)} ? $rename{uc($markname)} : $markname;
+my $outnum=exists $rename{uc($marknum)} ? $rename{uc($marknum)} : $marknum;
+my $dorename=$markname ne $outname || $marknum != $outnum;
+
+$outrnx =~ s/\{code\}/lc($outname)/eg;
+$outrnx =~ s/\{CODE\}/uc($outname)/eg;
+
+my $outversion=$version;
+$outversion=~ s/^3/2/;  # Not actual version - just changes 3 to 2.
+my $outhatanaka=$outrnx=~/d(\.gz)?$/i ? 1 : 0;
+my $outgzip=$outrnx=~/(\.gz)$/i ? 1 : 0;
+
+my $srcrnx=$inrnx;
+my $tmpdir;
+
+if( $version ne $outversion || $dorename || $hatanaka eq $outhatanaka || $gzipped eq $outgzip )
+{
+    $tmpdir=File::Temp::tempdir(CLEANUP=>$cleanup);
+    print("Temp dir: $tmpdir\n") if $verbose && ! $cleanup;
+    my $srcname=$srcrnx;
+    $srcname =~ s/.*[\\\/]//;
+    $srcrnx="$tmpdir/$srcname";
+    copy($inrnx,$srcrnx);
+
+    if( $gzipped )
+    {
+        my $target=$srcrnx;
+        if( $target =~ /.gz$/ )
+        {
+            $target =~ s/\.gz$//;
+        }
+        else
+        {
+            $srcrnx .= '.gz';
+            move($target,$srcrnx);
+        }
+        gunzip($srcrnx,$target);
+        die "gunzip failed\n" if ! -f $target;
+        $srcrnx=$target;
+    }
+    if( $hatanaka )
+    {
+        my $target;
+        if( $srcrnx =~ /\.\d\dd$/i )
+        {
+            $target = $srcrnx;
+            $target =~ s/d$/o/;
+            $target =~ s/D$/O/;
+        }
+        else
+        {
+            move($srcrnx,$srcrnx.'.crx');
+            $target=$srcrnx.'.rnx';
+            $srcrnx .= '.crx';
+        }
+        print("Running: ",join(" ",$crx2rnx,'-f',$srcrnx),"\n") if $verbose;
+        system($crx2rnx,'-f',$srcrnx);
+        die "crx2rnx failed\n" if ! -f $target;
+        unlink($srcrnx);
+        $srcrnx = $target;
+    }
+    if( $version ne $outversion )
+    { 
+        # Seems that to be safe we need to run gfzrnx in two stages, firstly make
+        # a standards compliant version 3 file, then convert to version 2.
+        # It looks like you should be able to use -vosc 2, but that just generates
+        # a version 3 file (gfzrnz 1.13)
+        move($srcrnx,$srcrnx.'.tmp');
+        print("Running: ",join(" ",$gfzrnx,'-f','-vosc','3','-finp',$srcrnx.'.tmp','-fout',$srcrnx),"\n") if $verbose;
+        system($gfzrnx,'-f','-vosc','3','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
+        die "gfzrnx failed\n" if ! -f $srcrnx;
+        unlink($srcrnx.'.tmp');
+        move($srcrnx,$srcrnx.'.tmp');
+        print("Running: ",join(" ",$gfzrnx,'-f','-vo','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx),"\n") if $verbose;
+        system($gfzrnx,'-f','-vo','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
+        die "gfzrnx failed\n" if ! -f $srcrnx;
+        unlink($srcrnx.'.tmp');
+    }
+    if( $dorename )
+    {
+        my $target=$srcrnx.'.tmp';
+        my $rnx=new LINZ::GNSS::RinexFile($srcrnx,skip_obs=>1);
+        $rnx->markname($outname);
+        $rnx->marknumber($outnum);
+        $rnx->write($target,simple_copy=>1);
+        die "Failed to update rinex name\n" if ! -f $target;
+        unlink($srcrnx);
+        move($target,$srcrnx);
+    }
+    if( $outhatanaka )
+    {
+        my $target;
+        if( $srcrnx =~ /\.\d\do$/i )
+        {
+            $target = $srcrnx;
+            $target =~ s/o$/d/;
+            $target =~ s/O$/D/;
+        }
+        else
+        {
+            move($srcrnx,$srcrnx.'.rnx');
+            $target=$srcrnx.'.crx';
+            $srcrnx .= '.rnx';
+        }
+        print("Running: ",join(" ",$rnx2crx,'-f',$srcrnx),"\n") if $verbose;
+        system($rnx2crx,'-f',$srcrnx);
+        die "rnx2crx failed\n" if ! -f $target;
+        unlink($srcrnx);
+        $srcrnx = $target;
+    }
+    if( $outgzip )
+    {
+        my $target=$srcrnx.'.gz';
+        print("Running gzip $srcrnx $target\n") if $verbose;
+        gzip($srcrnx,$target);
+        die "gzip failed\n" if ! -f $target;
+        unlink($srcrnx);
+        $srcrnx=$target;
+    }
+}
+
+if( $srcrnx ne $outrnx )
+{
+    my $outdir = $outrnx;
+    $outdir =~ s/[\\\/][^\\\/]*$//;
+    if( $outdir ne $outrnx )
+    {
+        make_path($outdir) if $outdir;
+    }
+    print("Copying $srcrnx to $outrnx\n") if $verbose;
+    if( $srcrnx eq $inrnx )
+    {
+        copy($srcrnx,$outrnx);
+    }
+    else
+    {
+        move($srcrnx,$outrnx);
+    }
+}
+
+print "$outrnx\n" if $printname;
+

@@ -290,7 +290,7 @@ else
 {
     $localsrc = $config{localbasedirectory};
     $localdir = $localsrc;
-    $localdir =~ s/^\~\//$confdir\//;
+    $localdir =~ s/^\~(\/.*)?$/$confdir$1/;
     die "LocalBaseDirectory $localsrc is not a directory\n" if ! -d $localdir;
 }
 

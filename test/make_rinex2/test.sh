@@ -20,8 +20,8 @@ gshx1500.20d.gz
 gshx1500.20o 
 gshx1500.20o.gz
 '
-#verbose=-v
-verbose=
+verbose=-v
+#verbose=
 
 for f in $files; do
     echo "Testing $f"

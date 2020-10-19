@@ -94,9 +94,6 @@ sub _loadHeader
 {
     my($self,$line) = @_;
     my $rectype=_trimsub($line,60);
-    my @obstypes=();
-    my $nobstypes=0;
-
     my $data=substr($line,0,60);
     push(@{$self->{headers}->{$rectype}},$data);
 
@@ -138,12 +135,12 @@ sub _loadHeader
         my $ntypes=substr($data,1,5);
         if( $ntypes =~ /\d/ )
         {
-            $nobstypes += $ntypes+0;
+            $self->{nobstypes} += $ntypes+0;
         }
         foreach my $nt (1..9)
         {
             my $ot=_trimsub($data,$nt*6,6);
-            push(@obstypes,$ot) if $ot ne '';
+            push(@{$self->{obstypes}},$ot) if $ot ne '';
         }
     }
     elsif( $rectype eq 'TIME OF FIRST OBS' )
@@ -164,8 +161,6 @@ sub _loadHeader
     {
         $self->{interval}=_trimsub($data)+0.0;
     }
-    $self->{nobstypes}=$nobstypes;
-    $self->{obstypes}=\@obstypes;
     $self->{marknumber} = $self->{markname} if ! exists $self->{marknumber} eq '';
     $self->{interval} = 0 if ! exists $self->{marknumber} eq '';
     return $line;
@@ -181,6 +176,8 @@ sub _scanHeader
     my $version='';
     my $hatanaka=0;
     $self->{hatanaka}=0;
+    $self->{nobstypes}=0;
+    $self->{obstypes}=[];
     $self->{headers}={};
     while(my $line=<$f>)
     {

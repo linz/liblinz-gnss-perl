@@ -143,15 +143,11 @@ if( $version ne $outversion || $dorename || $hatanaka || $outhatanaka || $gzippe
         # It looks like you should be able to use -vosc 2, but that just generates
         # a version 3 file (gfzrnz 1.13)
         move($srcrnx,$srcrnx.'.tmp');
-        print("Running: ",join(" ",$gfzrnx,'-f','-vosc','3','-finp',$srcrnx.'.tmp','-fout',$srcrnx),"\n") if $verbose;
-        system($gfzrnx,'-f','-vosc','3','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
+        print("Running: ",join(" ",$gfzrnx,'-f','-vosc','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx),"\n") if $verbose;
+        system($gfzrnx,'-f','-vo','2','-vosc','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
         die "gfzrnx failed\n" if ! -f $srcrnx;
         unlink($srcrnx.'.tmp');
         move($srcrnx,$srcrnx.'.tmp');
-        print("Running: ",join(" ",$gfzrnx,'-f','-vo','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx),"\n") if $verbose;
-        system($gfzrnx,'-f','-vo','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
-        die "gfzrnx failed\n" if ! -f $srcrnx;
-        unlink($srcrnx.'.tmp');
     }
     if( $dorename )
     {

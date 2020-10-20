@@ -1,0 +1,60 @@
+Input file: data/gsht1500.20o.gz
+Output file: out/rename/gsht1500.20o.gz/dummy/qqq11500.20d
+Renames: AAAA:BBBB+GSHT:QQQ1+CCCC:DDDD
+Using crx2rnx: /usr/bin/crx2rnx
+Using rnx2crx: /usr/bin/rnx2crx
+Using gfzrnx: /usr/bin/gfzrnx
+Input file gzipped RINEX version 3.02
+Output file hatanaka RINEX version 2
+Renaming mark name GSHT to QQQ1
+Renaming mark number GSHT to QQQ1
+Running gunzip /tmp/dummy/gsht1500.20o.gz  /tmp/dummy/gsht1500.20o
+Running: /usr/bin/gfzrnx -f -vosc 2 -vo 2 -finp /tmp/dummy/gsht1500.20o.tmp -fout /tmp/dummy/gsht1500.20o
+
+DATE/TIME           | C | EPOCH / FILE            | SITE | T | MESSAGE
+--------------------+---+-------------------------+------+---+-----------------------------------------------------------...
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | CRUX: SYS / # / OBS TYPES: obs. type C -> C1I replaced by C2I
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | CRUX: SYS / # / OBS TYPES: obs. type C -> L1I replaced by L2I
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | CRUX: SYS / # / OBS TYPES: obs. type C -> D1I replaced by D2I
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | CRUX: SYS / # / OBS TYPES: obs. type C -> S1I replaced by S2I
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: G -> >L2S< not found in used obs.types (removed)
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: G -> >L2X< not found in used obs.types (removed)
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: C -> L2I not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: C -> L7I not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: E -> L1C not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: E -> L5Q not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: E -> L7Q not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: G -> L1C not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: G -> L2W not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: G -> L5Q not found
+2020-01-02 03:04:05 | W | 0000-00-00 00:00:00.000 | GSHT | O | header SYS / PHASE SHIFT: R -> L1C not found
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C01 -> DELETE of 2844 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C03 -> DELETE of 2843 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C04 -> DELETE of 2844 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C06 -> DELETE of 1299 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C07 -> DELETE of 1791 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C08 -> DELETE of 1756 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C09 -> DELETE of 1001 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C10 -> DELETE of 1077 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C11 -> DELETE of 1003 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C12 -> DELETE of 838 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C13 -> DELETE of 1093 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C14 -> DELETE of 1178 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C16 -> DELETE of 1587 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C19 -> DELETE of 653 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C20 -> DELETE of 762 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C21 -> DELETE of 662 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C22 -> DELETE of 622 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C23 -> DELETE of 1092 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C24 -> DELETE of 1002 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C25 -> DELETE of 952 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C26 -> DELETE of 948 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C27 -> DELETE of 973 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C28 -> DELETE of 977 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C29 -> DELETE of 847 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | PRN C30 -> DELETE of 841 empty records
+2020-01-02 03:04:05 | W | 2020-05-29 23:59:30.000 | GSHT | O | split of internal header (2020-05-29 23:59:30.0000000) into 4 parts
+
+Renaming mark into file /tmp/dummy/gsht1500.20o.tmp
+Running: /usr/bin/rnx2crx -f /tmp/dummy/gsht1500.20o
+Copying /tmp/dummy/gsht1500.20d to out/rename/gsht1500.20o.gz/dummy/qqq11500.20d

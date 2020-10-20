@@ -1,0 +1,8 @@
+4-character ID          : GSHT
+Receiver type           : LEICA GR30 (# = 1706631)
+Antenna type            : LEIAS10         NONE
+Time of start of window : 2020 May 29  00:00:00.000
+Time of  end  of window : 2020 May 29  23:59:30.000
+Epochs w/ observations  :   2844
+Complete observations   :  67844
+ Deleted observations   :   1937

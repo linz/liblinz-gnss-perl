@@ -471,7 +471,7 @@ sub write
         }
         elsif( $options{simple_copy} && ! $options{session} )
         {
-            copy($fsrc,$ftgt);
+            while( my $line=<$fsrc>) { print $ftgt $line; }
         }
         else
         {

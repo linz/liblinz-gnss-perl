@@ -30,20 +30,30 @@ for f in $files; do
     mkdir -p $outdir
     outfile=$outdir/dummy/gsht1500.20o
     $script $verbose $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+    teqc +qc -s -l $outfile 2>/dev/null | grep -P '(Time of|observations|ID| type)' > $outdir/obs_summary.txt
  
     outdir=$outputdir/crx/$f
     mkdir -p $outdir
     outfile=$outdir/dummy/gsht1500.20d
     $script $verbose $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+    crx2rnx < $outfile > $outdir/rnx
+    teqc +qc -s -l $outdir/rnx 2>/dev/null | grep -P '(Time of|observations|ID| type)' > $outdir/obs_summary.txt
+    rm $outdir/rnx
 
     outdir=$outputdir/crxgz/$f
     mkdir -p $outdir
     outfile=$outdir/dummy/gsht1500.20d.gz
     $script $verbose $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+    gzip -d -c < $outfile | crx2rnx > $outdir/rnx
+    teqc +qc -s -l $outdir/rnx 2>/dev/null | grep -P '(Time of|observations|ID| type)' > $outdir/obs_summary.txt
+    rm $outdir/rnx
  
     outdir=$outputdir/rename/$f
     mkdir -p $outdir
     outfile=$outdir/dummy/qqq11500.20d
     $script $verbose -r AAAA:BBBB+GSHT:QQQ1+CCCC:DDDD $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+    crx2rnx < $outfile > $outdir/rnx
+    teqc +qc -s -l $outdir/rnx 2>/dev/null | grep -P '(Time of|observations|ID| type)' > $outdir/obs_summary.txt
+    rm $outdir/rnx
 
 done

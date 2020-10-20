@@ -1,0 +1,9 @@
+Input file: data/gshx1500.20d
+Output file: out/crx/gshx1500.20d/dummy/gsht1500.20d
+Renames: 
+Using crx2rnx: /usr/bin/crx2rnx
+Using rnx2crx: /usr/bin/rnx2crx
+Using gfzrnx: /usr/bin/gfzrnx
+Input file hatanaka RINEX version 2.11
+Output file hatanaka RINEX version 2
+Copying data/gshx1500.20d to out/crx/gshx1500.20d/dummy/gsht1500.20d

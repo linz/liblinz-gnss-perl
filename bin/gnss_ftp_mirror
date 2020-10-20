@@ -290,9 +290,13 @@ else
 {
     $localsrc = $config{localbasedirectory};
     $localdir = $localsrc;
-    $localdir =~ s/^\~\//$confdir\//;
+    $localdir =~ s/^\~(\/.*)?$/$confdir$1/;
     die "LocalBaseDirectory $localsrc is not a directory\n" if ! -d $localdir;
 }
+
+my $localpath=abs_path($localdir);
+my $startdir=getcwd;
+chdir($localpath);
 
 undef $opts{s} if $opts{s} eq 'default';
 undef $opts{e} if $opts{e} eq 'default';
@@ -406,6 +410,9 @@ my $failfile=$statusfile.'.fail' if $statusfile;
 
 if( $statusfile )
 {
+    my $statusdir=$statusfile;
+    $statusdir =~ s/[\/\/]?[^\\\/]*//;
+    File::Path::make_path($statusdir) if $statusdir ne '';
     if( (-e $successfile && $mintimesincesuccess > $SECS_PER_DAY*(-M $successfile) )
      || (-e $failfile && $mintimesincefail > $SECS_PER_DAY*(-M $failfile) ) )
     {
@@ -485,9 +492,6 @@ foreach my $p ( split(/\//,$remotedir),$remotefilere)
     push( @dirparts, { re=>qr/$p/, fields=>\@fields });
 }
 
-my $localpath=abs_path($localdir);
-my $startdir=getcwd;
-chdir($localpath);
 downloadDir( $ftp, $ftp->basedir, \@valid_dates, \@dirparts );
 $ftp->quit();
 
@@ -844,6 +848,7 @@ sub new
     $self->{remoteuri}=$config{remoteuri};
     $self->{user}=$config{remoteuser};
     $self->{password}=$config{remotepassword};
+    $self->{passive}=$config{passiveftp};
     $self->{timeout}=$config{timeout}+0 || 30;
     $self->{pause}=$config{downloadwait}+0 || 1; 
     $self->{reconnectwait}=$config{reconnectwait}+0 || 5;
@@ -862,6 +867,9 @@ sub new
     $self->{user}=$uri_user if $uri_user;
     $self->{password}=$uri_pwd if $uri_pwd;
     $self->{basedir}=$basedir;
+    $self->{passive}=$ENV{FTP_PASSIVE} if $self->{passive} eq '';
+    $self->{passive}=1 if $self->{passive} eq '';
+    $self->{passive} += 0;
 
     $self->{_ftp} = undef;
     $self->{_dir} = $basedir;
@@ -875,6 +883,7 @@ sub remoteuri { return $_[0]->{remoteuri}; }
 sub host { return $_[0]->{host}; }
 sub user { return $_[0]->{user}; }
 sub password { return $_[0]->{password}; }
+sub passive { return $_[0]->{passive}; }
 sub timeout { return $_[0]->{timeout}; }
 sub pause { return $_[0]->{pause}; }
 sub reconnectwait { return $_[0]->{reconnectwait}; }
@@ -894,7 +903,7 @@ sub ftp
     while( $trying-- )
     {
         print "Connecting to $host\n" if $self->verbose;
-        $ftp=Net::FTP->new($host, Timeout=>$self->timeout);
+        $ftp=Net::FTP->new($host, Timeout=>$self->timeout, Passive=>$self->passive );
         last if $ftp;
         Time::HiRes::usleep( $self->reconnectwait * 1000000) if $trying;
     }

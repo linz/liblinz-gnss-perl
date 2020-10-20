@@ -1,0 +1,10 @@
+Input file: data/gshx1500.20o.gz
+Output file: out/rnx/gshx1500.20o.gz/dummy/gsht1500.20o
+Renames: 
+Using crx2rnx: /usr/bin/crx2rnx
+Using rnx2crx: /usr/bin/rnx2crx
+Using gfzrnx: /usr/bin/gfzrnx
+Input file gzipped RINEX version 2.11
+Output file RINEX version 2
+Running gunzip /tmp/dummy/gshx1500.20o.gz  /tmp/dummy/gshx1500.20o
+Copying /tmp/dummy/gshx1500.20o to out/rnx/gshx1500.20o.gz/dummy/gsht1500.20o

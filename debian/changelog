@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.77.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Added support for passive FTP and default of passive in gnss_ftp_mirror
+  * Fixing handling of localbasedirectory in gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 7 Oct 2020 9:00:00 +1200
+
 liblinz-gnss-perl (1.76.0-1) bionic; urgency=medium
 
   [Chris Crook]

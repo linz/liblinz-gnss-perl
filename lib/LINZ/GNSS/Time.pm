@@ -8,8 +8,6 @@ package LINZ::GNSS::Time;
 ## Authors: Mike Moore     (Michael.Moore@ga.gov.ga)
 ##          Jeremy Palmer  (jpalmer@linz.govt.nz)
 ##
-## TODO:
-##
 ##
 ################################################################################
 

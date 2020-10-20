@@ -5,6 +5,7 @@ package LINZ::GNSS::RinexFile;
 no warnings qw/substr/;
 use File::Copy;
 use Carp;
+use PerlIO::gzip;
 use LINZ::GNSS::Time qw(ymdhms_seconds seconds_ymdhms);
 
 
@@ -35,8 +36,9 @@ If defined then only counts observations within this session
 sub new
 {
     my($class,$filename,%options) = @_;
-    open(my $f,"<$filename") || croak("Cannot open RINEX file $filename\n");
-    my $self=bless { filename=>$filename, _replace=>{}, _options=>\%options }, $class;
+    my $gzip=$filename =~ /\.gz$/;
+    my $self=bless { filename=>$filename, _replace=>{}, _options=>\%options, gzip=>$gzip }, $class;
+    my $f = $self->_open();
     eval
     {
         $self->_scanHeader($f);
@@ -50,6 +52,15 @@ sub new
     return $self;
 }
 
+sub _open()
+{
+    my ($self) = @_;
+    my $filename = $self->{filename};
+    my $gzip = $self->{gzip};
+    my $mode = $gzip ? "<:gzip" : "<";
+    open(my $f,$mode,$filename) || croak("Cannot open RINEX file $filename\n");
+    return $f;
+}
 
 sub _trimsub
 {
@@ -83,9 +94,6 @@ sub _loadHeader
 {
     my($self,$line) = @_;
     my $rectype=_trimsub($line,60);
-    my @obstypes=();
-    my $nobstypes=0;
-
     my $data=substr($line,0,60);
     push(@{$self->{headers}->{$rectype}},$data);
 
@@ -124,11 +132,10 @@ sub _loadHeader
     }
     elsif($rectype eq '# / TYPES OF OBSERV')
     {
-        my $ntypes=substr($data,0,6);
+        my $ntypes=substr($data,1,5);
         if( $ntypes =~ /\d/ )
         {
-            $self->{nobstypes} = $ntypes+0;
-            $self->{obstypes}=[];
+            $self->{nobstypes} += $ntypes+0;
         }
         foreach my $nt (1..9)
         {
@@ -169,6 +176,8 @@ sub _scanHeader
     my $version='';
     my $hatanaka=0;
     $self->{hatanaka}=0;
+    $self->{nobstypes}=0;
+    $self->{obstypes}=[];
     $self->{headers}={};
     while(my $line=<$f>)
     {
@@ -383,6 +392,8 @@ sub xyz  { return $_[0]->{xyz}; }
 sub delta_hen  { return $_[0]->{delta_hen}; }
 sub nobs { return $_[0]->{nobs}; }
 sub headers { return $_[0]->{headers}; }
+sub gzipped { return $_[0]->{gzip}; }
+sub hatanaka { return $_[0]->{hatanaka}; }
 
 # Get/set writeable fields.  Use a mapping of values to ensure that only 
 # replace one value (eg if multiple marker names in RINEX file
@@ -422,6 +433,9 @@ The header will not be copied
 =item skip_obs=1
 The observations will not be copied
 
+=item simple_copy=1
+Copies the observations without processing at all
+
 =item session=[start,end]
 Only observations from the session will be copied
 
@@ -434,8 +448,7 @@ sub write
     my ($self,$filename,%options) = @_;
     my $srcfile=$self->filename;
     my $options=$self->{_options};
-    open( my $fsrc, "<$srcfile" ) || croak("Cannot reopen $srcfile\n");
-
+    my $fsrc = $self->_open();
     my $tgtfile=$filename;
     my $ftgt;
     my $close=0;
@@ -452,7 +465,18 @@ sub write
     eval
     {
         $self->_scanHeader($fsrc,$options{skip_header} ? '' : $ftgt);
-        $self->_scanObs($fsrc,$options{session},$ftgt,1) if ! $options{skip_obs};
+        if( $options{skip_obs})
+        {
+            # Do nothing
+        }
+        elsif( $options{simple_copy} && ! $options{session} )
+        {
+            while( my $line=<$fsrc>) { print $ftgt $line; }
+        }
+        else
+        {
+            $self->_scanObs($fsrc,$options{session},$ftgt,1);
+        }
     };
     if( $@ )
     {

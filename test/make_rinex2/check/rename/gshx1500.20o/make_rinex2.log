@@ -1,0 +1,13 @@
+Input file: data/gshx1500.20o
+Output file: out/rename/gshx1500.20o/dummy/qqq11500.20d
+Renames: AAAA:BBBB+GSHT:QQQ1+CCCC:DDDD
+Using crx2rnx: /usr/bin/crx2rnx
+Using rnx2crx: /usr/bin/rnx2crx
+Using gfzrnx: /usr/bin/gfzrnx
+Input file RINEX version 2.11
+Output file hatanaka RINEX version 2
+Renaming mark name GSHT to QQQ1
+Renaming mark number GSHT to QQQ1
+Renaming mark into file /tmp/dummy/gshx1500.20o.tmp
+Running: /usr/bin/rnx2crx -f /tmp/dummy/gshx1500.20o
+Copying /tmp/dummy/gshx1500.20d to out/rename/gshx1500.20o/dummy/qqq11500.20d

@@ -87,12 +87,12 @@ $outversion=~ s/^3/2/;  # Not actual version - just changes 3 to 2.
 my $outhatanaka=$outrnx=~/d(\.gz)?$/i ? 1 : 0;
 my $outgzip=$outrnx=~/(\.gz)$/i ? 1 : 0;
 
-printf("Input file %s%sRINEX version %s\n",$gzipped ? 'gzipped ' : '',$hatanaka ? 'hatanaka ' : '',$version);
-printf("Output file %s%sRINEX version 2\n",$outgzip ? 'gzipped ' : '',$outhatanaka ? 'hatanaka ' : '');
+printf("Input file %s%sRINEX version %s\n",$gzipped ? 'gzipped ' : '',$hatanaka ? 'hatanaka ' : '',$version) if $verbose;
+printf("Output file %s%sRINEX version 2\n",$outgzip ? 'gzipped ' : '',$outhatanaka ? 'hatanaka ' : '') if $verbose;
 if( $dorename )
 {
-    printf("Renaming mark name %s to %s\n",$markname,$outname);
-    printf("Renaming mark number %s to %s\n",$marknum,$outnum);
+    printf("Renaming mark name %s to %s\n",$markname,$outname) if $verbose;
+    printf("Renaming mark number %s to %s\n",$marknum,$outnum) if $verbose;
 }
 
 my $srcrnx=$inrnx;
@@ -224,4 +224,5 @@ if( $srcrnx ne $outrnx )
 }
 
 print "$outrnx\n" if $printname;
+exit(-f $outrnx ? 0 : 1);
 

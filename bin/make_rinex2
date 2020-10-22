@@ -81,6 +81,8 @@ my $dorename=$markname ne $outname || $marknum != $outnum;
 
 $outrnx =~ s/\{code\}/lc($outname)/eg;
 $outrnx =~ s/\{CODE\}/uc($outname)/eg;
+$outrnx =~ s/\[code\]/lc($outname)/eg;
+$outrnx =~ s/\[CODE\]/uc($outname)/eg;
 
 my $outversion=$version;
 $outversion=~ s/^3/2/;  # Not actual version - just changes 3 to 2.

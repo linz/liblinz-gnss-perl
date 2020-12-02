@@ -760,7 +760,7 @@ sub downloadDir
             {
                 my $cwd=getcwd;
                 chdir($tgtpath) if $dochdir;
-                print "Running postdownload script with $commandshell" if $verbose;
+                print "Running postdownload script with $commandshell\n" if $verbose;
                 print "Script:\n$command\n" if $verbose > 1;
                 eval
                 {

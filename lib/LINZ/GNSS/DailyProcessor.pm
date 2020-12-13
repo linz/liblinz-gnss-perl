@@ -530,19 +530,18 @@ sub installPcfCampaignFiles {
 
     my $tmpdir;
     eval {
-        if ( $self->bucket ) {
-            foreach my $cfdef ( split( /\n/, $campfiles ) ) {
-                next if $cfdef =~ /^\s*$/;
-                $cfdef =~ /^\s*([A-Z]+(?:\s+uncompress)?\s+)(.*?)\s*$/;
-                my $prefix    = $1;
-                my $filenames = $2;
-                die "Invalid campaign file definition $cfdef\n" if ! $prefix;
+        foreach my $cfdef ( split( /\n/, $campfiles ) ) {
+            next if $cfdef =~ /^\s*$/;
+            $cfdef =~ /^\s*([A-Z]+(?:\s+uncompress)?\s+)(.*?)\s*$/;
+            my $prefix    = $1;
+            my $filenames = $2;
+            die "Invalid campaign file definition $cfdef\n" if ! $prefix;
 
-                # If the filename is not in
-                foreach my $filename ( split( ' ', $filenames ) ) {
-                    if (   $filename !~ /^\~\//
-                        && $filename !~ /[\?\*]/
-                        && !-e $filename )
+            # If the filename is not in
+            foreach my $filename ( split( ' ', $filenames ) ) {
+                if (   $filename !~ /^\~\// && ! -e $filename )
+                {
+                    if( $filename  !~ /[\?\*]/ && $self->bucket )
                     {
                         $tmpdir = File::Temp->newdir();
                         my $tmpfile = $filename;
@@ -553,12 +552,13 @@ sub installPcfCampaignFiles {
                         }
                         $filename = $tmpfile;
                     }
-                    push( @filespecs, $prefix . $filename );
+                    else
+                    {
+                        $filename=$self->basedir.'/'.$filename;
+                    }
                 }
+                push( @filespecs, $prefix . $filename );
             }
-        }
-        else {
-            @filespecs = split( /\n/, $campfiles );
         }
         LINZ::BERN::BernUtil::InstallCampaignFiles( $campaign, \@filespecs,
             SourceDirectory => $srcdir );

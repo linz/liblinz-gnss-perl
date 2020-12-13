@@ -81,18 +81,20 @@ my $dorename=$markname ne $outname || $marknum != $outnum;
 
 $outrnx =~ s/\{code\}/lc($outname)/eg;
 $outrnx =~ s/\{CODE\}/uc($outname)/eg;
+$outrnx =~ s/\[code\]/lc($outname)/eg;
+$outrnx =~ s/\[CODE\]/uc($outname)/eg;
 
 my $outversion=$version;
 $outversion=~ s/^3/2/;  # Not actual version - just changes 3 to 2.
 my $outhatanaka=$outrnx=~/d(\.gz)?$/i ? 1 : 0;
 my $outgzip=$outrnx=~/(\.gz)$/i ? 1 : 0;
 
-printf("Input file %s%sRINEX version %s\n",$gzipped ? 'gzipped ' : '',$hatanaka ? 'hatanaka ' : '',$version);
-printf("Output file %s%sRINEX version 2\n",$outgzip ? 'gzipped ' : '',$outhatanaka ? 'hatanaka ' : '');
+printf("Input file %s%sRINEX version %s\n",$gzipped ? 'gzipped ' : '',$hatanaka ? 'hatanaka ' : '',$version) if $verbose;
+printf("Output file %s%sRINEX version 2\n",$outgzip ? 'gzipped ' : '',$outhatanaka ? 'hatanaka ' : '') if $verbose;
 if( $dorename )
 {
-    printf("Renaming mark name %s to %s\n",$markname,$outname);
-    printf("Renaming mark number %s to %s\n",$marknum,$outnum);
+    printf("Renaming mark name %s to %s\n",$markname,$outname) if $verbose;
+    printf("Renaming mark number %s to %s\n",$marknum,$outnum) if $verbose;
 }
 
 my $srcrnx=$inrnx;
@@ -148,12 +150,9 @@ if( $dorename || $version ne $outversion || $hatanaka ne $outhatanaka || $gzippe
     }
     if( $version ne $outversion )
     { 
-        # Seems that to be safe we need to run gfzrnx in two stages, firstly make
-        # a standards compliant version 3 file, then convert to version 2.
-        # It looks like you should be able to use -vosc 2, but that just generates
-        # a version 3 file (gfzrnz 1.13)
+        # Convert RINEX3 to RINEX2.  Also resample down to 30 seconds...
         move($srcrnx,$srcrnx.'.tmp');
-        my @command=($gfzrnx,'-f','-vosc','2','-vo','2','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
+        my @command=($gfzrnx,'-q','-f','-vosc','2','-vo','2','-smp','30','-finp',$srcrnx.'.tmp','-fout',$srcrnx);
         print("Running: ",join(" ",@command),"\n") if $verbose;
         system(@command);
         die "gfzrnx failed\n" if ! -f $srcrnx;
@@ -224,4 +223,5 @@ if( $srcrnx ne $outrnx )
 }
 
 print "$outrnx\n" if $printname;
+exit(-f $outrnx ? 0 : 1);
 

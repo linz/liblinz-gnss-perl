@@ -24,6 +24,7 @@ verbose=-v
 #verbose=
 
 for f in $files; do
+break
     echo "Testing $f"
 
     outdir=$outputdir/rnx/$f
@@ -58,8 +59,29 @@ for f in $files; do
 
 done
 
+f=gshx1500.20o 
+outdir=$outputdir/rename/subcode
+mkdir -p $outdir
+outfile=$outdir/dummy/{code}1500.20d
+outfile2=$outdir/dummy/qqq11500.20d
+$script -p -r AAAA:BBBB+GSHT:QQQ1+CCCC:DDDD $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+crx2rnx < $outfile2 > $outdir/rnx
+teqc +qc -s -l $outdir/rnx 2>/dev/null | grep -P '(Time of|observations|ID| type)' >> $outdir/obs_summary.txt
+rm $outdir/rnx
+
+f=gshx1500.20o 
+outdir=$outputdir/rename/subcode2
+mkdir -p $outdir
+outfile=$outdir/dummy/[CODE]1500.20d
+outfile2=$outdir/dummy/QQQ11500.20d
+$script -p -r AAAA:BBBB+GSHT:QQQ1+CCCC:DDDD $datadir/$f $outfile > $outdir/make_rinex2.log 2>&1
+crx2rnx < $outfile2 > $outdir/rnx
+teqc +qc -s -l $outdir/rnx 2>/dev/null | grep -P '(Time of|observations|ID| type)' >> $outdir/obs_summary.txt
+rm $outdir/rnx
+
+
 rm -rf out/*/*/dummy
-for f in `find out -name make_rinex.log`; do
+for f in `find out -name make_rinex2.log`; do
     perl clean.pl $f
 done
 if diff -q -r out/ check/; then

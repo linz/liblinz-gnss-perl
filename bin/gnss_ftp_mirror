@@ -138,6 +138,7 @@ my %patterns=(
     'yyyy' => '\d\d\d\d',
     'yyyy1' => '\d\d\d\d',
     'yy' =>   '\d\d',
+    'yy1' => '\d\d',
     'hh' =>   '([01]\d|2[0-3])',
     'h' => '[a-x]',
     'H' => '[A-X]',
@@ -465,6 +466,7 @@ for( my $i = $startdate; $i <= $enddate; $i += $SECS_PER_DAY )
     ($yy,$mm,$dd)=(seconds_ymdhms($i+$SECS_PER_DAY));
     ($yy2,$skip,$ddd)=(time_elements($i+$SECS_PER_DAY));
     $filter->{yyyy1}=sprintf("%04d",$yy);
+    $filter->{yy1}=sprintf("%02d",$yy%100);
     $filter->{ddd1}=sprintf("%03d",$ddd);
     push(@valid_dates,$filter);
 }

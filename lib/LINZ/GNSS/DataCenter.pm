@@ -210,12 +210,21 @@ sub new
     my $scratchdir=$LINZ::GNSS::DataCenter::scratchdir."/gnss_gdt_$id"."_".$$;
 
     # Process the object
-    $uri = ExpandEnv($uri,"for datacenter $name");
+    my $host='';
+    $self->{id}=$id;
+    $self->{name}=$name;
+    $self->{filetypes}=$filetypes;
+    $self->{stncodes}=$stncodes;
+    $self->{excludestations}=$excludestations;
+    $self->{allstations}=$allstations;
+    $self->{priority}=$priority;
+    $self->{scratchdir}=$scratchdir;
+    $self->{uri}=$uri;
+
     # Crude handling for S3 urls
     my $testuri=$uri;
     $testuri =~ s/^s3\:/ftp:/;
     my $uriobj=URI->new($testuri);
-    my $host='';
     my ($user,$pwd);
     if( $scheme ne 'file' )
     {
@@ -237,15 +246,6 @@ sub new
         ($user,$pwd)=$self->_readCredentials($credfile);
     }
 
-    $self->{id}=$id;
-    $self->{name}=$name;
-    $self->{filetypes}=$filetypes;
-    $self->{stncodes}=$stncodes;
-    $self->{excludestations}=$excludestations;
-    $self->{allstations}=$allstations;
-    $self->{priority}=$priority;
-    $self->{scratchdir}=$scratchdir;
-    $self->{uri}=$uri;
     $self->{scheme}=$scheme;
     $self->{host}=$host;
     $self->{basepath}=$uriobj->path;

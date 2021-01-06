@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.79.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Improved handling of +/- 1 day date offsets in gnss_ftp_mirror
+  * Fix location of GNSS archive credentials
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 6 Jan 2021 12:00:00 +1200
+
 liblinz-gnss-perl (1.78.0-1) bionic; urgency=medium
 
   [Chris Crook]

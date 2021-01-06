@@ -1,7 +1,7 @@
 =head1 LINZ::GNSS::AwsS3Bucket
 
 Crude module to interface applications to an Amazon web services S3 bucket.
-It is crude because this implementation simply runs the aws cliend program for 
+It is crude because this implementation simply runs the aws client program for 
 all its operations.  This is inefficient, but does work!
 
 Note that this was initially tried with Net::Amazon::S3 module (version 0.80), but
@@ -151,8 +151,8 @@ sub _runAws
         my $secret_access_key=$self->{secret_access_key};
         if( $access_key_id && $secret_access_key )
         {
-            $ENV{$idenv}=$access_key_id if $access_key_id;
-            $ENV{$keyenv}=$secret_access_key if $secret_access_key;
+            $ENV{$idenv}=$access_key_id;
+            $ENV{$keyenv}=$secret_access_key;
         }
         foreach my $k (sort keys %ENV)
         {

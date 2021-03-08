@@ -4,10 +4,12 @@ use strict;
 package LINZ::GNSS::DataCenter::Http;
 use base "LINZ::GNSS::DataCenter";
 use fields qw (
+    cookies
     );
 
 use LWP::UserAgent;
 use HTTP::Request;
+use HTTP::Cookies;
 use MIME::Base64;
 use Carp;
 
@@ -16,6 +18,7 @@ sub new
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
+    $self->{cookies}=HTTP::Cookies->new();
     return $self;
 }
 
@@ -27,6 +30,7 @@ sub getfile
     my ($user,$pwd)=$self->credentials;
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
+    $ua->cookie_jar($self->{cookies});
     my %headers=();
     if( $user )
     {

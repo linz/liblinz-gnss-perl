@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.80.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Update HTTP DataCenter handler to include cookies (for eg CDDIS login)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 8 Mar 2021 12:00:00 +1200
+
 liblinz-gnss-perl (1.79.0-1) bionic; urgency=medium
 
   [Chris Crook]

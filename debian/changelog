@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.81.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Added handling of log dir/file to easy_init with LINZGNSS_DEBUG
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 27 May 2021 12:00:00 +1200
+
 liblinz-gnss-perl (1.80.0-1) bionic; urgency=medium
 
   [Chris Crook]

@@ -213,7 +213,12 @@ sub LoadConfig
             my $level=$DEBUG;
             $level=$WARN if lc($debug) eq 'warn';
             $level=$INFO if lc($debug) eq 'info';
-            Log::Log4perl->easy_init( $level );
+            my $logfile=$ENV{LINZGNSS_LOG_FILE};
+            if( ! $logfile && $ENV{LINZGNSS_LOG_DIR} )
+            {
+                $logfile=$ENV{LINZGNSS_LOG_DIR}.'/linzgnss.log';
+            }
+            Log::Log4perl->easy_init( level=>$level, file=>">>$logfile" );
         }
         elsif( exists $config->{logsettings} )
         {

@@ -104,6 +104,7 @@ Options are:
    -p ##         Reset pause between downloads
    -r ###        Maximum run time in minutes
    -i            Ignore file size - download all matching files
+   -f            Ignore recent downloads - download anyway
    -c            Print an example configuration file
 
 EOD
@@ -178,7 +179,7 @@ sub timeToSeconds
 #=================================================================
 # Get options
 my %opts;
-getopts('gVvncis:e:p:r:',\%opts);
+getopts('gVvfncis:e:p:r:',\%opts);
 
 if( $opts{c} )
 {
@@ -189,6 +190,7 @@ if( $opts{c} )
 my $verbose=$opts{g} ? 3 : $opts{V} ? 2 : $opts{v} ? 1 : 0;
 my $listfiles=$opts{n};
 my $ignoresize=$opts{i};
+my $forcedownload=$opts{f};
 $verbose=3 if $ENV{LINZGNSS_DEBUG} eq 'debug';
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
@@ -348,13 +350,17 @@ if( $mintimesincerun )
 
 my $ftp;
 my $remoteuri=$config{remoteuri};
-if( $remoteuri =~ /^smb:/ )
+if( $remoteuri =~ /^smb\:/ )
 {
     $ftp=new SmbConnection( %config );
 }
-elsif( $remoteuri =~ /^file:/ )
+elsif( $remoteuri =~ /^file\:/ )
 {
     $ftp=new FileConnection(%config);
+}
+elsif( $remoteuri =~ /^https?\:/ )
+{
+    $ftp=new HttpConnection(%config);
 }
 else
 {
@@ -409,14 +415,17 @@ my $failfile=$statusfile.'.fail' if $statusfile;
 if( $statusfile )
 {
     my $statusdir=$statusfile;
-    $statusdir =~ s/[\/\/]?[^\\\/]*//;
+    $statusdir =~ s/[\\\/][^\\\/]*//;
     File::Path::make_path($statusdir) if $statusdir ne '';
     if( (-e $successfile && $mintimesincesuccess > $SECS_PER_DAY*(-M $successfile) )
      || (-e $failfile && $mintimesincefail > $SECS_PER_DAY*(-M $failfile) ) )
     {
-        if( $verbose )
+        if( ! $forcedownload )
         {
-            print "Skipping download as already done recently\n";
+            if( $verbose )
+            {
+                print "Skipping download as already done recently\n";
+            }
             exit;
         }
     }
@@ -1019,6 +1028,193 @@ sub parseDir
     return $dirs,$files;
 }
 
+
+#========================================================================
+
+package HttpConnection;
+
+use strict;
+use Getopt::Std;
+use LWP::UserAgent;
+use HTTP::Request;
+use HTTP::Cookies;
+use MIME::Base64;
+use Carp;
+
+sub new
+{
+    my ($class, %config) = @_;
+
+    my $self={};
+    $self->{verbose}=$config{verbose};
+    $self->{remoteuri}=$config{remoteuri};
+    $self->{dirurl}=$config{directorylisturl};
+    $self->{dirre}=$config{directorylistre};
+    $self->{fileurl}=$config{filelisturl};
+    $self->{filere}=$config{filelistre};
+    $self->{user}=$config{remoteuser};
+    $self->{password}=$config{remotepassword};
+    $self->{timeout}=$config{timeout}+0 || 30;
+
+    die "FileListUrl must be defined in configuration\n" if ! $self->{fileurl};
+    die "FileListRe must be defined in configuration\n" if ! $self->{filere};
+
+    my $remoteuri=$self->{remoteuri};
+    my $uri=URI->new($remoteuri);
+    die "$remoteuri is not a valid HTTP URI.\nMust be an http(s):// URI" if $uri->scheme !~ /^https?/;
+
+    my $scheme=$uri->scheme;
+    my $host=$uri->host;
+    my $basedir=$uri->path;
+    my ($uri_user,$uri_pwd) = split(/\:/,$uri->userinfo,2);
+
+    $self->{scheme}=$scheme;
+    $self->{host}=$host;
+    $self->{user}=$uri_user if $uri_user;
+    $self->{password}=$uri_pwd if $uri_pwd;
+    $self->{basedir}=$basedir;
+    $self->{baseurl}="$scheme://$host";
+
+    $self->{_dir} = $basedir;
+    $self->{_ndownload} = 0;
+
+    return $self=bless $self, $class;
+}
+
+sub verbose { return $_[0]->{verbose}; }
+sub remoteuri { return $_[0]->{remoteuri}; }
+sub host { return $_[0]->{host}; }
+sub user { return $_[0]->{user}; }
+sub password { return $_[0]->{password}; }
+sub passive { return $_[0]->{passive}; }
+sub timeout { return $_[0]->{timeout}; }
+sub pause { return $_[0]->{pause}; }
+sub reconnectwait { return $_[0]->{reconnectwait}; }
+sub maxreconnect { return $_[0]->{maxreconnect}; }
+sub maxdownloads { return $_[0]->{maxdownloads}; }
+sub basedir { return $_[0]->{basedir}; }
+
+sub getUserAgent
+{
+    my($self) = @_;
+    if( ! $self->{useragent} )
+    {
+        my $cookies=HTTP::Cookies->new();
+        my $ua=new LWP::UserAgent;
+        $ua->env_proxy;
+        $ua->cookie_jar($cookies);
+        $ua->timeout($self->{timeout});
+        $self->{useragent}=$ua;
+    }
+    return $self->{useragent};
+}
+
+sub getUrlContent
+{
+    my($self,$url)=@_;
+    $url=$self->{baseurl}.$url;
+    print("Fetching content from $url\n") if $self->{verbose} > 1;
+
+    if( $url ne $self->{cachedurl})
+    {
+        my $user=$self->{user};
+        my $pwd=$self->{password};
+        my $ua=$self->getUserAgent();
+        my %headers=();
+        if( $user )
+        {
+            $headers{Authorization}="Basic ".encode_base64("$user:$pwd");
+        }
+        my $response=$ua->get($url,%headers);
+        if( $response->code ne '200' )
+        {
+            die "Cannot retrieve $url: ".$response->message."\n";
+        }
+        my $content=$response->content;
+        if( ! $content )
+        {
+            die "Cannot retrieve $url: No data\n";
+        }
+        $self->{cachedurl}=$url;
+        $self->{cachedcontent}=$content;
+    }
+    return $self->{cachedcontent};
+}
+
+sub quit
+{
+}
+
+sub reconnect
+{
+}
+
+sub run
+{
+}
+
+sub cwd
+{
+    my( $self, $dir) = @_;
+    $self->{_dir} = $dir;
+}
+
+sub dirList
+{
+    my ($self) = @_;
+    print("Fetching directory $self->{_dir}\n") if $self->{verbose} > 1;
+    my $curdir=$self->{_dir};
+    my $dirs=[];
+    my $files={};
+    my $dirurl=$self->{dirurl};
+    if( $dirurl )
+    {
+        $dirurl =~ s/\{curdir\}/$curdir/eg;
+        my $dirre=$self->{dirre};
+        my $dirlist=$self->getUrlContent($dirurl);
+        while( $dirlist =~ /$dirre/mg )
+        {
+            my $name=$+{dirname};
+            push(@$dirs,$name) if $name;
+        }
+    }
+    my $fileurl=$self->{fileurl};
+    $fileurl =~ s/\{curdir\}/$curdir/eg;
+    my $filere=$self->{filere};
+    my $filelist=$self->getUrlContent($fileurl);
+    while( $filelist =~ /$filere/mg )
+    {
+        my $name=$+{filename};
+        my $size=$+{filesize};
+        my $datestr=$+{filedate};
+        my $dirline="$name $size $datestr";
+        $files->{$name}={size=>$size,dir=>$dirline};
+    }
+    return $dirs,$files;
+}
+
+sub get
+{
+    my ($self,$file,$target) = @_;
+    my $success=0;
+    eval
+    {
+        my $fileurl=$self->{_dir}.'/'.$file;
+        my $data=$self->getUrlContent($fileurl);
+        open(my $fh,">$target") || die "Cannot open $target";
+        binmode($fh);
+        print $fh $data;
+        close($fh);
+        $success=1;
+    };
+    if( $@ )
+    {
+        print "** Download of $file failed\n".$@."\n" if $verbose;      
+    }
+    return $success;
+}
+
+
 #========================================================================
 
 package SmbConnection;
@@ -1333,6 +1529,20 @@ __END__
  RemotePassword=positionz@linz.govt.nz
  
  TimeOut 30
+
+ # If this is an http or https url then it needs configuration defining how to retrieve 
+ # and parse directory and file lists.  The URLs are relative to the base RemoteUri and
+ # should include the string {curdir} which will be replaced with the current "directory"
+ # being listed. The DirectoryListRe is a regular expression which must include a capture
+ # group (?<dirname>...).  The FileListRe is a regular expression that must include  
+ # a (?<filename>...) capture group.  Ideally it will also include filesize and filedata
+ # capture groups.  Typically the regular expressions will match a line in the content
+ # returned by the url, ie something like "^...(?<dirname>...)....$".
+
+ DirectoryListUrl
+ DirectoryListRe
+ FileListUrl
+ FileListRe
  
  # Delay in seconds added after each successful download to be polite to server
  

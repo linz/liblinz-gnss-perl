@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.82.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Added handling http(s) to gnss_ftp_mirror
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 1 Jun 2021 13:00:00 +1200
+
 liblinz-gnss-perl (1.81.0-1) bionic; urgency=medium
 
   [Chris Crook]

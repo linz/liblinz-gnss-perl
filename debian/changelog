@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.83.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Added option to zip up dump directory (pcf_copy_dir/pcf_fail_copy_dir = zip:zip_file_name)
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 13 July 2021 13:00:00 +1200
+
 liblinz-gnss-perl (1.82.0-1) bionic; urgency=medium
 
   [Chris Crook]

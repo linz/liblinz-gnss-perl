@@ -10,7 +10,7 @@ use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
-getopts('hHcCfFs:e:d:t:T:m:',\%opts);
+getopts('ghHcCfFs:e:d:t:T:m:',\%opts);
 
 if( $opts{c} || $opts{C} )
 {
@@ -38,6 +38,7 @@ Options can include
    -s yyyy-ddd Start date
    -e yyyy-ddd End date
    -d yyyy-ddd Just run one day
+   -g          Zip bernese campaign files into output directory
    -t yyyy-ddd Test specific day - outputs to current directory, outputs debug info
    -T dir      Test target directory - also copies bernese processing directory to dir/bernese
    -m #        Maximum number of days to process
@@ -93,8 +94,8 @@ push(@params,'target_directory='.$targetdir) if $targetdir;
 push(@params,'base_directory=') if $targetdir;
 push(@params,'logsettings=debug') if $opts{t};
 push(@params,'rerun=1') if $opts{t};
-push(@params,'pcf_copy_dir=bernese') if $opts{T};
-push(@params,'pcf_fail_copy_dir=bernese') if $opts{T};
+push(@params,'pcf_copy_dir=zip:bernese/campaign.zip') if $opts{T} || $opts{g};
+push(@params,'pcf_fail_copy_dir=zip:bernese/campaign.zip') if $opts{T} || $opts{g};
 push(@params,'max_days_processed_per_run='.$opts{m}) if $opts{m};
 
 eval

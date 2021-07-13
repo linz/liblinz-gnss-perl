@@ -474,10 +474,32 @@ sub runBernesePcf {
         my $copyfiles = $self->get( 'pcf' . $fail . '_save_files', '' );
 
         if ($copydir) {
+            my $zipfiles=$copydir =~ s/^zip\://;
             my $copytarget = $targetdir . '/' . $copydir;
             my $copysource = $campdir;
-            if ( !File::Copy::Recursive::dircopy( $copysource, $copytarget ) ) {
-                $self->error("Failed to copy $copysource to $copytarget");
+            if( $zipfiles )
+            {
+                eval 
+                {
+                    my $zipdir=$copytarget;
+                    $zipdir =~ s/.*[\\\/]//;
+                    $self->makePath($zipdir) || die "Cannot create zip file directory $zipdir\n";
+                    my $archive=Archive::Zip->new();
+                    $archive->addTree($copysource,'CAMP');
+                    $archive->writeToFileNamed($copytarget) == AZ_OK || die "Failed to write zip file $copydir\n";
+
+                };
+                if( $@ )
+                {
+                    $self->error("Failed to zip $copysource to $copytarget: $@")
+                }
+
+            }
+            else
+            {
+                if ( !File::Copy::Recursive::dircopy( $copysource, $copytarget ) ) {
+                    $self->error("Failed to copy $copysource to $copytarget");
+                }
             }
         }
 
@@ -1584,9 +1606,11 @@ __END__
  pcf_save_files   BPE/PNZDAILY.OUT
  pcf_fail_save_files
 
- # Directory into which to copy Bernese campaign files if the PCF fails.
+ # Directory into which to copy Bernese campaign files if the PCF succeeds and 
+ # if it fails.  The filename may be prefixed with zip: in which case the 
+ # campaign directory is zipped into a file (eg zip:debug/campaign.zip)
  # (Note: this is relative to the target directory for the daily process.
- # Files are not copied if this is not saved).
+ # Files are not copied if this is not saved).  
 
  pcf_copy_dir
  pcf_fail_copy_dir fail_data

@@ -161,10 +161,10 @@ sub new
         $retention=$expires if $expires && $expires < $retention;
     }
 
-    my $compression=$cfgft->{compression} || $default->{compression} || '';
+    my $compression=$cfgft->{compression} || $default->{compression} || 'auto';
     $compression=lc($compression);
     croak "Invalid compression $compression for $type:$subtype" if
-        $compression !~ /^(none|hatanaka|compress|gzip|hatanaka\+(compress|gzip))?$/;
+        $compression !~ /^(auto|none|hatanaka|compress|gzip|hatanaka\+(compress|gzip))$/;
 
     my $supplyfreq=lc($cfgft->{supply_frequency}) || $default->{supply_frequency}
           || $frequency;
@@ -477,8 +477,10 @@ sub _filespec
 {
     my($self,$jobid,$tc,$stn,$stncodes) =@_;
 
-    my $path=$self->_expandName($self->path,$jobid,$tc,$stn,$stncodes);
-    my $filename=$self->_expandName($self->filename,$jobid,$tc,$stn,$stncodes);
+    my $expandfunc=sub { return $self->_expandName($_[0],$jobid,$tc,$stn,$stncodes)};
+
+    my $path=$expandfunc->($self->path);
+    my $filename=$expandfunc->($self->filename);
 
     my $spec = new LINZ::GNSS::FileSpec(
         path=>$path,
@@ -489,6 +491,7 @@ sub _filespec
         station=>$stn,
         jobid=>$jobid,
         timestamp=>$tc->{timestamp},
+        expandfunc=>$expandfunc,
     );
     return $spec;
 }

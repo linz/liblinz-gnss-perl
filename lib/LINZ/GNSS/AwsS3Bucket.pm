@@ -25,9 +25,10 @@ use POSIX qw(strftime);
 use Time::Local;
 use Date::Parse;
 use Log::Log4perl;
+use File::Which;
 use Carp qw(croak);
 
-our $default_awsbin='/usr/bin/aws';
+our $default_awsbin=which('aws') || '/usr/bin/aws';
 our $idenv='AWS_ACCESS_KEY_ID';
 our $keyenv='AWS_SECRET_ACCESS_KEY';
 
@@ -123,7 +124,7 @@ sub debug
     $self->logger->debug($errmsg); 
 }
 
-=head2 $processor->_runAws($command,$subcommand,@params)
+=head2 $bucket->_runAws($command,$subcommand,@params)
 
 Runs an AWS command 
 
@@ -177,7 +178,7 @@ sub _runAws
     return wantarray ? ($ok,$out,$err) : $ok;
 }
 
-=head2 $processor->fileKey($file)
+=head2 $bucket->fileKey($file)
 
 Get the key used to identify a file in S3
 
@@ -191,7 +192,7 @@ sub fileKey
     return $key;
 }
 
-=head2 $processor->fileUrl($file)
+=head2 $bucket->fileUrl($file)
 
 Get the url used to identify a file in S3
 
@@ -206,7 +207,7 @@ sub fileUrl
     return $s3url;
 }
 
-=head2 $processor->putFile($sourcefile,$file)
+=head2 $bucket->putFile($sourcefile,$file)
 
 Copy a file to the S3 bucket store for the process. Also adds
 metadata for file modification date
@@ -230,7 +231,7 @@ sub putFile
 }
 
 
-=head2 $processor->putDir($sourcedir,$dir)
+=head2 $bucket->putDir($sourcedir,$dir)
 
 Recursively copy a directory contents to the bucket.  (Note 
 this does not include modification time metadata)
@@ -252,7 +253,7 @@ sub putDir
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
-=head2 $processor->getFile($name,$targetfile)
+=head2 $bucket->getFile($name,$targetfile)
 
 Copy a file to the S3 bucket store for the process.
 
@@ -286,7 +287,7 @@ sub getFile
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
-=head2 $processor->deleteFile($file)
+=head2 $bucket->deleteFile($file)
 
 Copy a file to the S3 bucket store for the process.
 
@@ -301,7 +302,7 @@ sub deleteFile
     return $self->_runAws('s3','rm','--only-show-errors',$s3url);
 }
 
-=head2 $processor->fileStats($file)
+=head2 $bucket->fileStats($file)
 
 Return {size=>size, mtime=>mtime} if a file exists, undef otherwise
 
@@ -337,7 +338,7 @@ sub fileStats
     return $result;
 }
 
-=head2 $processor->fileExists($file)
+=head2 $bucket->fileExists($file)
 
 Returns true (1) if a file exists, false (0) otherwise.
 
@@ -345,7 +346,7 @@ Returns true (1) if a file exists, false (0) otherwise.
 
 sub fileExists { my ($self,$file)=@_; return $self->fileStats($file) ? 1 : 0; }
 
-=head2 $processor->syncToBucket($sourcedir,$targetkey,[delete=>1])
+=head2 $bucket->syncToBucket($sourcedir,$targetkey,[delete=>1])
 
 Synchonise files from source directory to target "directory".  
 Runs aws s3 sync --delete unless delete=>0
@@ -375,7 +376,7 @@ sub syncToBucket
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
-=head2 $processor->syncFromBucket($sourcekey,$targetdir,[delete=>1])
+=head2 $bucket->syncFromBucket($sourcekey,$targetdir,[delete=>1])
 
 Synchronise files from source directory to target "directory".  
 Runs aws s3 sync --delete unless delete=>0 

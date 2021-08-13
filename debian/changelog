@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.84.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Option for wildcard in filenames in getdata.conf
+  * File compression inferred from filename by default in getdata.conf
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 12 Aug 2021 15:00:00 +1200
+
 liblinz-gnss-perl (1.83.0-1) bionic; urgency=medium
 
   [Chris Crook]

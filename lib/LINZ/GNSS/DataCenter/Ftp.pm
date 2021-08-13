@@ -105,4 +105,23 @@ sub getfile
     $self->_logger->info("Retrieved $file ($size bytes) from $host");
 }
 
+# Get a directory listing - used for wildcard file names
+
+sub getfilelist
+{
+    my ($self,$spec) = @_;
+    my $path=$spec->path;
+    my $filelist=$self->cachedFileList($path);
+    return $filelist if $filelist;
+    my $ftp = $self->{ftp};
+    $ftp->cwd($path);
+    if( ! $ftp || ! $ftp->cwd($path) || ! ($filelist = $ftp->ls()))
+    {
+        my $host = $self->{host};
+        $self->_logger->warn("Cannot get file list from $path on $host");
+        croak "Cannot get file list from $path on $host\n";
+    }
+    return $self->cachedFileList($path,$filelist);
+}
+
 1;

@@ -5,6 +5,7 @@ use Carp;
 use File::Copy;
 
 our $compressionTypes={};
+our $compressionSuffices=[];
 
 =head1 LINZ::GNSS::FileCompression
 
@@ -79,7 +80,39 @@ sub LoadCompressionTypes
         my $fc = new LINZ::GNSS::FileCompression($cfgct);
         $ctypes->{$fc->name}=$fc;
     }
+    my $suffices=[];
+    if( exists($cfg->{compressionsuffices}) )
+    {
+        my $data=$cfg->{compressionsuffices};
+        foreach my $line (split(/\n/,$data))
+        {
+            my($suffixre,$compdef)=split(' ',$line);
+            $suffixre .= '$';
+            my $re=qr/$suffixre/;
+            push(@$suffices,[$re,$compdef]);
+        }
+    }    
     $LINZ::GNSS::FileCompression::compressionTypes=$ctypes;
+    $LINZ::GNSS::FileCompression::compressionSuffices=$suffices;
+}
+
+
+=head2 my $compdef=LINZ::GNSS::FileCompression::InferCompressionType($filename)
+
+Infers the compression type based on the filename
+
+=cut
+
+sub InferCompressionType
+{
+    my($filename)=@_;
+    my $suffices=$LINZ::GNSS::FileCompression::compressionSuffices;
+    foreach my $suffix (@$suffices)
+    {
+        my($re,$compdef)=@$suffix;
+        return $compdef if $filename =~ /$re/;
+    }
+    return "none";
 }
 
 =head2 LINZ::GNSS::FileCompression::RecompressFile($filename,$fromcomp,$tocomp,$tofilename)

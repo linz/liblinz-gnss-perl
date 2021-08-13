@@ -20,6 +20,7 @@ use fields qw (
     station 
     jobid 
     timestamp 
+    expandfunc
 );
 
 =head2 $spec=new LINZ::GNSS::FileSpec($hash)
@@ -82,11 +83,18 @@ Timestamp of the file (? check this!)
 sub path { return $_[0]->{path}; }
 sub filename { return $_[0]->{filename}; }
 sub basepath { $_[0]->{basepath} = $_[1] if defined $_[1]; return $_[0]->{basepath}; }
-sub compression { return $_[0]->{compression}; }
+sub compression { 
+    my $type=$_[0]->{compression} || "auto"; 
+    return $type if $type ne "auto";
+    return LINZ::GNSS::FileCompression::InferCompressionType($_[0]->filename);
+    }
 sub type { return $_[0]->{type}; }
 sub subtype { return $_[0]->{subtype}; }
 sub station { return $_[0]->{station}; }
 sub timestamp { return $_[0]->{timestamp}; }
+# expandfunc needed for handling retrieving file lists in DataCenter.pm
+# as that needs to be able to use the same expansion for URLs.
+sub expandfunc { return $_[0]->{expandfunc}; }
 
 =head2 $path=$spec->filepath
 
@@ -128,6 +136,19 @@ EOD
     $result=~ s/^$1//mg if $result =~ /^(\s+)/;
     $result=~ s/^/$prefix/emg if $prefix;
     return $result;
+}
+
+=head2 print $spec->expandName($namestring)
+
+Expands namestring using a filename expansion defined when the filespec is created.
+
+=cut
+
+sub expandName
+{
+    my($self,$namestring)=@_;
+    $namestring = $self->{expandfunc}->($namestring) if $self->{expandfunc};
+    return $namestring;
 }
 
 1;

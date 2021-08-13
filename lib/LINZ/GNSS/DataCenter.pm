@@ -48,6 +48,7 @@ use fields qw (
     connected
     fileid
     _logger
+    _filelistcache
     );
 
 # scratchdir, fileid, and ftp are managed internally to 
@@ -253,6 +254,7 @@ sub new
     $self->{password} = $pwd;
     $self->{connected}=undef;
     $self->{fileid}=0;
+    $self->{_filelistcache}={};
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
     $self->_logger->debug("Created DataCenter $name");
     return $self;
@@ -868,8 +870,62 @@ sub disconnect
 
 sub getfile
 {
-    my($self,$path,$file,$target)=@_;
+    my($self,$path,$file,$target)=@_;    
     croak("getfile not implemented in ".$self->{scheme}." Datacenter ".$self->name."\n");
+}
+
+sub cachedFileList
+{
+    my ($self,$key,$list)=@_;
+    $self->{_filelistcache}->{$key} = $list if defined $list;
+    return $self->{_filelistcache}->{$key};
+}
+
+sub _hasWildcard
+{
+    my($self,$filename)=@_;
+    return $filename =~ /[\?\*]/;
+}
+
+sub _fileMatchingWildcard
+{
+    my($self,$spec,$croak)=@_;
+    my $path=$spec->path;
+    my $filename=$spec->filename;
+    return $filename if ! $self->_hasWildcard($filename);
+    my $filelist=$self->getfilelist($spec);
+    my $filere='^'.join('',map {$_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_)} split(/([\?\*])/,$filename)).'$';
+    my @filenames = grep(/$filere/,@$filelist);
+    if( scalar(@filenames) != 1 )
+    {
+        return '' if ! $croak;
+        if( ! @filenames )
+        {
+            croak("File $filename not found on $path in Datacenter ".$self->name."\n");
+        }
+        else
+        {
+            croak("File $filename on $path is ambiguous in Datacenter ".$self->name."\n");
+        }
+    }
+    return $filenames[0];
+}
+
+
+sub _getfile
+{
+    my($self,$spec,$target)=@_;
+    my $path=$spec->path;
+    my $filename=$self->_fileMatchingWildcard($spec,1);
+    return $self->getfile($path,$filename,$target);
+}
+
+# Get a list of files available at the specified path, used to handle wildcard requests
+
+sub getfilelist
+{
+    my($self,$path)=@_;
+    croak("getfilelist not implemented in ".$self->{scheme}." Datacenter ".$self->name."\n");
 }
 
 # Check to see whether a data center has a file
@@ -1041,7 +1097,7 @@ sub getData
 
             eval
             {
-                $self->getfile($spec->{path},$spec->{filename},$tempfile);
+                $self->_getfile($spec,$tempfile);
             };
             if( $@ )
             {
@@ -1063,8 +1119,8 @@ sub getData
             }
 
             # Change the compression if required
-            my $fromcomp=$spec->{compression};
-            my $tocomp=$tospec->{compression};
+            my $fromcomp=$spec->compression;
+            my $tocomp=$tospec->compression;
             if($fromcomp ne $tocomp)
             {
                 $self->_logger->debug("Converting compression from $fromcomp to $tocomp");

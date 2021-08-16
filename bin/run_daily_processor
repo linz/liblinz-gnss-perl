@@ -6,7 +6,6 @@
 
 use strict;
 use LINZ::GNSS::DailyProcessor;
-use LINZ::RunBatch;
 use Getopt::Std;
 
 my %opts;
@@ -29,8 +28,6 @@ if( $opts{c} || $opts{C} )
 syntax: run_daily_processor [options] configuration_file [stop|restart] [option=value option=value ...]
 
 Options can include
-   -b          Run in batch mode (using at now)
-   -B logfile  Run in batch mode and specify the log file
    -c          Just print an example configuration file and exit
    -C          Print example configuration more briefly
    -f          Force retry of all failures 

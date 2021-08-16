@@ -85,7 +85,6 @@ use Time::HiRes;
 use Config::General;
 use Data::Dumper;
 use POSIX qw/strftime/;
-use LINZ::RunBatch;
 use LINZ::GNSS::Config;
 use LINZ::GNSS::Time qw/parse_gnss_date datetime_seconds seconds_yearday time_elements seconds_ymdhms $SECS_PER_DAY/;
 
@@ -94,8 +93,6 @@ my $syntax=<<EOD;
 Syntax: gnss_ftp_mirror.pl [-b|-B logfile] [options] config_file [item=value ...]
 
 Options are:
-   -b            Run in batch mode starting with 'at now'
-   -B logfile    Run in batch mode with a specified log file
    -n            List downloaded files
    -v            Verbose mode
    -V            Even more verbose

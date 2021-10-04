@@ -432,6 +432,12 @@ sub runBernesePcf {
         $self->setPcfParams( $pcf_params, $campaign->{variables} );
         $self->info("Campaign dir: $campdir");
         $self->info("Target dir: $ENV{S}");
+        my $vars=$campaign->{variables};
+        foreach my $k (sort(keys(%$vars)))
+        {
+            my $vk=$vars->{$k};
+            $self->info("PCF variable: $k=$vk");
+        };
     }
 
     if ($return) {
@@ -439,6 +445,7 @@ sub runBernesePcf {
     }
 
     if ($return) {
+        $self->info("Running $pcf PCF");
         my $result =
           LINZ::BERN::BernUtil::RunPcf( $campaign, $pcf, $environment );
         my $status = LINZ::BERN::BernUtil::RunPcfStatus($campaign);

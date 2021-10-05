@@ -489,7 +489,7 @@ sub runBernesePcf {
                 eval 
                 {
                     my $zipdir=$copytarget;
-                    $zipdir =~ s/.*[\\\/]//;
+                    $zipdir =~ s/[\\\/][^\\\/]*$//;
                     $self->makePath($zipdir) || die "Cannot create zip file directory $zipdir\n";
                     my $archive=Archive::Zip->new();
                     $archive->addTree($copysource,'CAMP');

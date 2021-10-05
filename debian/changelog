@@ -1,3 +1,11 @@
+liblinz-gnss-perl (1.86.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: Adding apache include and relative include to config to support AWS github configurations
+  * Fix: Not creating zip directory for campaign files zip dump
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 6 Oct 2021 12:00:00 +1300
+
 liblinz-gnss-perl (1.85.0-1) bionic; urgency=medium
 
   [Chris Crook]

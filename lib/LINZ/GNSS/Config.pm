@@ -155,7 +155,10 @@ sub new {
             if $args{config} && -f $cfgfile . '.' . $args{config};
         }
         foreach my $errfile (@files) {
-            my %cfg = ParseConfig( -ConfigFile => $errfile, -UseApacheInclude=>1, -IncludeRelative=>1 );
+            my %cfg = ParseConfig( -ConfigFile => $errfile, 
+                -UseApacheInclude=>1, 
+                -IncludeRelative=>1,
+                -MergeDuplicateOptions=>1 );
             while ( my ( $key, $value ) = each(%cfg) ) {
                 $keys{$key} = 1;
                 $data{ lc($key) } = $value;

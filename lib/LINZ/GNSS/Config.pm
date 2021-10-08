@@ -103,6 +103,7 @@ use strict;
 package LINZ::GNSS::Config;
 
 use Carp;
+use Cwd;
 use Config::General qw/ParseConfig/;
 use Log::Log4perl qw(:easy);
 use LINZ::GNSS::Variables qw/ExpandEnv/;
@@ -129,7 +130,8 @@ sub new {
     foreach my $a (@args) {
         $args{ lc($1) } = $2 if $a =~ /^([^\=]+)\=(.*)/;
     }
-
+  
+    $cfgfile=Cwd::realpath($cfgfile);
     my $configdir = $cfgfile;
     $configdir =~ s/[^\\\/]*$//;
     $configdir =~ s/.$//;
@@ -153,7 +155,10 @@ sub new {
             if $args{config} && -f $cfgfile . '.' . $args{config};
         }
         foreach my $errfile (@files) {
-            my %cfg = ParseConfig( -ConfigFile => $errfile );
+            my %cfg = ParseConfig( -ConfigFile => $errfile, 
+                -UseApacheInclude=>1, 
+                -IncludeRelative=>1,
+                -MergeDuplicateOptions=>1 );
             while ( my ( $key, $value ) = each(%cfg) ) {
                 $keys{$key} = 1;
                 $data{ lc($key) } = $value;
@@ -168,6 +173,7 @@ sub new {
 
     my $suffices = [];
     push( @$suffices, '-' . $args{config} ) if $args{config};
+    push( @$suffices, '-' . $data{config} ) if $data{config};
     push( @$suffices, '' );
 
     my $self = {
@@ -227,8 +233,8 @@ sub _setDateBasedConfiguration {
     my ( $self, $timestamp ) = @_;
     my @configs = ();
     my @sprefix = ();
-    my $arg     = $self->{args}->{config};
-    push( @sprefix, '-' . $arg ) if $arg;
+    push(@sprefix,'-'.$self->{args}->{config}) if $self->{args}->{config};
+    push(@sprefix,'-'.$self->{data}->{config}) if $self->{data}->{config};
     push( @sprefix, '' );
     foreach my $dbc ( @{ $self->{date_configuration} } ) {
         my ( $before, $date, $cfgcode ) = @$dbc;

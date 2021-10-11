@@ -274,7 +274,7 @@ my @args=(
     "s3_debug_aws=".($verbose > 1 ? 1 : 0),
     "logsettings=".($verbose > 1 ? 'DEBUG' : ($verbose > 0 ? 'INFO' : 'FATAL'))
 );
-my $cfg=new LINZ::GNSS::Config('',@args);
+my $cfg=new LINZ::GNSS::Config($conffile,@args);
 $cfg->initLogger();
 if( $bucketname )
 {

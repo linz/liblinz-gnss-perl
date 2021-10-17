@@ -615,7 +615,7 @@ sub downloadDir
         return;
     }
     my ($dirs, $files) = $ftp->dirList();
-    print Data::Dumper->Dump([$options],['options']) if $verbose > 2;
+    #print Data::Dumper->Dump([$options],['options']) if $verbose > 2;
     my @parts=@$dirparts;
     my $dirpart=shift(@parts);
 
@@ -651,7 +651,7 @@ sub downloadDir
         File::Path::make_path($localpath);
         cwd($localpath);
     }   
-    print Data::Dumper->Dump([$options],['options']) if $verbose > 2;     
+    # print Data::Dumper->Dump([$options],['options']) if $verbose > 2;     
     foreach my $file (sort keys %$files)
     {
         $expired=1;
@@ -659,7 +659,7 @@ sub downloadDir
         $expired=0;
         # Does it match the current filtered options
         my $opts=filteredOptions($options,$file,$dirpart);
-        print Data::Dumper->Dump([$file,$opts],['filename','opts']) if $verbose > 2;     
+        # print Data::Dumper->Dump([$file,$opts],['filename','opts']) if $verbose > 2;     
         next if ! @$opts;
 
         # Build the target name. There may be more than one filtered option

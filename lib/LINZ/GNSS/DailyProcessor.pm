@@ -520,6 +520,7 @@ sub runBernesePcf {
             }
             else
             {
+                # Currently pcf_copy_exclude not implemented here
                 if ( !File::Copy::Recursive::dircopy( $copysource, $copytarget ) ) {
                     $self->error("Failed to copy $copysource to $copytarget");
                 }
@@ -1640,7 +1641,7 @@ __END__
 
  # Exclude files from directory copy. 
 
- pcf_copy_exclude SOL/*F
+ pcf_copy_exclude SOL/*
  pcf_fail_copy_exclude SOL/*
 
  # By default the Bernese runtime environment is deleted once the script has finished.

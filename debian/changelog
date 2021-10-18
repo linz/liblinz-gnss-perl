@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.87.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: pcf_copy_exclude option
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 18 Oct 2021 16:00:00 +1300
+
 liblinz-gnss-perl (1.86.2-1) bionic; urgency=medium
 
   [Chris Crook]

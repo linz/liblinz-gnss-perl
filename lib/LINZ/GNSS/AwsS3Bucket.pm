@@ -69,7 +69,7 @@ sub new()
         $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
         $self->{$item}=$value;
     }
-    $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
+    # $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
     $self->error("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
     my $awsbin=$self->{aws_client};
@@ -137,7 +137,8 @@ sub _runAws
     my $awsparams=$self->_aws_parameters;
     my @awsparams=split(' ',$awsparams);
     my @command=($awsbin);
-    push(@command,'--debug') if $self->_debug_aws;
+    push(@command,'--debug') if $self->_debug_aws > 1;
+    push(@command,'--only-show-errors') if $command eq 's3' && $self->_debug_aws < 1;
     push(@command,$command,$subcommand,@awsparams,@params);
     my $in='';
     my $out;
@@ -226,7 +227,7 @@ sub putFile
     my $timetag=(stat($sourcefile))[9];
     my $utctag=strftime("%Y-%m-%dT%H:%M:%S",gmtime($timetag));
     my @params=('--metadata',"mtime=$utctag",$sourcefile,$s3url);
-    my ($ok,$result,$error)=$self->_runAws('s3','cp','--only-show-errors',@params);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp',@params);
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
@@ -249,7 +250,7 @@ sub putDir
     $dir .= '/' if $dir =~ /[^\/]$/;
     my $s3url=$self->fileUrl($dir);
     my @params=($sourcedir.'/',$s3url);
-    my ($ok,$result,$error)=$self->_runAws('s3','cp','--recursive','--only-show-errors',@params);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp','--recursive',@params);
     return wantarray ? ($ok,$result,$error) : $ok;
 }
 
@@ -276,7 +277,7 @@ sub getFile
     }
     my $s3url=$self->fileUrl($name);
     my @params=($s3url,$targetfile);
-    my ($ok,$result,$error)=$self->_runAws('s3','cp','--only-show-errors',@params);
+    my ($ok,$result,$error)=$self->_runAws('s3','cp',@params);
     if( ! -e $targetfile )
     {
         $self->error("Cannot retrieve file $name from S3: $error");
@@ -299,7 +300,7 @@ sub deleteFile
     my $bucket=$self->bucket;
     my $key=$self->fileKey($name);
     my $s3url="s3://$bucket/$key";
-    return $self->_runAws('s3','rm','--only-show-errors',$s3url);
+    return $self->_runAws('s3','rm',$s3url);
 }
 
 =head2 $bucket->fileStats($file)
@@ -369,7 +370,7 @@ sub syncToBucket
         return 0;             
     }
     my $s3url=$self->fileUrl($targetkey);
-    my @cmd=('s3','sync','--only-show-errors');
+    my @cmd=('s3','sync');
     push(@cmd,'--delete') unless exists $opts{delete} && ! $opts{delete};
     push(@cmd,$sourcedir,$s3url);
     my ($ok,$result,$error)=$self->_runAws(@cmd);
@@ -399,7 +400,7 @@ sub syncFromBucket
         return 0;            
     }
     my $s3url=$self->fileUrl($sourcekey);
-    my @cmd=('s3','sync','--only-show-errors');
+    my @cmd=('s3','sync');
     push(@cmd,'--delete') unless exists $opts{delete} && ! $opts{delete};
     push(@cmd,$s3url,$targetdir);
     my ($ok,$result,$error)=$self->_runAws(@cmd);    

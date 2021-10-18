@@ -479,11 +479,27 @@ sub runBernesePcf {
         my $fail = $return ? '' : '_fail';
         my $copydir   = $self->get( 'pcf' . $fail . '_copy_dir',   '' );
         my $copyfiles = $self->get( 'pcf' . $fail . '_save_files', '' );
+        my $copyexclude = $self->get( 'pcf' . $fail . '_copy_exclude', '' );
+
 
         if ($copydir) {
             my $zipfiles=$copydir =~ s/^zip\://;
             my $copytarget = $targetdir . '/' . $copydir;
             my $copysource = $campdir;
+            my $addfile=sub {1};
+            if( $copyexclude )
+            {
+                my $excludere='^(.*?\/)?(?:';
+                foreach my $exclude (split(' ',$copyexclude))
+                {
+                    $exclude=quotemeta($exclude);
+                    $exclude =~ s/\\?\?/[^\/]/g;
+                    $exclude =~ s/\\?\*/[^\/]*/g;
+                    $excludere .= '|' . $exclude;
+                }
+                $excludere .= ')$';
+                $addfile = sub { $_ !~ /$excludere/ };
+            }
             if( $zipfiles )
             {
                 eval 
@@ -492,7 +508,7 @@ sub runBernesePcf {
                     $zipdir =~ s/[\\\/][^\\\/]*$//;
                     $self->makePath($zipdir) || die "Cannot create zip file directory $zipdir\n";
                     my $archive=Archive::Zip->new();
-                    $archive->addTree($copysource,'CAMP');
+                    $archive->addTree($copysource,'',$addfile);
                     $archive->writeToFileNamed($copytarget) == AZ_OK || die "Failed to write zip file $copydir\n";
 
                 };
@@ -1621,6 +1637,11 @@ __END__
 
  pcf_copy_dir
  pcf_fail_copy_dir fail_data
+
+ # Exclude files from directory copy. 
+
+ pcf_copy_exclude SOL/*F
+ pcf_fail_copy_exclude SOL/*
 
  # By default the Bernese runtime environment is deleted once the script has finished.
  # Use pcf_save_campaign_dir to leave it unchanged (though it may be overwritten by

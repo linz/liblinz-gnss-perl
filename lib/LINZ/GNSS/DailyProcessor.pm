@@ -16,12 +16,11 @@ use strict;
 
 package LINZ::GNSS::DailyProcessor;
 use Carp;
-use Archive::Zip qw/ :ERROR_CODES /;
-use Cwd qw/abs_path/;
+use Cwd qw/abs_path getcwd/;
 use File::Path qw/make_path remove_tree/;
 use File::Which;
+use File::Find;
 use File::Copy;
-use File::Copy::Recursive;
 use File::Temp;
 use LINZ::GNSS::Config;
 use LINZ::GNSS::AwsS3Bucket;
@@ -483,7 +482,8 @@ sub runBernesePcf {
 
 
         if ($copydir) {
-            my $zipfiles=$copydir =~ s/^zip\://;
+            my $compress = $1 if $copydir =~ s/^(tar|zip)\://;
+            my $bin = which($compress);
             my $copytarget = $targetdir . '/' . $copydir;
             my $copysource = $campdir;
             my $addfile=sub {1};
@@ -500,30 +500,69 @@ sub runBernesePcf {
                 $excludere .= ')$';
                 $addfile = sub { $_ !~ /$excludere/ };
             }
-            if( $zipfiles )
+            my @copyfiles=();
+            my $srclen=length($copysource)+1;
+            find({
+                no_chdir=>1,
+                wanted=>sub {
+                    my $f=$File::Find::name;
+                    if( -f $f )
+                    {
+                        $f=substr($f,$srclen);
+                        push(@copyfiles,$f) if $addfile->($f);
+                    }
+                }
+            },$copysource);
+            if( $bin )
             {
+                my $savewd=getcwd();
                 eval 
                 {
-                    my $zipdir=$copytarget;
-                    $zipdir =~ s/[\\\/][^\\\/]*$//;
-                    $self->makePath($zipdir) || die "Cannot create zip file directory $zipdir\n";
-                    my $archive=Archive::Zip->new();
-                    $archive->addTree($copysource,'',$addfile);
-                    $archive->writeToFileNamed($copytarget) == AZ_OK || die "Failed to write zip file $copydir\n";
+                    my $cmpdir=$copytarget;
+                    $cmpdir =~ s/[\\\/][^\\\/]*$//;
+                    $self->makePath($cmpdir) || die "Cannot create zip file directory $cmpdir\n";
+                    my @command;
+                    if( $compress eq 'tar' )
+                    {
+                        @command=($bin,"-czf",$copytarget,sort(@copyfiles));
+                    }
+                    elsif( $compress eq 'zip' )
+                    {
+                        @command=($bin,$copytarget,sort(@copyfiles));
 
+                    }
+                    else
+                    {
+                        die "Invalid compression $compress in pcf_copy_dir\n";
+                    }
+                    chdir($copysource);
+                    system(@command);
                 };
                 if( $@ )
                 {
-                    $self->error("Failed to zip $copysource to $copytarget: $@")
+                    $self->error("Failed to $compress $copysource to $copytarget: $@")
                 }
-
+                chdir($savewd);
             }
             else
             {
-                # Currently pcf_copy_exclude not implemented here
-                if ( !File::Copy::Recursive::dircopy( $copysource, $copytarget ) ) {
-                    $self->error("Failed to copy $copysource to $copytarget");
-                }
+                eval
+                {
+                    foreach my $copyfile (@copyfiles)
+                    {
+                        my $source=$copysource."/".$copyfile;
+                        my $target=$copytarget."/".$copyfile;
+                        my $targetdir=$target;
+                        $targetdir =~ s/[\\\/][^\\\/]*$//;
+                        $self->makePath($targetdir) if ! -d $targetdir;
+                        File::Copy::copy($source,$target);
+                        die "Cannot create pcf_copy_dir target directory $targetdir\n" if ! -d $targetdir;
+                    }
+                };
+                if( $@ )
+                {
+                    $self->error("Failed to copy $copysource to $copytarget: $@")
+                }                
             }
         }
 

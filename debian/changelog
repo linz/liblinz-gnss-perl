@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.88.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: NotCode in gnss_ftp_mirror configuration
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 5 Nov 2021 15:00:00 +1300
+
 liblinz-gnss-perl (1.87.1-1) bionic; urgency=medium
 
   [Chris Crook]

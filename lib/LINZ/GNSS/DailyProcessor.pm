@@ -1670,8 +1670,8 @@ __END__
  pcf_fail_save_files
 
  # Directory into which to copy Bernese campaign files if the PCF succeeds and 
- # if it fails.  The filename may be prefixed with zip: in which case the 
- # campaign directory is zipped into a file (eg zip:debug/campaign.zip)
+ # if it fails.  The filename may be prefixed with tar: or zip: in which case the 
+ # campaign directory is compressed into a file (eg zip:debug/campaign.zip)
  # (Note: this is relative to the target directory for the daily process.
  # Files are not copied if this is not saved).  
 

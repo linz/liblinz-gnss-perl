@@ -316,6 +316,16 @@ foreach my $c (split(' ',$codes))
 }
 $allcodes = 1 if ! %$validcodes;
 
+
+my $notcodes=$config{notcodes};
+$notcodes = join(' ',@$notcodes) if ref($notcodes) eq 'ARRAY';
+$notcodes = join(' ',keys %$notcodes) if ref($notcodes) eq 'HASH';
+my $invalidcodes={};
+foreach my $c (split(' ',$notcodes))
+{
+    $invalidcodes->{uc($c)} = 1;
+}
+
 my $remotedir=$config{remotedir};
 my $remotefilere=$config{remotefilere};
 my $targetpath=$config{targetpath};
@@ -393,6 +403,10 @@ if( $verbose )
     else
     {
         printf "Downloading:      %d codes\n",scalar(keys %$validcodes);
+    }
+    if( %$invalidcodes )
+    {
+        printf "Discarding:       %d codes\n",scalar(keys %$invalidcodes);
     }
     printf "FTP timeout:     %s\n",$ftp->timeout;
     if( $mintimesincesuccess || $mintimesincefail )
@@ -559,7 +573,7 @@ sub filteredOptions
         }
     }
 
-    return [] if $code ne '' && ! $allcodes && ! $validcodes->{$code};
+    return [] if ($code ne '' && ! $allcodes && ! $validcodes->{$code}) || $invalidcodes->{$code};
 
     my @matches=();
 
@@ -1647,6 +1661,11 @@ __END__
  
  Codes KAIK RGRE
  Codes SCTB
+  
+ # Codes to discard.  This is applied after codes have been accepted from the Codes list
+ # (Though only makes sense if Codes is empty or *).
+ 
+ NotCodes CRUD BAD9
  
  # Number of days before current date to start and end download
  

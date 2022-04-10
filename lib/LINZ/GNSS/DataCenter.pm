@@ -54,6 +54,7 @@ use fields qw (
 # scratchdir, fileid, and ftp are managed internally to 
 
 use Carp;
+use JSON;
 use URI;
 use URI::file;
 use File::Path qw( make_path remove_tree );
@@ -802,11 +803,18 @@ sub checkRequest
 Returns the user credentials for the DataCenter.  If default is true
 then will return the default user/password if none explicitly defined.
 Credentials can be defined either with a user/password or with a 
-credentials_file.  If a credentials_file is specified then it should 
-contain two lines 
+credentials_file.  
 
-   user username
-   password password
+If a credentials_file is specified then it can either be a JSON formatted 
+file with file extension .json, or a text formatted file.  The JSON format 
+should look like:
+
+{"username": "the-user-name": "password":"the-password"}
+
+The text format file should include lines
+
+   user the-user-name
+   password the-password
 
 Only the first such lines will be read.  Lines not matching this are
 are ignored.
@@ -819,10 +827,23 @@ sub _readCredentials
     open(my $crdf,$credfile) || 
         croak("Cannot open credentials files $credfile for DataCenter ".$self->name);
     my ($user,$pwd);
-    while( my $line=<$crdf> )
+    if( $credfile =~ /\.json$/ )
     {
-        $user=$1 if ! $user && $line =~ /^\s*user\s+(\S.*?)\s*$/i;
-        $pwd=$1 if ! $pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
+        my $json=join('',<$crdf>);
+        eval
+        {
+            my $userdef=decode_json($json);
+            $user=$userdef->{username};
+            $pwd=$userdef->{password};
+        };
+    }
+    else
+    {
+        while( my $line=<$crdf> )
+        {
+            $user=$1 if ! $user && $line =~ /^\s*user(?:name)?\s+(\S.*?)\s*$/i;
+            $pwd=$1 if ! $pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
+        }
     }
     croak("Credentials file $credfile doesn't define user") if ! defined($user);
     return $user,$pwd;

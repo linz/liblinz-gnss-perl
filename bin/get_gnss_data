@@ -10,6 +10,8 @@ use LINZ::GNSS::FileCache;
 use LINZ::GNSS::Time qw/seconds_datetime parse_gnss_date seconds_yearday/;
 use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED INVALID);
 use LINZ::GNSS::DataCenter;
+use File::Temp qw/tempdir/;
+
 eval
 {
     require LINZ::BERN::BernUtil;
@@ -21,7 +23,7 @@ if( $@ )
 }
 
 my %opts;
-getopts('b:d:f:n:ilshciC:',\%opts);
+getopts('b:d:f:n:ilshcitC:',\%opts);
 
 die "Cannot use -c option with -d, -b, or -n options\n" 
     if $opts{c} && ($opts{b} || $opts{d} || $opts{n});
@@ -33,12 +35,13 @@ my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
 my $cacheonly=$opts{c};
 my $cfgfile=$opts{C} || '';
+my $testsources=$opts{t};
 
 LINZ::BERN::BernUtil::SetBerneseEnv();
 LINZ::GNSS::LoadConfig($cfgfile);
 
 my $target=$cacheonly ? undef : $dir;
-if( $campaign )
+if( $campaign && ! $testsources )
 {
     die "Bernese campaign $campaign does not exist\n"
         if ! -d $ENV{P}.'/'.$campaign;
@@ -81,6 +84,12 @@ die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n
               (\d\d))
               )?
             $/x;
+
+if( $testsources )
+{
+    testDataSources($date,@ARGV);
+    exit();
+}
 
 my @input=();
 if( $opts{f} )
@@ -217,6 +226,72 @@ sub printFileTypes
     }
     print "Types marked with a '*' require a station code\n";
 }
+
+
+sub testDataSources
+{
+    my($date,@stations)=@_;
+    my $tgtdir=tempdir(CLEANUP=>1);
+    foreach my $center (@{$LINZ::GNSS::DataCenter::prioritized_centers})
+    {
+        my $name=$center->name;
+        foreach my $ft (@{$center->filetypes->types})
+        {
+            my $ftcode=$ft->type.':'.$ft->subtype;
+            my @teststns=('');
+            my $usestns=$ft->use_station;
+            if( $usestns )
+            {
+                if( $center->{allstations} )
+                {
+                    @teststns=@stations;
+                }
+                else
+                {
+                    my %available=map {$_ => 1} $center->stations;
+                    @teststns=grep {$available{$_}} @stations;
+                    if( ! @teststns )
+                    {
+                        print("$name: $ftcode: Warning - none of test stations are supported\n");
+                        next;
+                    }
+                }
+            }
+            my $ok=0;
+            my $delayed=1;
+            foreach my $stn (@teststns)
+            {
+                my $request="$ftcode $date $stn";
+                my ($status,$when,$downloaded)=$center->getData($request,$tgtdir);
+                if( $status eq COMPLETED )
+                {
+                    unlink @$downloaded;
+                    $ok=1;
+                    last;
+                }
+                elsif( $status ne $delayed )
+                {
+                    $delayed=0;
+                }
+            }
+            if( $ok )
+            {
+                print("$name: $ftcode: Ok\n");
+            }
+            elsif( $delayed )
+            {
+                print("$name: $ftcode: Warning - not available, may not be due yet\n");
+            }
+            else
+            {
+                my $stnmsg=$usestns ? ' (for selected stations)': '';
+                print("$name: $ftcode: Error - data unavailable\n");
+            }
+        }
+    }
+}
+
+
 __DATA__
 
 =head1 Name
@@ -227,6 +302,7 @@ This script can only be used by a user configured to use the Bernese software.
 =head1 Synopsis
 
     get_gnss_data [options] date type [station ...]
+    get_gnss_data [options] -t date station...
     get_gnss_data [options] -f filename date
     get_gnss_data [options] -i date
     get_gnss_data -l
@@ -312,6 +388,14 @@ been requested then list the files that could be downloaded to fill the request.
 
 Specifies a configuration file to use instead of the default file.  This can also be specified
 using the LINZGNSS_CONFIG_FILE environment variable
+
+=item -t
+
+Test the getdata.conf configuration by retrieving at least one file for each data 
+source and file type using the date supplied for testing. 
+If the file type requires a station name, then each station in the list will be 
+tried until one is found that can be returned.  
+Lists which data centers and file types could not be retrieved.
 
 =back
 

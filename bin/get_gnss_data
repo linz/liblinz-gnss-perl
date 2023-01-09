@@ -232,6 +232,10 @@ sub testDataSources
 {
     my($date,@stations)=@_;
     my $tgtdir=tempdir(CLEANUP=>1);
+    my $stnstr=join(' ',@stations);
+    print("Testing data sources for date: $date\n");
+    print("Testing data sources for stations $stnstr\n");
+
     foreach my $center (@{$LINZ::GNSS::DataCenter::prioritized_centers})
     {
         my $name=$center->name;

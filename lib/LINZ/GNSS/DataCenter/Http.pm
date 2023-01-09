@@ -7,6 +7,7 @@ use fields qw (
     cookies
     filelistpath
     filelistregex
+    timeout
     );
 
 use LWP::UserAgent;

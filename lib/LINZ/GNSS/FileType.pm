@@ -164,7 +164,7 @@ sub new
     my $compression=$cfgft->{compression} || $default->{compression} || 'auto';
     $compression=lc($compression);
     croak "Invalid compression $compression for $type:$subtype" if
-        $compression !~ /^(auto|none|hatanaka|compress|gzip|hatanaka\+(compress|gzip))$/;
+        ! LINZ::GNSS::FileCompression::IsValidCompression($compression);
 
     my $supplyfreq=lc($cfgft->{supply_frequency}) || $default->{supply_frequency}
           || $frequency;

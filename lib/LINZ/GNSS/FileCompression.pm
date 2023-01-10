@@ -115,6 +115,28 @@ sub InferCompressionType
     return "none";
 }
 
+
+=head2 my $compdef=LINZ::GNSS::FileCompression::IsValidCompression($type)
+
+Tests whether a compression definition as one or more types separated by '+'
+can be a valid compression type.
+
+=cut
+
+sub IsValidCompression
+{
+
+    my($type)=@_;
+    return 1 if $type eq 'auto' || $type eq 'none';
+    return 0 if $type !~ /^\w+(\+\w+)*$/;
+    my $ctypes=$LINZ::GNSS::FileCompression::compressionTypes;
+    foreach my $stage (split(/\+/,$type))
+    {
+        return 0 if ! exists $ctypes->{$stage};
+    }
+    return 1;
+}
+
 =head2 LINZ::GNSS::FileCompression::RecompressFile($filename,$fromcomp,$tocomp,$tofilename)
 
 Convert a file $filename from a source compression $fromcomp to a target compression $tocomp.  

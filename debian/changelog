@@ -1,16 +1,24 @@
+liblinz-gnss-perl (1.92.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: Scan RINEX3 obs in RinexFile.pm
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Sun, 12 Feb 2023 12:00:00 +1300
+
+
 liblinz-gnss-perl (1.91.0-1) bionic; urgency=medium
 
   [Chris Crook]
   * Feat: Test data sources function in get-gnss-data
 
- -- Chris Crook <ccrook@linz.govt.nz>  Wed, 11 Jan 2022 12:00:00 +1300
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 11 Jan 2023 12:00:00 +1300
 
 liblinz-gnss-perl (1.90.0-1) bionic; urgency=medium
 
   [Chris Crook]
   * Feat: Test data sources function in get-gnss-data
 
- -- Chris Crook <ccrook@linz.govt.nz>  Mon, 9 Jan 2022 09:00:00 +1300
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 9 Jan 2023 09:00:00 +1300
 
 liblinz-gnss-perl (1.89.0-1) bionic; urgency=medium
 

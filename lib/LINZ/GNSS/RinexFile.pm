@@ -97,7 +97,11 @@ sub _loadHeader
     my $data=substr($line,0,60);
     push(@{$self->{headers}->{$rectype}},$data);
 
-    if( $rectype eq 'MARKER NAME')
+    if( $rectype eq 'RINEX VERSION / TYPE')
+    {
+        $self->{version} = _trimsub($line,9);
+    }
+    elsif( $rectype eq 'MARKER NAME')
     {
         $self->_loadWritableField(\$line,0,60,'markname');
     }
@@ -222,6 +226,103 @@ sub _scanHeader
 }
 
 sub _scanObs
+{
+    my($self,$f,$session,$of) = @_;
+    if( $self->{version} =~ /^2/ )
+    {
+        $self->_scanObs2($f,$session,$of);
+    }
+    else
+    {
+        $self->_scanObs3($f,$session,$of);
+    }
+
+}
+
+sub _scanObs3
+{
+    my($self,$f,$session,$of) = @_;
+    my $nobs=0;
+    my $lasttime;
+    my $copy=1;
+    if( $self->{hatanaka} )
+    {
+        die "Scanning RINEX observations in Hatanaka compressed files not supported\n";
+    }
+    while( my $line=<$f> )
+    {
+        next if $line =~ /^\s*$/;
+        if( $line =~ /^
+            \>\s(\d\d\d\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d\.]{10})
+            \s\s([016])
+            ([\s\d][\s\d]\d)
+            /x )
+        {
+            my ($year,$mon,$day,$hour,$min,$sec,$eflag,$nsat)=($1,$2,$3,$4,$5,$6,$7,$8);
+            $year += 1900;
+            $year += 100 if $year < $self->{_year};
+            my $endtime=ymdhms_seconds($year,$mon,$day,$hour,$min,$sec);
+            if( $lasttime )
+            {
+                my $interval=$endtime-$lasttime;
+                $self->{interval} = $interval if
+                    $self->{interval} == 0 || ($interval > 0 && $interval < $self->{interval});
+            }
+            $lasttime=$endtime;
+        
+            $copy=0;
+            if( ! $session || ($endtime >= $session->[0] && $endtime <= $session->[1]) )
+            {
+                $copy=1;
+                $nobs++ if $eflag < 2;
+                $self->{endtime} = $endtime if $endtime > $self->{endtime};
+            }
+            my $nskip=$nsat = $eflag < 2 ? $nsat : 0;
+
+            # Skip for additional satellite ids
+            # Number of obs records
+            print $of $line if $of && $copy;
+            while( $line && $nskip-- )
+            {
+                $line=<$f>;
+                print $of $line if $of && $copy;
+            }
+        }
+        elsif( $line =~ /^
+            \>\s(\d\d\d\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d]\d)
+            \s([\s\d\.]{10})
+            \s\s(\d])
+            ([\s\d][\s\d]\d)
+            /x )
+        {
+            print $of $line if $of;
+            my $nskip=$8;
+            while( $nskip--)
+            {
+                $line=<$f>;
+                last if ! $line;
+                $line=$self->_loadHeader($line);
+                print $of $line if $of;
+            }
+        }
+        else
+        {
+            die("Unrecognized record $line in ".$self->{filename});
+        }
+    }
+    $self->{nobs}=$nobs;
+}
+
+sub _scanObs2
 {
     my($self,$f,$session,$of) = @_;
     my $nobs=0;

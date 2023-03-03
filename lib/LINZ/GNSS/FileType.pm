@@ -64,6 +64,7 @@ use LINZ::GNSS::Variables qw(ExpandEnv);
 
 our $freqmap = {
     'hourly'  => $SECS_PER_HOUR,
+    '3hourly' => $SECS_PER_HOUR * 3,
     '6hourly' => $SECS_PER_HOUR * 6,
     'daily'   => $SECS_PER_DAY,
     'weekly'  => $SECS_PER_WEEK,

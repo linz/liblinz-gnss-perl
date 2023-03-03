@@ -60,7 +60,7 @@ hourly, final, etc.
         filename filename_pattern
         path path_pattern
         compression [hatanaka]+[compress|gzip]
-        frequency (hourly|6hourly|daily|weekly)
+        frequency (hourly|3hourly|6hourly|daily|weekly)
         latency # (minutes|hours|days [weeky dow])
         retention # days
      </subtype>

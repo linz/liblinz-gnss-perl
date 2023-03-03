@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.93.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: Support files with 3 hour frequency
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 3 Mar 2023 18:00:00 +1300
+
 liblinz-gnss-perl (1.92.0-1) bionic; urgency=medium
 
   [Chris Crook]

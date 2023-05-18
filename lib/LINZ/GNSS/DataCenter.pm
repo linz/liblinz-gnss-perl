@@ -72,6 +72,7 @@ our $ftp_user='anonymous';
 our $ftp_password='none';
 our $ftp_timeout=30;
 our $ftp_passive='default';
+our $http_timeout=30;
 
 sub makepublicpath
 {

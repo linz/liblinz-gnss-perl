@@ -23,7 +23,7 @@ sub new
     $self->SUPER::new($cfgdc);
     $self->{cookies}=HTTP::Cookies->new();
     $self->{filelistpath}=${cfgdc}->{filelisturipath};
-    $self->{timeout} = $cfgdc->{timeout} || 0;
+    $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
     my $fre=${cfgdc}->{filelistregex} || '^\s*([\w\.]+)(?:\s|$)';
     $self->{filelistregex}=qr/$fre/;
     return $self;
@@ -76,10 +76,7 @@ sub _content
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
     $ua->cookie_jar($self->{cookies});
-    if( $self->{timeout} )
-    {
-        $ua->timeout($self->{timeout});
-    }
+    $ua->timeout($self->{timeout});
     my %headers=();
     if( $user )
     {

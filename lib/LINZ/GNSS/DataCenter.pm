@@ -166,7 +166,9 @@ sub new
     my $filetypes;
     if( exists $cfgdc->{datafiles} )
     {
-        $filetypes=new LINZ::GNSS::FileTypeList($cfgdc->{datafiles}); 
+        $filetypes=new LINZ::GNSS::FileTypeList($cfgdc->{datafiles});
+        my $unsupported=join(', ',$filetypes->unsupportedTypes());
+        croak("DataCenter $name uses invalid types/subtypes: $unsupported\n") if $unsupported;
     }
     else
     {
@@ -229,8 +231,15 @@ sub new
     $testuri =~ s/^s3\:/ftp:/;
     my $uriobj=URI->new($testuri);
     my ($user,$pwd);
-    if( $scheme ne 'file' )
+    if( $scheme eq 'file' )
     {
+        # File DataCenters are used for writing data, so need to support all data types
+        my $unsupported=join(', ',$LINZ::GNSS::FileTypeList::defaultTypes->unsupportedTypes($filetypes));
+        croak("Output DataCenter $name doesn't support the following file types: $unsupported\n") if $unsupported;
+    }
+    else
+    {
+        # Check for credentials in non file DataCenters
         $host=$uriobj->host;
         my $userinfo = $uriobj->userinfo;
         ($user,$pwd)=split(/\:/,$userinfo,2);

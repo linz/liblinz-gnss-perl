@@ -87,6 +87,43 @@ sub loadTypes
     return $self;
 }
 
+
+=head2 $list->unsupportedTypes( $otherlist )
+
+Checks that all the types defined in a DataCenter are defined in an another
+data center (or defaultTypes if not defined).
+
+Returns an array of missing types/subtypes
+
+=cut
+
+sub unsupportedTypes
+{
+    my ($self,$other)=@_;
+    $other=$other || $defaultTypes;
+    my @missing=();
+    foreach my $type (keys %$self )
+    {
+        if( ! exists $other->{$type})
+        {
+            push(@missing,$type);
+            next;
+        }
+        my $subtypes=$self->{$type};
+        
+        
+        foreach my $subtype (keys %$subtypes)
+        {
+            if( ! exists $other->{$type}->{$subtype} )
+            {
+                push(@missing,"$type:$subtype")
+            }
+        }
+    }
+    @missing=sort(@missing);
+    return wantarray ? @missing : \@missing;
+}
+
 =head2 LINZ::GNSS::FileTypeList::LoadDefaultTypes($cfg)
 
 Loads the default types from the file type list.  Generally should be called

@@ -776,8 +776,8 @@ sub checkRequest
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
     return 0,undef if 
         $request->use_station && 
-        ! ( ($self->{allstations} && ! $matchstation
-              || exists $self->{stncodes}->{uc($request->station)}));
+        ! ( ($self->{allstations} && ! $matchstation)
+              || exists $self->{stncodes}->{uc($request->station)});
 
     return 0,undef if
         $request->use_station  

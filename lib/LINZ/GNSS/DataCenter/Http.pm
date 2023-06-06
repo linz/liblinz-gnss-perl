@@ -33,10 +33,11 @@ sub getfilelist
 {
     my( $self,$spec)=@_;
     my $path=$spec->path;
-    my $uripath=$spec->expandName($self->{filelistpath});
+    my $uripath=$self->{filelistpath};
+    $uripath =~ s/\[path\]/$path/eg;
+    $uripath = $spec->expandName($uripath);
     croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri in configuration\n"
         if ! $uripath;
-    $uripath =~ s/\[path\]/$path/eg;
     my $list=$self->cachedFileList($uripath);
     return $list if $list;
     my $url=$self->{uri}.$uripath;

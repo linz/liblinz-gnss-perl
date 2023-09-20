@@ -49,6 +49,7 @@ use fields qw (
     fileid
     _logger
     _filelistcache
+    _checkfilelist
     );
 
 # scratchdir, fileid, and ftp are managed internally to 
@@ -129,6 +130,7 @@ configuration is defined as
   priority #
   uri  data_center_uri
   stations stn1 stn2 ...
+  usefilelist 1
   ....
   <datafiles>
      <type>
@@ -149,6 +151,9 @@ used.
 The priority defines the preference from which files are located.  A priority 
 of 0 means a datacentre will not be selected by default, it must be explicitly 
 chosen.  
+
+The default for data centers that support it is to check the directory listing before
+trying to fetch a file.  Set to 0 to not do this.
 
 The URI can either be an ftp or local file scheme (eg ftp://user:password@ftp.somewhere)
 or a file base scheme (eg file:///home/gps/data).  
@@ -266,6 +271,7 @@ sub new
     $self->{connected}=undef;
     $self->{fileid}=0;
     $self->{_filelistcache}={};
+    $self->{_checkfilelist}=0; # Set to 1 to check a file listing before trying to retrieve a file
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
     $self->_logger->debug("Created DataCenter $name");
     return $self;
@@ -907,9 +913,14 @@ sub getfile
 
 sub cachedFileList
 {
-    my ($self,$key,$list)=@_;
-    $self->{_filelistcache}->{$key} = $list if defined $list;
-    return $self->{_filelistcache}->{$key};
+    my ($self,$spec)=@_;
+    my $path=$spec->path;
+    if( ! exists $self->{_filelistcache}->{$path} )
+    {
+        $self->_logger->debug("Getting file listing: Datacenter ".$self->name.": path ",$path);
+        $self->{_filelistcache}->{$path}=$self->getfilelist($spec);
+    }
+    return $self->{_filelistcache}->{$path};
 }
 
 sub _hasWildcard
@@ -918,13 +929,20 @@ sub _hasWildcard
     return $filename =~ /[\?\*]/;
 }
 
-sub _fileMatchingWildcard
+sub _findMatchingFilename
 {
     my($self,$spec,$croak)=@_;
     my $path=$spec->path;
     my $filename=$spec->filename;
-    return $filename if ! $self->_hasWildcard($filename);
-    my $filelist=$self->getfilelist($spec);
+    my $wildcard = $self->_hasWildcard($filename);
+    return $filename if ! $wildcard && ! $self->{_checkfilelist};
+    my $filelist=$self->cachedFileList($spec);
+    if( ! $wildcard )
+    {
+        return $filename if grep {$_ eq $filename} @$filelist;
+        return '' if ! $croak;
+        croak("File $filename not found on $path in Datacenter ".$self->name."\n");
+    }
     my $filere='^'.join('',map {$_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_)} split(/([\?\*])/,$filename)).'$';
     my @filenames = grep(/$filere/,@$filelist);
     if( scalar(@filenames) != 1 )
@@ -947,7 +965,7 @@ sub _getfile
 {
     my($self,$spec,$target)=@_;
     my $path=$spec->path;
-    my $filename=$self->_fileMatchingWildcard($spec,1);
+    my $filename=$self->_findMatchingFilename($spec,1);
     return $self->getfile($path,$filename,$target);
 }
 

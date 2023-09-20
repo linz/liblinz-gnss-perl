@@ -20,6 +20,7 @@ sub new
     $self->SUPER::new($cfgdc);
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::ftp_timeout;
     $self->{ftp_passive} = $cfgdc->{ftppassive} || $LINZ::GNSS::DataCenter::ftp_passive;
+    $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 1;
     return $self;
 }
 
@@ -111,17 +112,16 @@ sub getfilelist
 {
     my ($self,$spec) = @_;
     my $path=$spec->path;
-    my $filelist=$self->cachedFileList($path);
-    return $filelist if $filelist;
     my $ftp = $self->{ftp};
     $ftp->cwd($path);
+    my $filelist;
     if( ! $ftp || ! $ftp->cwd($path) || ! ($filelist = $ftp->ls()))
     {
         my $host = $self->{host};
         $self->_logger->warn("Cannot get file list from $path on $host");
         croak "Cannot get file list from $path on $host\n";
     }
-    return $self->cachedFileList($path,$filelist);
+    return $filelist;
 }
 
 1;

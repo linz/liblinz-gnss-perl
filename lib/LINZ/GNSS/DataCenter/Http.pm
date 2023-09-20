@@ -26,6 +26,10 @@ sub new
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
     my $fre=${cfgdc}->{filelistregex} || '^\s*([\w\.]+)(?:\s|$)';
     $self->{filelistregex}=qr/$fre/;
+    if( $self->{filelistpath} )
+    {
+        $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 1;
+    }
     return $self;
 }
 
@@ -38,17 +42,15 @@ sub getfilelist
     $uripath = $spec->expandName($uripath);
     croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri in configuration\n"
         if ! $uripath;
-    my $list=$self->cachedFileList($uripath);
-    return $list if $list;
     my $url=$self->{uri}.$uripath;
     my $content=$self->_content($url);
     my $filere=$self->{filelistregex};
-    $list=[];
+    my $list=[];
     foreach my $line (split(/[\r\n]+/,$content))
     {
         push(@$list,$1) if $line =~ /$filere/;
     }
-    return $self->cachedFileList($uripath,$list);
+    return $list;
 }
 
 sub getfile

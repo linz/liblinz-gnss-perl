@@ -47,9 +47,11 @@ use fields qw (
     basepath
     connected
     fileid
+    maxdownloads
     _logger
     _filelistcache
     _checkfilelist
+    _ndownloads
     );
 
 # scratchdir, fileid, and ftp are managed internally to 
@@ -212,6 +214,7 @@ sub new
         else { $excludestations->{uc($s)}=$s; }
     }
     my $priority=$cfgdc->{priority} || 0;
+    my $maxdownloads=($cfgdc->{maxdownloads}+0) || 50;
 
     # Create a scratch directory that is unique
     # Use the data centre id and the process id ($$) to achieve this
@@ -230,6 +233,7 @@ sub new
     $self->{priority}=$priority;
     $self->{scratchdir}=$scratchdir;
     $self->{uri}=$uri;
+    $self->{maxdownloads}=$maxdownloads;
 
     # Crude handling for S3 urls
     my $testuri=$uri;
@@ -272,6 +276,7 @@ sub new
     $self->{fileid}=0;
     $self->{_filelistcache}={};
     $self->{_checkfilelist}=0; # Set to 1 to check a file listing before trying to retrieve a file
+    $self->{_ndownloads}=0;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
     $self->_logger->debug("Created DataCenter $name");
     return $self;
@@ -280,7 +285,7 @@ sub new
 sub DESTROY
 {
     my($self)=@_;
-    if( $self->{ftp} )
+    if( $self->{connected} )
     {
         $self->disconnect();
     }
@@ -917,8 +922,11 @@ sub cachedFileList
     my $path=$spec->path;
     if( ! exists $self->{_filelistcache}->{$path} )
     {
+        # If we fail to get the file list then assume invalid path and therefore no files
+        $self->{_filelistcache}->{$path}=[];
         $self->_logger->debug("Getting file listing: Datacenter ".$self->name.": path ",$path);
         $self->{_filelistcache}->{$path}=$self->getfilelist($spec);
+        $self->{_ndownloads} += 1;
     }
     return $self->{_filelistcache}->{$path};
 }
@@ -966,7 +974,9 @@ sub _getfile
     my($self,$spec,$target)=@_;
     my $path=$spec->path;
     my $filename=$self->_findMatchingFilename($spec,1);
-    return $self->getfile($path,$filename,$target);
+    my $result=$self->getfile($path,$filename,$target);
+    $self->{_ndownloads} += 1;
+    return $result;
 }
 
 # Get a list of files available at the specified path, used to handle wildcard requests
@@ -1093,7 +1103,6 @@ sub getData
 
     # Process each file in turn..
 
-    my $connected=$self->{connected};
     my $canconnect=1;
     my $delayed=0;
     my $error=0;
@@ -1121,6 +1130,15 @@ sub getData
             {
                 push(@$downloaded,$tospec);
                 next;
+            }
+
+            # If this connection has already done the maximum number of downloads per
+            # connection then reset the connection
+
+            if( $self->{_ndownloads} >= $self->{maxdownloads} )
+            {
+                $self->disconnect();
+                $self->{_ndownloads}=0;
             }
 
             # If not already connected then connect
@@ -1191,9 +1209,6 @@ sub getData
         # Don't want the temporary file retained..
         unlink($tempfile) if -e $tempfile;
     }
-
-    # Disconnect if wasn't connected before this request
-    $self->disconnect() if ! $connected;
 
     # Update the location of the downloaded files to point to the target base path.
     foreach my $d (@$downloaded)

@@ -1,3 +1,10 @@
+liblinz-gnss-perl (1.97.0-1) bionic; urgency=medium
+
+  [Chris Crook]
+  * Feat: Change management of connections to keep connections open between requests
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 22 Sep 2023 08:00:00 +1300
+
 liblinz-gnss-perl (1.96.0-1) bionic; urgency=medium
 
   [Chris Crook]

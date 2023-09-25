@@ -248,7 +248,7 @@ sub LoadConfig
     }
 
     # Create the scratch directory
-    my $scratchdir=$ENV{LINZGNSS_TMP_DIR};
+    my $scratchdir=$ENV{LINZGNSS_TMP_DIR} || $ENV{TMPDIR};
     $scratchdir=ExpandEnv($config->{scratchdir},"for temporary directory") if ! $scratchdir;
     $scratchdir='/tmp' if ! $scratchdir;
     LINZ::GNSS::DataCenter::makepublicpath($scratchdir) ||

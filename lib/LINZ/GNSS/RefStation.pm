@@ -1,22 +1,16 @@
 use strict;
 use Math::Trig;
 
-=head1 LINZ::GNSS::RefStation
+package LINZ::GNSS::RefStation;
 
-LINZ::GNSS::RefStation manages the definition of a reference station, including availability and the coordinate model.
+=head2 LINZ::GNSS::RefStation
+
+Package just defines some constants.  Actual base class for reference stations is RefStationBase, as
+this avoids recursive file loading with use base 'LINZ::GNSS::RefStation'.
 
 =cut
 
-package LINZ::GNSS::RefStation;
-use base qw(Exporter);
-use XML::Simple;
-use Time::Local;
-use File::Path qw(make_path);
-use Storable;
-use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime/;
-use LINZ::GNSS::Variables qw/ExpandEnv/;
-use Log::Log4perl qw/get_logger/;
-use Carp;
+
 
 use constant {
     MISSING=>0,
@@ -28,10 +22,117 @@ our @EXPORT_OK=qw(
     MISSING
     UNRELIABLE
     AVAILABLE
-    GetRefStations
-    PrepareRankRefStations
-    NextRankedRefStation
     );
+
+our $DefaultDate='2020-01-01';
+
+
+
+package LINZ::GNSS::RefStationBase;
+
+=head1 LINZ::GNSS::RefStationBase
+
+LINZ::GNSS::RefStationBase base class for reference stations.
+
+=cut
+
+
+=head2 my $station=LINZ::GNSS::RefStationBase->new($code, $xyz)
+
+Loads the reference station data from the XML file. 
+
+=cut
+
+use fields qw (
+    code
+    xyz
+    datum
+);
+
+sub new 
+{
+    my ( $self, $code, $xyz, $datum )=@_;
+    $self=fields::new($self) unless ref $self;
+    $self->{code}=$code;
+    $self->{xyz}=$xyz;
+    $self->{datum}=$datum;
+    return $self;
+}
+
+=head2 $station->xxx
+
+Accessor functions for the stations
+
+=over
+
+=item code  The station code
+
+=item site  The station site code (several stations may be on the same site) - defaults to the code
+
+=item priority   The stations priority on the site (lower numbered priority stations are used by preference)
+
+=back
+
+=cut 
+
+sub code { return $_[0]->{code} }
+sub xyz { return $_[0]->{xyz} }
+sub datum { return $_[0]->{datum} }
+sub site { return $_[0]->{code} }
+sub priority { return 1 }
+
+=head2 $station->available($time)
+
+Determines if a station is available at a given time
+
+=cut
+
+sub available { return 1 }
+
+=head2 $station->availability( $start, $end, $use_unreliable )
+
+Determines the percentage availability of a station for the time from $start to $end.  
+If $use_unreliable then days that have been excluded in calculating the model (because
+they don't fit) will be allowed, otherwise they are excluded.
+
+Returns a value between 0 and 1.
+
+=cut
+
+sub availability { return 1 }
+
+=head2 my $xyz=$station->calc_xyz($date);
+
+Calculates the coordinates at a specific date
+(not implemented in base class). Returns XYZ coordinate
+as an array ref, and datum as a string (eg ITRF2008).
+
+=cut
+
+sub calc_xyz 
+{ 
+    my ($self,$date)=@_;
+    my $class=ref($self);
+    die "Function calc_xyz not implemented in class $class\n";
+}
+
+=head1 LINZ::GNSS::RefStationList
+
+LINZ::GNSS::RefStationList is the base class for lists of reference stations.  This 
+manages accessing the list of available stations and prioritizing those stations for use
+in processing the GNSS data for a given location and date.
+
+=cut
+
+
+package LINZ::GNSS::RefStationList;
+use base qw(Exporter);
+use Time::Local;
+use Storable;
+use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime seconds_yearday/;
+use Log::Log4perl qw/get_logger/;
+use Carp;
+
 
 # Factors used in ranking stations...
 #
@@ -44,41 +145,59 @@ our $default_distance_factors=[
 
 our $default_cos_factor=35;
 
-our $refstn_dir;
-our $refstn_filename;
-our $refstn_cachedir;
-our $refstn_list;
+use fields qw(
+    refstn_list
+    available
+    first
+    test_date_func
+    distance_factors
+    cos_factor
+    logger
+);
 
-=head2 LINZ::GNSS::RefStation::LoadConfig
-
-Load reference station information from the configuration file.
-
-Looks for a configuration items RefStationFilename and RefStationCacheDir.
-
-=cut
+our $station_list=undef;
 
 sub LoadConfig
 {
     my ($cfg) = @_;
-    my $filename = $cfg->{refstationfilename};
-    croak("RefStationFilename is not defined in the configuration") if ! $filename;
-    croak("Reference station filename in configuration must include [ssss] as code placeholder")
-        if $filename !~ /\[ssss\]/; 
-   
-    my $dir=$ENV{POSITIONZ_REFSTATION_DIR};
-    $dir = ExpandEnv($cfg->{refstationdir}) if ! defined $dir;
-    croak("RefStationDir is not defined in the configuration") if ! $dir;
-
-    $refstn_dir = $dir;
-    $refstn_filename = "$dir/$filename";
-
-    if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
+    my $refcfg=$cfg->{refstations};
+    if( $refcfg  )
     {
-        my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
-        $cache_dir=$cfg->{refstationcachedir} || 'refstn_cache' if ! $cache_dir;
-        $cache_dir=$refstn_dir.'/'.$cache_dir if $cache_dir !~ /^\//;
-        $refstn_cachedir = $cache_dir;
+        if( exists $refcfg->{modelfilename})  
+        {
+            $LINZ::GNSS::RefStationList::station_list = LINZ::GNSS::StationCoordModelList->new($refcfg);
+        }
+        elsif( exists $refcfg->{coordapiurl} )
+        {
+            my $sourcelists=$cfg->{sourcelists} || {};
+            $LINZ::GNSS::RefStationList::station_list = LINZ::GNSS::StationCoordApiList->new($refcfg, $sourcelists );
+        }
+        else
+        {
+            croak("RefStations does not define either ModelFilename or CoordApiUrl");
+
+        }
     }
+    #!!! backwards compatibility
+    elsif( exists $cfg->{refstationfilename} )
+    {
+        $LINZ::GNSS::RefStationList::station_list = LINZ::GNSS::StationCoordModelList->new($cfg);
+    }
+
+    return $LINZ::GNSS::RefStationList::station_list;
+}
+
+sub StationList
+{
+    return $LINZ::GNSS::RefStationList::station_list;
+}
+
+sub new
+{
+    my($self,$cfg)=@_;
+
+    $self->{logger}=get_logger('LINZ.GNSS.RefStationList');
+
 
     if( exists($cfg->{rankdistancefactor}) )
     {
@@ -88,200 +207,49 @@ sub LoadConfig
         {
             push(@$factors,[$1,$2]) if $line=~/^\s*(\d+\.?\d*)\s+(\d+\.?\d*)\s*$/;
         }
-        $default_distance_factors = $factors;
+        $self->{distance_factors} = $factors;
     }
     if( exists($cfg->{rankcosinefactor}))
     {
-        $default_cos_factor=$cfg->{rankcosinefactor};
+        $self->{cos_factor}=$cfg->{rankcosinefactor};
     }
+    $self->{refstn_list}=undef;
+
+    return $self;
 }
 
-=head2 my $filepath=LINZ::GNSS::RefStation::RefStationFile($code)
 
-Returns the filepath in which a reference station definition file is stored
-
-=cut
-
-sub RefStationFile
+sub _getRefStations
 {
-    my ($code)=@_;
-    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
-    $code=uc($code);
-    my $filepath=$refstn_filename;
-    $filepath=~s/\[ssss\]/$code/g;
-    return $filepath;
+    my ($self)=@_;
+    my $class = ref($self);
+    die "Implementation error: _getRefStations not defined in $class\n";
 }
 
-=head2 my $filepath=LINZ::GNSS::RefStation::GetStation($code)
-
-Returns the station corresponding to a station code
-
-=cut
-
-sub GetStation
+sub _requiredDates
 {
-    my ($code)=@_;
-    my $file=LINZ::GNSS::RefStation::RefStationFile($code);
-    my $station=LINZ::GNSS::RefStation->new($file);
-    return $station;
-}
-
-=head2 my $list=LINZ::GNSS::RefStation::GetRefStations($filepattern,%options)
-
-Returns an array hash of RefStation objects.  The list is loaded from the files
-matching the supplied file name pattern, which should include the string [ssss] 
-that will be substituted with the name of the station.  Each matching file will
-attempt to be loaded, and added to the list if successful.  
-
-The parameters are the filepattern, and options.  Options can include:
-
-=over
-
-=item cache_dir=>dirname
-
-Defines a directory for caching the interpreted stations
-
-=item required_date=>date
-
-The date at which the station is required supplied as seconds.  Stations not
-during the 24 hours starting at this date will not be included
-
-=item required_dates=>[startdate,enddate]
-
-Alternative to required_date, specifies the start and end of the range in which
-the station is required
-
-=item use_unreliable=>1
-
-If included then data marked as unreliable (days which were excluded in the 
-station coordinate modelling) are not included. Default is 0.
-
-=item availability_required=>95
-
-If included then stations available for at least this percentage of the test
-range will be included. Default is 100.
-
-=back
-
-=cut
-
-sub _cachefile
-{
-    my($filename,$cachedir)=@_;
-    $filename=~s/^.*(\/|\\)//;
-    $filename=~s/\.xml$//i;
-    return $cachedir.'/'.$filename.'.cache';
-}
-
-sub GetRefStations
-{
-    my ($filename,%options) = @_;
-    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
-
-    my $savelist = 0;
-    if( ! @_ )
-    {
-        return $refstn_list if defined $refstn_list;
-        $savelist = 1;
-        $filename=$refstn_filename;
-        if( $refstn_cachedir )
-        {
-            $options{cache_dir} = $refstn_cachedir;
-        }
-    }
-    $filename =~ /\[ssss\]/ || croak("Filename in RefStation::GetRefStations must include [ssss]");
-    foreach my $key (keys %options)
-    {
-        croak("Invalid option $key in RefStation::GetRefStations")
-          if $key !~ /^(cache_dir|required_dates?|use_unreliable|availability_required)$/;
-    }
-    my $testdates=0;
+    my($self,%options)=@_;
     my $startdate=0;
     my $enddate=0;
-    my $required=exists $options{availability_required} ? 
-        $options{availability_required}/100.0 : 0.99999;
-    my $use_unreliable=$options{use_unreliable};
     if( exists( $options{required_dates} ) )
     {
-        $testdates=1;
         ($startdate, $enddate)=@{$options{required_dates}};
     }
     elsif( exists( $options{required_date} ) )
     {
-        $testdates=1;
         $startdate = $options{required_date};
         $enddate = $startdate + $SECS_PER_DAY - 1;
     }
-    my $cachedir;
-    if( exists( $options{cache_dir} ) )
-    {
-        $cachedir = $options{cache_dir};
-        if( ! -d $cachedir )
-        {
-            my $errval;
-            my $umask=umask(0000);
-            make_path($cachedir,{error=>\$errval});
-            umask($umask);
-        }
-        croak("Invalid cache directory $cachedir") 
-            if ! -d $cachedir;
-    }
-    my $fileglob=$filename;
-    $fileglob =~ s/\[ssss\]/????/;
-    my $stations=[];
-    foreach my $spmf ( glob($fileglob) )
-    {
-        my $cachekey;
-        my $cachefile;
-        if( $cachedir )
-        {
-            $cachekey=sprintf("%s:%s",(stat($spmf))[7,9]);
-            $cachefile=_cachefile($spmf,$cachedir);
-            if( -e $cachefile )
-            {
-                eval
-                {
-                    my $ref=retrieve($cachefile);
-                    if( $ref->{key} eq $cachekey )
-                    {
-                        my $value=$ref->{value};
-                        push(@$stations,$value) if $value;
-                        next;
-                    }
-                    unlink($cachefile);
-                };
-            }
-        }
-        my $m;
-        eval
-        {
-            $m=LINZ::GNSS::RefStation->new($spmf);
-            if ($testdates)
-            {
-                my $availability=$m->availability($startdate,$enddate,$use_unreliable);
-                next if $availability < $required;
-            }
-            push(@$stations,$m);
-        };
-        if( $@ )
-        {
-            carp($@);
-            $m=0;
-        }
-        if( $cachedir )
-        {
-            my $ref={key=>$cachekey,value=>$m};
-            eval
-            {
-                store($ref,$cachefile);
-            };
-        }
-    }
-    if( $savelist ) { $refstn_list=$stations; }
-    return $stations;
+    return $startdate,$enddate;
 }
 
-=head2 $stnlist=LINZ:GNSS::RefStation::PrepareRankRefStations($srclist,$xyz,%options)
+sub stations
+{
+    my ($self,%options)=@_;
+    return $self->_getRefStations(%options);
+}
+
+=head2 $stnlist=$list->rankStations($srclist,$xyz,%options)
 
 Determines an ordered list of stations to use as reference stations.  Stations
 are selected from a supplied list, ordering according to a factor based on their
@@ -291,10 +259,11 @@ and the angle to the test point from higher ranked stations.
 This function prepares a list of potential stations that is used by NextRankedRefStation.
 The usage is:
 
-   my $rankdata = LINZ::GNSS::RefStation::PrepareRankRefStations( ... );
+   my $stationlist = LINZ::GNSS::RefStationList::LoadConfig($cfg);
+   $stationlist->rankStations( ... );
    my $used=0;
    my $nused=0;
-   while( my $stn=LINZ::GNSS:RefStation::NextRankedRefStation($rankdata,$used))
+   while( my $stn=$stnlist->nextRankedRefStation($used))
    {
        
        $used=1 if canuse($stn);
@@ -343,13 +312,13 @@ between an already ranked station and the proposed next station.  (Default 35)
 
 =item required_date=>date
 
-The date at which the station is required supplied as seconds.  Stations not
-during the 24 hours starting at this date will not be included
+The date at which the station is required supplied as timestamp in seconds.  
+Stations not observed during the 24 hours starting at this date will not be included
 
 =item required_dates=>[startdate,enddate]
 
 Alternative to required_date, specifies the start and end of the range in which
-the station is required
+the station is required (each as a timestamp in seconds)
 
 =item use_unreliable=>1
 
@@ -410,9 +379,10 @@ sub _formCodeList
     return $codelist;
 }
 
-sub PrepareRankRefStations 
+
+sub rankStations() 
 {
-    my ( $srclist, $xyz, %options )=@_;
+    my ( $self, $xyz, %options )=@_;
 
     foreach my $key (keys %options)
     {
@@ -420,31 +390,19 @@ sub PrepareRankRefStations
           if $key !~ /^(include|exclude|required_dates?|use_unreliable|availability_required)$/;
     }
 
-    my $logger=get_logger('LINZ.GNSS.PrepareRankRefStations');
+    my $logger=$self->{logger};
 
     my $debug=$logger->is_debug();
     $logger->debug(sprintf("Rank ref stations: basepoint [%.3f,%.3f,%.3f]",
             $xyz->[0],$xyz->[1],$xyz->[2]));
 
-    my $factors = $options{distance_factors} || $default_distance_factors;
-    my $cosfactor= $options{angle_factor} || $default_cos_factor;
-    my $testdates=0;
-    my $startdate=0;
-    my $enddate=0;
+    my $factors = $options{distance_factors} || $self->{distance_factors};
+    my $cosfactor= $options{angle_factor} || $self->{cos_factor};
     my $required=exists $options{availability_required} ? 
         $options{availability_required}/100.0 : 0.99999;
     my $use_unreliable=$options{use_unreliable};
-    if( exists( $options{required_dates} ) )
-    {
-        $testdates=1;
-        ($startdate, $enddate)=@{$options{required_dates}};
-    }
-    elsif( exists( $options{required_date} ) )
-    {
-        $testdates=1;
-        $startdate = $options{required_date};
-        $enddate = $startdate + $SECS_PER_DAY - 1;
-    }
+    my  ($startdate, $enddate ) = $self->_requiredDates(%options);
+    my $testdates=$startdate != 0;
     my $testdatefunc;
     if( $testdates )
     {
@@ -478,7 +436,7 @@ sub PrepareRankRefStations
         }
     }
 
-    my $refdate=$startdate ? ($startdate+$enddate)/2.0 : datetime_seconds('2000-01-01');
+    my $refdate=$startdate ? ($startdate+$enddate)/2.0 : datetime_seconds($LINZ::GNSS::RefStation::DefaultDate);
 
     my $include=_formCodeList($options{include});
     $include=undef if ! %$include;
@@ -491,6 +449,7 @@ sub PrepareRankRefStations
     # Compile into sites (arrays of stations at the same site)
     # Calculate site information from the first station defined for the site
 
+    my $srclist = $self->stations(required_date=>$refdate);
     foreach my $stn ( @$srclist ) 
     {
         my $code=$stn->code();
@@ -515,7 +474,7 @@ sub PrepareRankRefStations
         my @sorted=sort {$a->{priority} <=> $b->{priority}} @{$site->{stations}};
         $site->{stations}=\@sorted;
         my $stn=$sorted[0]->{stn};
-        my $stnxyz = $stn->calc_xyz($refdate);
+        my ($stnxyz,$stndatum) = $stn->calc_xyz($refdate);
         my $dx=$stnxyz->[0]-$xyz->[0];
         my $dy=$stnxyz->[1]-$xyz->[1];
         my $dz=$stnxyz->[2]-$xyz->[2];
@@ -533,6 +492,7 @@ sub PrepareRankRefStations
         $site->{factor}=$dfactor+$cosfactor;
         $site->{dcos}=[$dx/$dist,$dy/$dist,$dz/$dist];
         $site->{xyz}=$stnxyz;
+        $site->{datum}=$stndatum;
 
         # $logger->debug(sprintf("Site %s: location [%.3f,%.3f,%.3f], distance factor %.3f\n",
         #         $site->{$site}, $stnxyz->[0],$stnxyz->[1],$stnxyz->[2], $dfactor));
@@ -543,25 +503,22 @@ sub PrepareRankRefStations
     @available = grep { exists($_->{dfactor}) } @available;
     @available=sort {$b->{factor} <=> $a->{factor}} @available;
 
-    return 
-    {
-        sites=>\@available,
-        testdatefunc=>$testdatefunc,
-        cosfactor=>$cosfactor,
-        logger=>$logger,
-        first=>1,
-    }
+    $self->{test_date_func}=$testdatefunc;
+    $self->{available}=\@available;
+    $self->{cos_factor}=$cosfactor;
+    $self->{first} = 1;
+    return $self;
 };
 
 
-sub NextRankedRefStation
+sub nextRankedStation
 {
-    my($rankdata,$usedlast) = @_;
-    my @available = @{$rankdata->{sites}};
-    my $testdatefunc=$rankdata->{testdatefunc};
-    my $cosfactor=$rankdata->{cosfactor};
-    my $first=$rankdata->{first};
-    $rankdata->{first} = 0;
+    my($self,$usedlast) = @_;
+    my @available = @{$self->{available}};
+    my $testdatefunc=$self->{test_date_func};
+    my $cosfactor=$self->{cos_factor};
+    my $first=$self->{first};
+    $self->{first} = 0;
 
     # If the last station returned was used then remove the site
     # from the available list and update the weighting of the remaining 
@@ -614,35 +571,480 @@ sub NextRankedRefStation
 
     # Update the list of available sites, and return the station
 
-    $rankdata->{sites} = \@available;
+    $self->{available} = \@available;
     return $stn;
 }
 
+=head1 LINZ::GNSS::StationCoordModelList
 
-sub _min
-{
-    my ($a,$b) = @_;
-    return  $a < $b ? $a : $b;
-}
+LINZ::GNSS::StationCoordModelList is a coordinate model based list of reference stations.
 
-sub _max
-{
-    my ($a,$b) = @_;
-    return  $a < $b ? $b : $a;
-}
+=cut
 
+package LINZ::GNSS::StationCoordApiList;
 
-=head2 my $station=LINZ::GNSS::RefStation->new($filename)
+=head1 LINZ::GNSS::StationCoordAPIlList
 
-Loads the reference station data from the XML file. 
+LINZ::GNSS::StationCoordAPIlList is a coordinate model based list of reference stations.
+
+=cut
+
+use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime seconds_yearday/;
+use LINZ::GNSS::Variables qw/ExpandEnv/;
+use LWP::Simple;
+use JSON;
+
+use base 'LINZ::GNSS::RefStationList';
+use fields qw(
+    coordapi_url
+    strategies
+    codes
+    method
+    days_before
+    days_after
+    min_days
+    );
+
+=head2 my $stnlist=LINZ::GNSS::StationCoordModelList->new($cfg)
+
+Load reference station information from the configuration file.
+
+Looks for a configuration items RefStationFilename and RefStationCacheDir.
 
 =cut
 
 sub new
 {
-    my($class,$filename) = @_;
+    my ($self, $cfg, $sourcelists ) = @_;
+    $self=fields::new($self) unless ref $self;
+    $self->SUPER::new($cfg);
+   
+    my $url=$ENV{POSITIONZ_COORDAPI_URL};
+    $url = ExpandEnv($cfg->{coordapiurl}) if ! defined $url;
+    croak("Refstation CoordApiUrl is not defined in the configuration") if ! $url;
+    $self->{coordapi_url} = $url;
+
+    my $stglist = $cfg->{strategies};
+    croak("RefStation strategies is not defined in the configuration") if ! $stglist;
+    my @stglsta=(split(' ',$stglist));
+    $self->{strategies}=\@stglsta;
+
+    my $stnlist = $cfg->{codes};
+    croak("RefStation codes is not defined in the configuration") if ! $stnlist;
+ 
+    my $codes={};
+    foreach my $s (split(' ',$stnlist))
+    {
+        if( $s =~ /^\@(\w+)$/ )
+        {
+            my $inclist=lc($1);
+            foreach my $slk (keys %$sourcelists)
+            {
+                if( lc($slk) eq $inclist )
+                {
+                    foreach my $s (split(' ',$sourcelists->$slk))
+                    {
+                        $codes->{uc($s)}=$s if $s =~ /^\w+$/;
+                    }
+                }
+            }
+        }
+        elsif( $s =~ /^\w+$/ )
+        {
+            $codes->{uc($s)}=$s;
+        }
+        else
+        {
+            warn("Refstation code $s is not valid");
+        }
+    }
+    $self->{codes}=$codes;
+
+    $self->{method}=lc($cfg->{method}) || 'mean';
+    croak("RefStation method $self->{method} is not valid: must be mean or median") if $self->{method} !~ /^(mean|median)$/;
+
+    foreach my $item ('days_before','days_after')
+    {
+        my $cfgitem=$item;
+        $cfgitem =~ s/(?:^|_)(\w)/uc($1)/eg; # Camel case
+        my $days=$cfg->{lc($cfgitem)};
+        $days=28 if $days eq '';
+        $self->{$item}=$days+0;
+        croak("RefStation $item $days is not valid, must be a number > 0") if $self->{$item}==0;
+    }
+
+    my $mindays=$cfg->{mindays};
+    $mindays=7 if $mindays eq '';
+    $self->{min_days}= $mindays+0;
+    croak("RefStation MinDays must be a number greater than 0") if $self->{min_days} == 0;
+
+    return $self;
+}
+
+sub _getRefStations
+{
+    my ($self,%options)=@_;
+    my  ($startdate, $enddate ) = $self->_requiredDates(%options);
+    my $refdate=$startdate ? ($startdate+$enddate)/2.0 : datetime_seconds($LINZ::GNSS::RefStation::DefaultDate);
+    my $apistart=$refdate-$self->{days_before}*$SECS_PER_DAY;
+    my $apiend=$refdate-$self->{days_after}*$SECS_PER_DAY;
+    my $ydstart=sprintf("%04d:%03d",seconds_yearday($apistart));
+    my $ydend=sprintf("%04d:%03d",seconds_yearday($apiend));
+    my @codes=keys %{$self->{codes}};
+    my $endpoint=$self->{coordapi_url}."/strategy_coordinates";
+    my $baseurl=$endpoint."?from_epoch=$ydstart&to_epoch=$ydend&method=$self->{method}&min_sessions=$self->{min_days}";
+
+    my %stations=();
+    foreach my $stg (@{$self->{strategies}})
+    {
+        my $url=$baseurl."&strategy=$stg&code=".join("%2B",@codes);
+        my $crdjson=get($url);
+        next if ! $crdjson;
+        my $crddef=decode_json $crdjson;
+        my $datum=$crddef->{datum};
+        my $fields=$crddef->{fields};
+        foreach my $stnfld (@{$crddef->{data}})
+        {
+            # Create hash from lists of field names and values
+            my %stndef;
+            @stndef{@$fields}=@$stnfld;
+            my $stn=LINZ::GNSS::ApiRefStation->new($stndef{code},
+                [$stndef{x},$stndef{y},$stndef{z}],$datum,$refdate);
+            $stations{uc($stndef{code})}=$stn;
+        }
+        my @reqcodes=();
+        foreach my $code (@codes)
+        {
+            push(@reqcodes,$code) if ! exists $stations{$code};
+        }
+        last if ! @reqcodes;
+        @codes=@reqcodes;
+    }
+    my @refstns=(values %stations);
+    return \@refstns;
+}
+
+
+package LINZ::GNSS::ApiRefStation;
+
+=head1 LINZ::GNSS::ApiRefStation
+
+LINZ::GNSS::RefStation manages the definition of a reference station based on a station coordinate model
+
+=cut
+
+
+=head2 my $station=LINZ::GNSS::ApiRefStation->new($code, $xyz, $datum, $refdate )
+
+Loads the reference station data from the XML file. 
+
+=cut
+
+use LINZ::GNSS::Time qw($SECS_PER_DAY);
+use Carp;
+
+use base 'LINZ::GNSS::RefStationBase';
+use fields qw(
+    refdate
+);
+
+
+sub new
+{
+    my( $self, $code, $xyz, $datum, $refdate )=@_;
+    $self=fields::new($self) unless ref $self;
+    $self->SUPER::new($code,$xyz, $datum);
+    $self->{refdate}=$refdate;
+    return $self;
+}
+
+sub calc_xyz
+{
+    my($self,$date)=@_;
+    croak("Cannot revaluate coordinate API station $self->{code} XYZ at different epoch")
+        if abs($date-$self->{refdate}) > $SECS_PER_DAY;
+    return $self->{xyz}, $self->{datum};
+}
+
+package LINZ::GNSS::StationCoordModelList;
+
+=head1 LINZ::GNSS::StationCoordModelList
+
+LINZ::GNSS::StationCoordModelList is a coordinate model based list of reference stations.
+
+=cut
+
+package LINZ::GNSS::StationCoordModelList;
+
+use LINZ::GNSS::Time qw($SECS_PER_DAY);
+use LINZ::GNSS::Variables qw/ExpandEnv/;
+use File::Path qw(make_path);
+
+use Carp;
+
+use base 'LINZ::GNSS::RefStationList';
+use fields qw(
+    refstn_dir
+    refstn_filename
+    refstn_cachedir
+    );
+
+=head2 my $stnlist=LINZ::GNSS::StationCoordModelList->new($cfg)
+
+Load reference station information from the configuration file.
+
+Looks for a configuration items RefStationFilename and RefStationCacheDir.
+
+=cut
+
+# Note: backwards compatibility is for getdata.conf without <RefStations> as defined section in the configuration,
+# using explicit config items prefixed RefStation.
+
+sub new
+{
+    my ($self, $cfg) = @_;
+    $self=fields::new($self) unless ref $self;
+    $self->SUPER::new($cfg);
+
+    #!!! backwards compatibility
+    my $filename = $cfg->{modelfilename} || $cfg->{refstationfilename};
+    croak("RefStationFilename is not defined in the configuration") if ! $filename;
+    croak("Reference station filename in configuration must include [ssss] as code placeholder")
+        if $filename !~ /\[ssss\]/; 
+   
+    my $dir=$ENV{POSITIONZ_REFSTATION_DIR};
+    #!!! backwards compatibility
+    $dir = ExpandEnv($cfg->{directory} || $cfg->{refstationdir}) if ! defined $dir;
+    croak("RefStationDir is not defined in the configuration") if ! $dir;
+
+    $self->{refstn_dir} = $dir;
+    $self->{refstn_filename} = "$dir/$filename";
+
+    if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
+    {
+        my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
+        #!!! backwards compatibility
+        $cache_dir=$cfg->{cachedir} || $cfg->{refstationcachedir} || 'refstn_cache' if ! $cache_dir;
+        $cache_dir=$self->{refstn_dir}.'/'.$cache_dir if $cache_dir !~ /^\//;
+        $self->{refstn_cachedir} = $cache_dir;
+    }
+    return $self;
+}
+
+=head2 my $filepath=$self->refStationFile($code)
+
+Returns the filepath in which a reference station definition file is stored
+
+=cut
+
+sub refStationFile
+{
+    my ($self,$code)=@_;
+    croak("Reference station directory $self->{refstn_dir} doesn't exist") if ! -d $self->{refstn_dir};
+    $code=uc($code);
+    my $filepath=$self->{refstn_filename};
+    $filepath=~s/\[ssss\]/$code/g;
+    return $filepath;
+}
+
+=head2 my $filepath=LINZ::GNSS::RefStation::GetStation($code)
+
+Returns the station corresponding to a station code
+
+=cut
+
+sub getStation
+{
+    my ($self,$code)=@_;
+    my $file=$self->refStationFile($code);
+    my $station=LINZ::GNSS::SCMRefStation->new($file);
+    return $station;
+}
+
+=head2 my $list=$self->_getRefStations($filepattern,%options)
+
+Returns an array hash of RefStation objects.  The list is loaded from the files
+matching the supplied file name pattern, which should include the string [ssss] 
+that will be substituted with the name of the station.  Each matching file will
+attempt to be loaded, and added to the list if successful.  
+
+The parameters are the filepattern, and options.  Options can include:
+
+=over
+
+=item cache_dir=>dirname
+
+Defines a directory for caching the interpreted stations
+
+=item required_date=>date
+
+The date at which the station is required supplied as seconds.  Stations not
+during the 24 hours starting at this date will not be included
+
+=item required_dates=>[startdate,enddate]
+
+Alternative to required_date, specifies the start and end of the range in which
+the station is required
+
+=item use_unreliable=>1
+
+If included then data marked as unreliable (days which were excluded in the 
+station coordinate modelling) are not included. Default is 0.
+
+=item availability_required=>95
+
+If included then stations available for at least this percentage of the test
+range will be included. Default is 100.
+
+=back
+
+=cut
+
+sub _cachefile
+{
+    my($self,$filename,$cachedir)=@_;
+    $filename=~s/^.*(\/|\\)//;
+    $filename=~s/\.xml$//i;
+    return $cachedir.'/'.$filename.'.cache';
+}
+
+sub _getRefStations
+{
+    my ($self,%options) = @_;
+    my $filename=$self->{refstn_filename};
+    my $savelist = 0;
+    if(scalar(@_) == 1)
+    {
+        return $self->{refstn_list} if defined $self->{refstn_list};
+        $savelist = 1;
+        $filename=$self->{refstn_filename};
+        if( $self->{refstn_cachedir} )
+        {
+            $options{cache_dir} = $self->{refstn_cachedir};
+        }
+    }
+    foreach my $key (keys %options)
+    {
+        croak("Invalid option $key in RefStation::GetRefStations")
+          if $key !~ /^(cache_dir|required_dates?|use_unreliable|availability_required)$/;
+    }
+    my $required=exists $options{availability_required} ? 
+        $options{availability_required}/100.0 : 0.99999;
+    my $use_unreliable=$options{use_unreliable};
+    my  ($startdate, $enddate ) = $self->_requiredDates(%options);
+    my $testdates=$startdate != 0;
+
+    my $cachedir;
+    if( exists( $options{cache_dir} ) )
+    {
+        $cachedir = $options{cache_dir};
+        if( ! -d $cachedir )
+        {
+            my $errval;
+            my $umask=umask(0000);
+            make_path($cachedir,{error=>\$errval});
+            umask($umask);
+        }
+        croak("Invalid cache directory $cachedir") 
+            if ! -d $cachedir;
+    }
+    my $fileglob=$filename;
+    $fileglob =~ s/\[ssss\]/????/;
+    my $stations=[];
+    foreach my $spmf ( glob($fileglob) )
+    {
+        my $cachekey;
+        my $cachefile;
+        if( $cachedir )
+        {
+            $cachekey=sprintf("%s:%s",(stat($spmf))[7,9]);
+            $cachefile=_cachefile($spmf,$cachedir);
+            if( -e $cachefile )
+            {
+                eval
+                {
+                    my $ref=retrieve($cachefile);
+                    if( $ref->{key} eq $cachekey )
+                    {
+                        my $value=$ref->{value};
+                        push(@$stations,$value) if $value;
+                        next;
+                    }
+                    unlink($cachefile);
+                };
+            }
+        }
+        my $m;
+        eval
+        {
+            $m=LINZ::GNSS::SCMRefStation->new($spmf);
+            if ($testdates)
+            {
+                my $availability=$m->availability($startdate,$enddate,$use_unreliable);
+                next if $availability < $required;
+            }
+            push(@$stations,$m);
+        };
+        if( $@ )
+        {
+            carp($@);
+            $m=0;
+        }
+        if( $cachedir )
+        {
+            my $ref={key=>$cachekey,value=>$m};
+            eval
+            {
+                store($ref,$cachefile);
+            };
+        }
+    }
+    if( $savelist ) { $self->{refstn_list}=$stations; }
+    return $stations;
+}
+
+package LINZ::GNSS::SCMRefStation;
+
+=head1 LINZ::GNSS::SCMRefStation
+
+LINZ::GNSS::RefStation manages the definition of a reference station based on a station coordinate model
+
+=cut
+
+
+=head2 my $station=LINZ::GNSS::SCMRefStation->new($filename)
+
+Loads the reference station data from the XML file. 
+
+=cut
+
+use LINZ::GNSS::Time qw($SECS_PER_DAY datetime_seconds);
+use XML::Simple;
+
+use Carp;
+
+use base 'LINZ::GNSS::RefStationBase';
+use fields qw(
+    model
+    start_date
+    end_date
+    site
+    priority
+    outages
+);
+
+use constant {
+    MISSING=>LINZ::GNSS::RefStation::MISSING,
+    UNRELIABLE=>LINZ::GNSS::RefStation::UNRELIABLE,
+    AVAILABLE=>LINZ::GNSS::RefStation::AVAILABLE,
+};
+
+sub new
+{
+    my($self,$filename) = @_;
     my $result= eval
     {
+        $self=fields::new($self) unless ref $self;    
         my $xml=XMLin($filename,
            ForceArray=>[
                'outage',
@@ -663,17 +1065,10 @@ sub new
         my $end_date=datetime_seconds($xml->{end_date}) || 0;
         my $site=$xml->{site} || $code;
         my $priority=$xml->{priority} || 0;
-        my $self= bless
-        {
-            code=>$code,
-            start_date=>$start_date,
-            end_date=>$end_date,
-            site=>$site,
-            priority=>$priority,
-        }, $class;
+
 
         my $cpm=$xml->{coordinate_prediction_model};
-        $self->{model} = new LINZ::GNSS::CoordinateModel($cpm);
+        my $model = new LINZ::GNSS::CoordinateModel($cpm);
 
         my $outages=[];
         my $xo=$xml->{outages};
@@ -696,6 +1091,13 @@ sub new
             }
         }
         $self->{outages}=$outages;
+        $self->{model}=$model;
+        $self->{start_date}=$start_date;
+        $self->{end_date}=$end_date;
+        $self->{site}=$site;
+        $self->{priority}=$priority;
+        $self->{outages}=$outages;
+        $self->SUPER::new($code,$model->xyz0, $model->datum);
         return $self;
     };
     if( $@ )
@@ -721,7 +1123,6 @@ Accessor functions for the stations
 
 =cut
 
-sub code { return $_[0]->{code}; }
 sub site { return $_[0]->{site}; }
 sub priority { return $_[0]->{priority}; }
 
@@ -755,6 +1156,17 @@ Returns a value between 0 and 1.
 
 =cut
 
+sub _min
+{
+    my ($self,$a,$b) = @_;
+    return  $a < $b ? $a : $b;
+}
+
+sub _max
+{
+    my ($self,$a,$b) = @_;
+    return  $a < $b ? $b : $a;
+}
 sub availability
 {
     my ($self,$start,$end,$use_unreliable) = @_;
@@ -763,29 +1175,16 @@ sub availability
     my $total=$end-$start;
     return 0 if $total <= 0;
     my $available=$total;
-    $available -= _max(0,$self->{start_date}-$start);
-    #$available -= _max(0,$end-$self->{end_date}) if $self->{end_date};
+    $available -= $self->_max(0,$self->{start_date}-$start);
+    #$available -= $self->_max(0,$end-$self->{end_date}) if $self->{end_date};
     foreach my $outage (@{$self->{outages}})
     {
         next if $use_unreliable && $outage->{status} == UNRELIABLE;
-        my $ostart=_max($start,$outage->{start});
-        my $oend=_min($end,$outage->{end});
+        my $ostart=$self->_max($start,$outage->{start});
+        my $oend=$self->_min($end,$outage->{end});
         $available -= $oend-$ostart if $oend > $ostart;
     }
     return $available/$total;
-}
-
-=head2 $station->offset_enu( $date )
-
-Determines the east/north/up offset relative to the reference coordinate at a given
-date.
-
-=cut
-
-sub offset_enu
-{
-    my($self,$date) = @_;
-    return $self->{model}->offset_enu($date);
 }
 
 =head2 $station->calc_xyz( $date )
@@ -814,6 +1213,8 @@ sub new
 
     my $date=datetime_seconds($definition->{ref_date});
 
+    my $datum = $definition->{datum} || 'ITRF2008';
+
     my $xyz=[
         $definition->{X0},
         $definition->{Y0},
@@ -834,7 +1235,8 @@ sub new
     {
         xyz0=>$xyz,
         ref_date=>$date,
-        venu=>$venu
+        venu=>$venu,
+        datum=>$datum
     }, $class;
 
     my $components=[];
@@ -867,6 +1269,10 @@ sub new
     return $self;
 }
 
+sub xyz0 { return $_[0]->{xyz0} }
+
+sub datum { return $_[0]->{datum} }
+
 sub offset_enu
 {
     my($self,$date) = @_;
@@ -888,11 +1294,12 @@ sub calc_xyz
     my $denu=$self->offset_enu($date);
     my $xyz0=$self->{xyz0};
     my $venu=$self->{venu};
-    return [
+    my $xyz= [
        $xyz0->[0]+$denu->[0]*$venu->[0]->[0]+$denu->[1]*$venu->[1]->[0]+$denu->[2]*$venu->[2]->[0],
        $xyz0->[1]+$denu->[0]*$venu->[0]->[1]+$denu->[1]*$venu->[1]->[1]+$denu->[2]*$venu->[2]->[1],
        $xyz0->[2]+$denu->[0]*$venu->[0]->[2]+$denu->[1]*$venu->[1]->[2]+$denu->[2]*$venu->[2]->[2]
    ];
+   return $xyz, $self->{datum};
 
 }
 

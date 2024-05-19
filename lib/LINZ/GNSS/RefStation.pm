@@ -81,6 +81,13 @@ sub datum { return $_[0]->{datum} }
 sub site { return $_[0]->{code} }
 sub priority { return 1 }
 
+sub setXyz
+{
+    my($self,$xyz,$datum)=@_;
+    $self->{xyz}=$xyz;
+    $self->{datum}=$datum if $datum;
+}
+
 =head2 $station->available($time)
 
 Determines if a station is available at a given time
@@ -129,7 +136,9 @@ package LINZ::GNSS::RefStationList;
 use base qw(Exporter);
 use Time::Local;
 use Storable;
-use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime seconds_yearday/;
+use LINZ::GNSS::Time qw/$SECS_PER_DAY datetime_seconds seconds_datetime seconds_yearday seconds_decimal_year/;
+use LINZ::Geodetic::CoordSysList;
+use LINZ::Geodetic::CoordSys;
 use Log::Log4perl qw/get_logger/;
 use Carp;
 
@@ -152,7 +161,10 @@ use fields qw(
     test_date_func
     distance_factors
     cos_factor
+    datum
     logger
+    cslist
+    datumcs
 );
 
 our $station_list=undef;
@@ -214,6 +226,9 @@ sub new
         $self->{cos_factor}=$cfg->{rankcosinefactor};
     }
     $self->{refstn_list}=undef;
+    $self->{datum}=$cfg->{datum};
+    $self->{cslist}=undef;
+    $self->{datumcs}={};
 
     return $self;
 }
@@ -241,6 +256,20 @@ sub _requiredDates
         $enddate = $startdate + $SECS_PER_DAY - 1;
     }
     return $startdate,$enddate;
+}
+
+sub _datumCartesianCoordsys
+{
+    my ($self, $datum ) = @_;
+    return $self->{datumcs}->{$datum} if exists $self->{datumcs}->{$datum};
+
+    $self->{cslist} = LINZ::Geodetic::CoordSysList->newFromCoordSysDef if ! $self->{cslist};
+    my $dtm=$self->{cslist}->datum($datum);
+    die "Invalid datum $datum requested." if ! defined $dtm;
+
+    my $dtmcs=LINZ::Geodetic::CoordSys->new(LINZ::Geodetic::CARTESIAN,$datum."_XYZ",$dtm,undef,$datum."_XYZ");
+    $self->{datumcs}->{datum}=$dtmcs;
+    return $dtmcs;
 }
 
 sub stations
@@ -325,6 +354,13 @@ the station is required (each as a timestamp in seconds)
 If included then data marked as unreliable (days which were excluded in the 
 station coordinate modelling) are not included. Default is 0.
 
+=item datum
+
+If this is defined then coordinates will be returned in this datum, otherwise
+in the datum defined in the list configuration, and if that is empty, then
+in the source coordinate datum.  Datum must be an ITRF, eg ITRF2008.  Assumes
+that the coordsys.def file includes a 
+
 =item availability_required=>95
 
 If included then stations available for at least this percentage of the test
@@ -387,7 +423,7 @@ sub rankStations()
     foreach my $key (keys %options)
     {
         croak("Invalid option $key in RefStation::GetRefStations")
-          if $key !~ /^(include|exclude|required_dates?|use_unreliable|availability_required)$/;
+          if $key !~ /^(include|exclude|required_dates?|use_unreliable|availability_required|datum)$/;
     }
 
     my $logger=$self->{logger};
@@ -416,6 +452,9 @@ sub rankStations()
     {
         $testdatefunc= sub { return 1; }
     }
+
+    my $datum=$options{datum} || $self->{datum};
+    my $datumcs = $self->_datumCartesianCoordsys($datum) if $datum;
 
     if( $debug )
     {
@@ -475,6 +514,15 @@ sub rankStations()
         $site->{stations}=\@sorted;
         my $stn=$sorted[0]->{stn};
         my ($stnxyz,$stndatum) = $stn->calc_xyz($refdate);
+        if( $datum && ($stndatum ne $datum) )
+        {
+            my $stncs = $self->_datumCartesianCoordsys($stndatum);
+            my $epoch = seconds_decimal_year($refdate);
+            my $crd=$stncs->coord(@$stnxyz)->as($datumcs,$epoch);
+            $stnxyz=[$crd->X,$crd->Y,$crd->Z];
+            $stndatum=$datum;
+            $stn->setXyz($stnxyz,$stndatum);
+        }
         my $dx=$stnxyz->[0]-$xyz->[0];
         my $dy=$stnxyz->[1]-$xyz->[1];
         my $dz=$stnxyz->[2]-$xyz->[2];

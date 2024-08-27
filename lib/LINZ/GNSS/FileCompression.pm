@@ -3,6 +3,7 @@ package LINZ::GNSS::FileCompression;
 use fields qw( name compress uncompress presuffix postsuffix );
 use Carp;
 use File::Copy;
+use LINZ::GNSS::Variables qw(ExpandEnv);
 
 our $compressionTypes={};
 our $compressionSuffices=[];
@@ -201,10 +202,12 @@ sub new
     $self = fields::new($self) unless ref $self;
     my $name=$cfgcmp->{name} || croak "Name is missing for compression type\n";
     my $command=$cfgcmp->{compress} || croak "Compress command is missing for compression type $name\n";
+    $command=ExpandEnv($command,"compression command for $name compression");
     my @cmdparts=split(' ',$command);
     -x $cmdparts[0] || croak "Compression $name command $cmdparts[0] is not an executable file\n";
     my @compress=@cmdparts;
     $command=$cfgcmp->{uncompress} || croak "Uncompress command is missing for compression type $name\n";
+    $command=ExpandEnv($command,"uncompression command for $name compression");
     @cmdparts=split(' ',$command);
     -x $cmdparts[0] || croak "Compression $name command $cmdparts[0] is not an executable file\n";
     my @uncompress=@cmdparts;

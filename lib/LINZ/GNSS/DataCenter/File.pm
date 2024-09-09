@@ -4,6 +4,7 @@ use strict;
 package LINZ::GNSS::DataCenter::File;
 use base "LINZ::GNSS::DataCenter";
 use fields qw (
+    readonly
     );
 
 use Carp;
@@ -13,6 +14,7 @@ sub new
 {
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
+    $self->{readonly}=1 if $cfgdc->{readonly};
     $self->SUPER::new($cfgdc);
     return $self;
 }
@@ -45,6 +47,11 @@ sub hasfile
 sub putfile
 {
     my ($self,$source,$spec) = @_;
+    if( $self->{readonly} )
+    {
+        $self->SUPER::putfile($source,$spec) if $self->{readonly};
+        return;
+    }
     my $target=$spec->{path};
     $target = $self->{basepath}.'/'.$target if $self->{basepath};
     LINZ::GNSS::DataCenter::makepublicpath($target) || croak "Cannot create target directory $target\n"; 

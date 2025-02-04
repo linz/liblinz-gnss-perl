@@ -112,6 +112,7 @@ sub readAscii
             $key =~ s/^iersDomes/iersDOMES/;
             $key =~ s/^([xyz])Coordinate/$1CoordinateInMeters/;
             $key =~ s/^fourCharacterId/fourCharacterID/;
+            $key =~ s/^nineCharacterId/nineCharacterID/;
             $key =~ s/^latitude$/latitude-North/;
             $key =~ s/^longitude$/longitude-East/;
             $key =~ s/^elevation$/elevation-m_ellips./;
@@ -241,7 +242,7 @@ Return the four character code from the site log identification section.
 sub code
 {
     my($self)=@_;
-    return $self->{id}->{fourCharacterID};
+    return $self->{id}->{fourCharacterID} || substr($self->{id}->{nineCharacterID},0,4);
 }
 
 =head2 $name=$sitelog->name

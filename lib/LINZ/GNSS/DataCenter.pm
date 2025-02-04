@@ -243,8 +243,11 @@ sub new
     if( $scheme eq 'file' )
     {
         # File DataCenters are used for writing data, so need to support all data types
-        my $unsupported=join(', ',$LINZ::GNSS::FileTypeList::defaultTypes->unsupportedTypes($filetypes));
-        croak("Output DataCenter $name doesn't support the following file types: $unsupported\n") if $unsupported;
+        if( ! $cfgdc->{readonly} )
+        {
+            my $unsupported=join(', ',$LINZ::GNSS::FileTypeList::defaultTypes->unsupportedTypes($filetypes));
+            croak("Output DataCenter $name doesn't support the following file types: $unsupported\n") if $unsupported;
+        }
     }
     else
     {

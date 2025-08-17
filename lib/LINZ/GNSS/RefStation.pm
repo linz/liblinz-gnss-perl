@@ -60,25 +60,22 @@ Looks for a configuration items RefStationFilename and RefStationCacheDir.
 sub LoadConfig
 {
     my ($cfg) = @_;
-    my $filename = $cfg->{refstationfilename};
-    croak("RefStationFilename is not defined in the configuration") if ! $filename;
-    croak("Reference station filename in configuration must include [ssss] as code placeholder")
-        if $filename !~ /\[ssss\]/; 
+    $refstn_filename = $cfg->{refstationfilename};
    
-    my $dir=$ENV{POSITIONZ_REFSTATION_DIR};
-    $dir = ExpandEnv($cfg->{refstationdir}) if ! defined $dir;
-    croak("RefStationDir is not defined in the configuration") if ! $dir;
+    $refstn_dir=$ENV{POSITIONZ_REFSTATION_DIR};
+    $refstn_dir = ExpandEnv($cfg->{refstationdir}) if ! defined $refstn_dir;
 
-    $refstn_dir = $dir;
-    $refstn_filename = "$dir/$filename";
-
-    if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
+    if( $refstn_dir )
     {
-        my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
-        $cache_dir=$cfg->{refstationcachedir} || 'refstn_cache' if ! $cache_dir;
-        $cache_dir=$refstn_dir.'/'.$cache_dir if $cache_dir !~ /^\//;
-        $refstn_cachedir = $cache_dir;
+        if( ! $ENV{POSITIONZ_REFSTATION_NO_CACHE})
+        {
+            my $cache_dir=$ENV{POSITIONZ_REFSTATION_CACHE_DIR};
+            $cache_dir=$cfg->{refstationcachedir} || 'refstn_cache' if ! $cache_dir;
+            $cache_dir=$refstn_dir.'/'.$cache_dir if $cache_dir !~ /^\//;
+            $refstn_cachedir = $cache_dir;
+        }
     }
+
 
     if( exists($cfg->{rankdistancefactor}) )
     {
@@ -96,6 +93,16 @@ sub LoadConfig
     }
 }
 
+
+sub _checkRefStationFilenameConfiguration
+{
+    croak("RefStationDir is not defined in the configuration") if ! $refstn_dir;
+    croak("RefStationFilename is not defined in the configuration") if ! $refstn_filename;
+    croak("Reference station filename in configuration must include [ssss] as code placeholder")
+        if $refstn_filename !~ /\[ssss\]/; 
+    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;    
+}
+
 =head2 my $filepath=LINZ::GNSS::RefStation::RefStationFile($code)
 
 Returns the filepath in which a reference station definition file is stored
@@ -105,9 +112,9 @@ Returns the filepath in which a reference station definition file is stored
 sub RefStationFile
 {
     my ($code)=@_;
-    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
+    LINZ::GNSS::RefStation::_checkRefStationFilenameConfiguration();
     $code=uc($code);
-    my $filepath=$refstn_filename;
+    my $filepath="$refstn_dir/$refstn_filename";
     $filepath=~s/\[ssss\]/$code/g;
     return $filepath;
 }
@@ -120,8 +127,8 @@ Returns the station corresponding to a station code
 
 sub GetStation
 {
-    my ($code)=@_;
-    my $file=LINZ::GNSS::RefStation::RefStationFile($code);
+    my ($code,$file)=@_;
+    $file ||= LINZ::GNSS::RefStation::RefStationFile($code);
     my $station=LINZ::GNSS::RefStation->new($file);
     return $station;
 }
@@ -176,14 +183,14 @@ sub _cachefile
 sub GetRefStations
 {
     my ($filename,%options) = @_;
-    croak("Reference station directory $refstn_dir doesn't exist") if ! -d $refstn_dir;
 
     my $savelist = 0;
     if( ! @_ )
     {
         return $refstn_list if defined $refstn_list;
+        LINZ::GNSS::RefStation::_checkRefStationFilenameConfiguration();
         $savelist = 1;
-        $filename=$refstn_filename;
+        $filename="$refstn_dir/$refstn_filename";
         if( $refstn_cachedir )
         {
             $options{cache_dir} = $refstn_cachedir;
@@ -631,6 +638,8 @@ sub _max
     return  $a < $b ? $b : $a;
 }
 
+#############################################################################################
+# Instance definition
 
 =head2 my $station=LINZ::GNSS::RefStation->new($filename)
 
@@ -704,6 +713,29 @@ sub new
     }
     return $result;
 }
+
+
+=head2 my $station=LINZ::GNSS::RefStation->newFromXyz($code,$xyz,%options)
+
+Creates a new reference station object from XYZ coordinates.  This is a static
+coordinate, it calculates to the same value regardless of epoch
+
+=cut
+
+sub newFromXyz
+{
+    my($class,$code,$xyz,%options) = @_;
+    my $self=bless
+    {
+        code=>$code,
+        site=>$options{site} || $code,
+        priority=>$options{priority} || 0,
+        model=>newFromXyz LINZ::GNSS::CoordinateModel($xyz),
+        outages=>[],
+    }, $class;
+    return $self;
+}   
+
 
 =head2 $station->xxx
 
@@ -867,6 +899,19 @@ sub new
     return $self;
 }
 
+sub newFromXyz
+{
+    my($class,$xyz) = @_;
+    my $self = bless
+    {
+        xyz0=>$xyz,
+        ref_date=>0,
+        venu=>[],
+        components=>[],
+    }, $class;
+    return $self;
+}
+
 sub offset_enu
 {
     my($self,$date) = @_;
@@ -885,6 +930,7 @@ sub offset_enu
 sub calc_xyz
 {
     my($self,$date) = @_;
+    return $self->{xyz0} if ! @{$self->{components}};
     my $denu=$self->offset_enu($date);
     my $xyz0=$self->{xyz0};
     my $venu=$self->{venu};

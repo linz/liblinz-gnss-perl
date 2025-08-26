@@ -12,14 +12,16 @@ use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED I
 use LINZ::GNSS::DataCenter;
 use File::Temp qw/tempdir/;
 
+my $havebern = 0;
 eval
 {
     require LINZ::BERN::BernUtil;
     require LINZ::BERN::CrdFile;
+    $havebern = 1;
 };
 if( $@ )
 {
-    die "The LINZ::BERN::BernUtil module is not installed\n";
+    print("Warning: The LINZ::BERN package is not installed - some functions are not available\n");
 }
 
 my %opts;
@@ -37,7 +39,7 @@ my $cacheonly=$opts{c};
 my $cfgfile=$opts{C} || '';
 my $testsources=$opts{t};
 
-LINZ::BERN::BernUtil::SetBerneseEnv();
+LINZ::BERN::BernUtil::SetBerneseEnv() if $havebern;
 LINZ::GNSS::LoadConfig($cfgfile);
 
 my $target=$cacheonly ? undef : $dir;

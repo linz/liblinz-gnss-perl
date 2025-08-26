@@ -24,11 +24,42 @@ sub new
     $self->{cookies}=HTTP::Cookies->new();
     $self->{filelistpath}=${cfgdc}->{filelisturipath};
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
-    my $fre=${cfgdc}->{filelistregex} || '^\s*([\w\.]+)(?:\s|$)';
-    $self->{filelistregex}=qr/$fre/;
     if( $self->{filelistpath} )
     {
-        $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 1;
+
+        my $fre=${cfgdc}->{filelistregex};
+        # If we have a file list and no regex, 
+        # then compile a regex from all product filenames that contain a wildcard
+        if( ! $fre ) 
+        {
+            foreach my $df (values %{$cfgdc->{datafiles}} ) {
+                foreach my $dt ( values %$df ) {
+                    my $filename = $dt->{filename};
+                    if( $filename =~ /\*|\?/ )
+                    {
+                        $filename =~ s/\./\\./g;
+                        $filename =~ s/\*/.*/g;
+                        $filename =~ s/\?/./g;
+                        $filename =~ s/\[h\]/[a-x]/gi;
+                        $filename =~ s/\[d\]/\\d/gi;
+                        $filename =~ s/\[(?:yy|ww|hh)\]/\\d\\d/gi;
+                        $filename =~ s/\[ddd\]/\\d\\d\\d/gi;
+                        $filename =~ s/\[dddh\]/\\d\\d\\d[a-x]/gi;
+                        $filename =~ s/\[(?:yyyy|wwww)\]/\\d\\d\\d\\d/gi;
+                        $filename =~ s/\[ssss\]/\\w\\w\\w\\w/gi;
+                        $fre .= $filename."|";
+                    }
+                }
+            }
+            $fre =~ s/\|$//;
+            $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"");
+            $fre = "\\b($fre)\\b";
+        }
+        $self->{filelistregex}=qr/$fre/;
+        if( $self->{filelistpath} )
+        {
+            $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 1;
+        }
     }
     return $self;
 }
@@ -43,13 +74,16 @@ sub getfilelist
     croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri in configuration\n"
         if ! $uripath;
     my $url=$self->{uri}.$uripath;
+    $self->_logger->debug("Retrieving file list from $url");
     my $content=$self->_content($url);
     my $filere=$self->{filelistregex};
-    my $list=[];
-    foreach my $line (split(/[\r\n]+/,$content))
-    {
-        push(@$list,$1) if $line =~ /$filere/;
+    my $listhash={};
+    while ($content =~ /$filere/g) {
+        $listhash->{$1}=1;
     }
+    my $list = [keys %$listhash];
+    my $file0 = $list->[0];
+    $self->_logger->debug("Found ".scalar(keys %$listhash)." files: $file0 ...");
     return $list;
 }
 

@@ -63,7 +63,14 @@ sub LoadConfig
     $refstn_filename = $cfg->{refstationfilename};
    
     $refstn_dir=$ENV{POSITIONZ_REFSTATION_DIR};
-    $refstn_dir = ExpandEnv($cfg->{refstationdir}) if ! defined $refstn_dir;
+    eval
+    {
+        $refstn_dir = ExpandEnv($cfg->{refstationdir}) if ! defined $refstn_dir;
+    };
+    if( $@ )
+    {
+        warn("Reference station directory not defined: $@\n");
+    }
 
     if( $refstn_dir )
     {

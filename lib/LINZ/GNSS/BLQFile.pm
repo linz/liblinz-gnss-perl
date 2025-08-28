@@ -118,7 +118,7 @@ sub readBlqData
         {
             $computed=$1;
         }
-        elsif( $l =~ /^\$\$\s+([\w\s]+)\,\s+RADI\s+TANG\s+lon\/lat\:\s+(\S+)\s+(\S+)\s+(\S+)\s*$/ )
+        elsif( $l =~ /^\$\$\s+(\w+)\s*\,?\s+RADI\s+TANG\s+lon\/lat\:\s+(\S+)\s+(\S+)\s+(\S+)\s*$/ )
         {
             ($code,$lon,$lat,$hgt)=($1,$2,$3,$4);
             last;
@@ -127,7 +127,7 @@ sub readBlqData
         {
             $model=$1;
         }
-    }
+    }e
 
     while($l=<$fh>)
     {

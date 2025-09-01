@@ -127,7 +127,7 @@ sub readBlqData
         {
             $model=$1;
         }
-    }e
+    }
 
     while($l=<$fh>)
     {

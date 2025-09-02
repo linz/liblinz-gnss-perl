@@ -18,6 +18,7 @@ The cache itself retrieves files from the prioritized source data centres.
 
 package LINZ::GNSS::FileCache;
 use fields qw(
+    usedb
     dbh 
     dbfile
     basepath
@@ -56,6 +57,7 @@ sub new
     $self=fields::new($self) unless ref $self;
     return $self if $ENV{LINZGNSS_NO_CACHE};
     my $datacenter;
+    $self->{usedb} = 1;
     if( $ENV{LINZGNSS_CACHE_DIR} )
     {
         $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($ENV{LINZGNSS_CACHE_DIR},
@@ -66,8 +68,7 @@ sub new
     {
         $datacenter = LINZ::GNSS::DataCenter::GetCenter($datacenter_name);
         croak "Invalid datacenter $datacenter_name for FileCache\n" if ! $datacenter;
-        croak "FileCache datacenter $datacenter_name invalid as is not a file based center\n"
-            if $datacenter->scheme ne 'file';
+        $self->{usedb} = 0 if $datacenter->scheme ne 'file';
     }
     my $basepath=$datacenter->basepath;
     if( ! -d $basepath )
@@ -78,24 +79,29 @@ sub new
         umask $umask;
         croak "Cannot create LINZ::GNSS::FileCache cache directory at $basepath\n" if @$errval;
     }
-    my $dbfile=$basepath.'/cache.db';
-    my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","",
-        {sqlite_use_immediate_transaction=>1} )
-       || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
-            DBI->errstr."\n";
-    chmod 0664, $dbfile;
-    $self->{dbh} = $dbh;
-    $self->{dbfile} = $dbfile;
+    if( $self->{usedb} )
+    {
+        my $dbfile=$basepath.'/cache.db';
+        my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","",
+            {sqlite_use_immediate_transaction=>1} )
+           || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
+                DBI->errstr."\n";
+        chmod 0664, $dbfile;
+        $self->{dbh} = $dbh;
+        $self->{dbfile} = $dbfile;
+        $self->_setupTables();
+    }
     $self->{basepath} = $basepath;
     $self->{datacenter} = $datacenter;
     $self->{jobretention} = $DefaultJobRetention;
     $self->{queuelatency} = $DefaultQueueLatency;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.FileCache');
-    $self->_logger->debug("Created FileCache for datacenter $datacenter_name using $dbfile");
-    $self->_setupTables();
+    my $dbmessage = $self->{dbfile} ? "using $self->{dbfile}" : "- no database";
+    $self->_logger->debug("Created Cache for datacenter $datacenter_name $dbmessage");
     return $self;
 }
 
+sub usedb { return $_[0]->{usedb}; }
 sub dbfile { return $_[0]->{dbfile}; }
 sub datacenter { return $_[0]->{datacenter}; }
 sub _logger { return $_[0]->{_logger}; }
@@ -322,7 +328,7 @@ sub fillRequest
         $self->addFile( $id, $dnldfile, $fexpiry );
     }
     # Update the request...
-    $self->addRequest($request);
+    $self->addRequest($request) if $self->{usedb};
     return $status;
 }
 
@@ -356,6 +362,7 @@ Returns a list of jobids of jobs for which all pending requests have now been co
 sub fillPendingRequests
 {
     my($self,$time) = @_;
+    return if ! $self->{usedb};
     $time ||= time();
     my $requests = $self->getRequests(
         where=>'status in (?,?) and available_date < ?',
@@ -515,6 +522,7 @@ The parameter $now is for testing - default is the current time.
 sub purgeFiles
 {
     my($self,$now) = @_;
+    return if ! $self->{usedb};
     $now ||= time();
     my $basepath = $self->{basepath};
     my $dbh = $self->{dbh};
@@ -542,6 +550,7 @@ will be available and the current time.
 sub updateJob
 {
     my( $self, $jobid ) = @_;
+    return if ! $self->{usedb};
     my $dbh = $self->{dbh};
     my ($exists) = $dbh->selectrow_array('select id from jobs where id=?',{},$jobid);
     my ($expiry) = $dbh->selectrow_array('select max(available_date) from requests where jobid=?',{},$jobid);
@@ -567,6 +576,7 @@ Remove data for job $jobid from the cache
 sub deleteJob
 {
     my($self,$jobid) = @_;
+    return if ! $self->{usedb};
     $self->_logger->debug("Deleting job $jobid");
     my $dbh=$self->{dbh};
     $dbh->do('delete from file_requests where request_id in (select id from requests where jobid=?)',{},$jobid);
@@ -584,6 +594,7 @@ date.  Jobs that have expired by $now are deleted.
 sub purgeJobs
 {
     my($self,$now) = @_;
+    return if ! $self->{usedb};
     $now ||= time();
     my $ids = $self->{dbh}->selectcol_arrayref("select id from jobs where expirydate<?",{},$now);
     foreach my $id (@$ids) { $self->deleteJob($id); }
@@ -598,6 +609,7 @@ Remove expired jobs and files
 sub purge
 {
     my($self,$now) = @_;
+    return if ! $self->{usedb};
     $now ||= time();
     $self->purgeJobs($now);
     $self->purgeFiles($now);
@@ -617,8 +629,6 @@ ref of values corresponding to '?' placeholders in where.
 
 The criteria request=$r is treated specially - $r is assumed to be a DataRequest and is 
 updated with the data from the database.
-
-
 
 =cut
 

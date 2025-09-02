@@ -70,4 +70,14 @@ sub getfile
     $self->{_logger}->info("Retrieved $file ($size bytes) from $name");
 }
 
+sub putfile
+{
+    my($self,$source, $spec)=@_;
+    my $target=$spec->{path}.'/'.$spec->{filename};
+    $self->{bucket}->putFile($source,$target);
+    my $size=-s $source;
+    my $name=$self->{name};
+    $self->{_logger}->info("Uploaded $target ($size bytes) to $name");
+}
+
 1;

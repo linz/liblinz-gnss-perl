@@ -69,7 +69,7 @@ sub new()
         $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
         $self->{$item}=$value;
     }
-    # $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
+    $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
     $self->error("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
     my $awsbin=$self->{aws_client};
@@ -162,10 +162,10 @@ sub _runAws
             next if $k eq $idenv || $k eq $keyenv;
             $cmdstr .= "\n$k=$ENV{$k}";
         }
-        $self->debug($cmdstr);
+        $self->debug($cmdstr) if $self->_debug_aws > 1;
         $ok=run(\@command,\$in,\$out,\$err);
-        $self->debug("Output: $out");
-        $self->debug("Error: $err")
+        $self->debug("Output: $out") if $self->_debug_aws > 1;
+        $self->debug("Error: $err") if $self->_debug_aws > 0;
     };
     if( $@ )
     {

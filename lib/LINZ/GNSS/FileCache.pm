@@ -57,7 +57,7 @@ sub new
     $self=fields::new($self) unless ref $self;
     return $self if $ENV{LINZGNSS_NO_CACHE};
     my $datacenter;
-    $self->{usedb} = 1;
+    $self->{usedb} = 0;
     if( $ENV{LINZGNSS_CACHE_DIR} )
     {
         $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($ENV{LINZGNSS_CACHE_DIR},
@@ -68,30 +68,30 @@ sub new
     {
         $datacenter = LINZ::GNSS::DataCenter::GetCenter($datacenter_name);
         croak "Invalid datacenter $datacenter_name for FileCache\n" if ! $datacenter;
-        $self->{usedb} = 0 if $datacenter->scheme ne 'file';
     }
-    my $basepath=$datacenter->basepath;
-    if( ! -d $basepath )
+    if( $datacenter->scheme eq 'file' )
     {
-        my $errval;
-        my $umask=umask 0000;
-        make_path($basepath,{error=>\$errval});
-        umask $umask;
-        croak "Cannot create LINZ::GNSS::FileCache cache directory at $basepath\n" if @$errval;
-    }
-    if( $self->{usedb} )
-    {
+        $self->{usedb} = 1;
+        my $basepath=$datacenter->basepath;
+        $self->{basepath} = $basepath;
+        if( ! -d $basepath )
+        {
+            my $errval;
+            my $umask=umask 0000;
+            make_path($basepath,{error=>\$errval});
+            umask $umask;
+            croak "Cannot create LINZ::GNSS::FileCache cache directory at $basepath\n" if @$errval;
+        }
         my $dbfile=$basepath.'/cache.db';
         my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","",
             {sqlite_use_immediate_transaction=>1} )
-           || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
+        || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
                 DBI->errstr."\n";
         chmod 0664, $dbfile;
         $self->{dbh} = $dbh;
         $self->{dbfile} = $dbfile;
         $self->_setupTables();
     }
-    $self->{basepath} = $basepath;
     $self->{datacenter} = $datacenter;
     $self->{jobretention} = $DefaultJobRetention;
     $self->{queuelatency} = $DefaultQueueLatency;
@@ -764,6 +764,15 @@ sub getData
     if( ! $self->datacenter )
     {
         return LINZ::GNSS::DataCenter::FillRequest($request,$target);
+    }
+    # Try downloading each file to our datacenter if not using database, which
+    # should only download if the file isn't already there, then download from 
+    # our datacenter to the target datacenter. 
+    if( ! $self->{usedb} )
+    {
+        my ($status1,$available1,$downloaded1)=LINZ::GNSS::DataCenter::FillRequest($request,$self->datacenter);
+        my ($status2,$available2,$downloaded2)=$self->datacenter->getData($request,$target);
+        return $status1,$available1,$downloaded2;
     }
     my ($lodged) = $self->getRequests(request=>$request);
     my $download= exists($options{download}) ? $options{download} : 1;

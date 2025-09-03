@@ -34,6 +34,7 @@ Connect to S3 bucket
 sub connect
 {
     my($self) = @_;
+    return if $self->{bucket};
     my $bucketname=$self->host;
     my ($user,$pwd) = $self->credentials(0);
     eval
@@ -64,10 +65,33 @@ sub connect
 sub getfile
 {
     my($self,$path,$file,$target)=@_;
+    $self->connect;
     $self->{bucket}->getFile("$path/$file",$target);
     my $size=-s $target;
     my $name=$self->{name};
     $self->{_logger}->info("Retrieved $file ($size bytes) from $name");
+}
+
+
+# Check to see a file is in the bucket
+
+sub hasfile
+{
+    my($self,$spec)=@_;
+    $self->connect;
+    my $target=$spec->{path}.'/'.$spec->{filename};
+    return $self->{bucket}->fileExists($target);
+}
+
+sub putfile
+{
+    my($self,$source, $spec)=@_;
+    $self->connect;
+    my $target=$spec->{path}.'/'.$spec->{filename};
+    $self->{bucket}->putFile($source,$target);
+    my $size=-s $source;
+    my $name=$self->{name};
+    $self->{_logger}->info("Uploaded $target ($size bytes) to $name");
 }
 
 1;

@@ -61,6 +61,7 @@ sub new()
     $self->{logger}=Log::Log4perl->get_logger('LINZ.GNSS.AwsS3Bucket');
     $self->{aws_access_key_id}=$args{access_key_id};
     $self->{aws_secret_access_key}=$args{secret_access_key};
+    $self->{aws_endpoint} = $ENV{AWS_ENDPOINT_URL};
     my $cfg_prefix=$args{config_prefix} || '';
     foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
     {
@@ -139,6 +140,7 @@ sub _runAws
     my @command=($awsbin);
     push(@command,'--debug') if $self->_debug_aws > 1;
     push(@command,'--only-show-errors') if $command eq 's3' && $self->_debug_aws < 1;
+    push(@command,'--endpoint-url',$self->_aws_endpoint) if $self->_aws_endpoint;
     push(@command,$command,$subcommand,@awsparams,@params);
     my $in='';
     my $out;

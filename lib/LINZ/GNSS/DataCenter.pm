@@ -179,7 +179,7 @@ sub new
     }
     else
     {
-        $filetypes=$LINZ::GNSS::FileTypeList::defaultTypes->clone();
+        $filetypes=$LINZ::GNSS::FileTypeList::DefaultTypes->clone();
     }
 
     my $stnlist=$cfgdc->{stations} || [];
@@ -245,7 +245,7 @@ sub new
         # File DataCenters are used for writing data, so need to support all data types
         if( ! $cfgdc->{readonly} )
         {
-            my $unsupported=join(', ',$LINZ::GNSS::FileTypeList::defaultTypes->unsupportedTypes($filetypes));
+            my $unsupported=join(', ',$LINZ::GNSS::FileTypeList::DefaultTypes->unsupportedTypes($filetypes));
             croak("Output DataCenter $name doesn't support the following file types: $unsupported\n") if $unsupported;
         }
     }
@@ -353,16 +353,18 @@ sub LoadDataCenters
     }
     foreach my $cfgdc (@$dcs)
     {
+        my $dcname;
         eval
         {
             $cfgdc->{stationlists}=$stationlists;
+            $dcname = $cfgdc->{name} || 'unnamed';
             my $center = LINZ::GNSS::DataCenter::Create($cfgdc);
             push(@$centers,$center);
             push(@prioritized_centers,$center) if $center->priority > 0;
         };
         if( $@ )
         {
-            carp "Datacenter not defined: ",$@;
+            $logger->warn("Datacenter $dcname not defined: ".$@);
         }
     }
     @prioritized_centers = sort {$b->priority <=> $a->priority} @prioritized_centers;
@@ -689,9 +691,15 @@ sub description
     return $dsc if $brief;
     my $usestn=0;
     my $prefix="    Data types: ";
+    my $typecodes={};
     foreach my $ft (@{$self->filetypes->types})
     {
-        $dsc .= $prefix.$ft->type.': '.$ft->subtype."\n";
+        my $typecode=$ft->type.':'.$ft->subtype;
+        if( ! exists $typecodes->{$typecode} )
+        {
+            $dsc .= $prefix.$typecode."\n";
+            $typecodes->{$typecode}=1;
+        }
         $prefix="                ";
         $usestn ||= $ft->use_station;
     }
@@ -1175,12 +1183,12 @@ sub getData
                 chomp($message);
                 $self->_logger->info("Retrieve failed: $message");
                 unlink($tempfile) if -e $tempfile;
-                my $ft=$self->filetypes->getFilespecType($spec);
-                my($available,$retry,$fail)=$ft->availableTime($request);
+
+                my ($available,$files, $retry)=$self->filetypes->checkRequest($request);
                 my $now=time();
-                if( $fail < $now )
+                if( ! $available )
                 {
-                    die "Download failed - maximum delay exceeded for this file\n";
+                    die "Download failed - file not available\n";
                 }
                 $delayed=1;
                 $retry += $now;

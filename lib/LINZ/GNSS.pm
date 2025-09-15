@@ -220,19 +220,6 @@ sub LoadConfig
             }
             Log::Log4perl->easy_init({level=>$level, file=>">>$logfile"});
         }
-        elsif( exists $config->{logsettings} )
-        {
-            my $logcfg=$config->{logsettings};
-            my $logfile=$ENV{LINZGNSS_LOG_FILE};
-            if( ! $logfile )
-            {
-                my $logdir=$ENV{LINZGNSS_LOG_DIR};
-                $logdir=_expandvar($config->{logdir}) if ! $logdir;
-                $logfile="$logdir"."/"._expandvar($config->{logfile});
-            }
-            $logcfg =~ s/\[logfilename\]/$logfile/eg;
-            Log::Log4perl->init(\$logcfg);
-        }
         else
         {
             Log::Log4perl->easy_init($WARN);

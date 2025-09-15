@@ -323,7 +323,7 @@ sub fillRequest
     $self->_logger->debug("Request $id FillRequest status $status");
     foreach my $dnldfile (@$files)
     {
-        my $ftype = $datacenter->filetypes->getType($dnldfile->type,$dnldfile->subtype);
+        my $ftype = $datacenter->filetypes->getType($dnldfile->type,$dnldfile->subtype)->[0];
         my $fexpiry = time() + $ftype->retention * $SECS_PER_DAY;
         $self->addFile( $id, $dnldfile, $fexpiry );
     }

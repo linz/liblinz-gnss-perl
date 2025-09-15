@@ -77,10 +77,9 @@ our $SECS_PER_WEEK = $SECS_PER_DAY * 7;
 our @alpha_hours   = qw(a b c d e f g h i j k l m n o p q r s t u v w x);
 our $DATERE        = qr/
                      (\d{4})
-                     (?:\-|\s+)
                      (?:
-                        (\d\d)(?:\-|\s+)(\d\d)|
-                        (\d\d\d)
+                        (?:(?:\-|\s+)(\d\d)(?:\-|\s+)(\d\d))|
+                        (?:(?:\-|\s+|\:)(\d\d\d))
                      )
                      (?:
                      (?:\s+|T\s*)

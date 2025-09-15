@@ -6,12 +6,15 @@ LINZ::GNSS::FileTypeList class defines a set of FileType objects.  These can be 
 types for a particular data source or target. The class wraps a hash of hashes, on type and 
 subtype, and provides accessor and processing functions relating to the group.
 
+Each type/subtype entry is an array ref of one or more FileType objects, as there may be
+multiple definitions of a subtype with different suffixes (eg _1, _2, ...)
+
 =cut
 
 package LINZ::GNSS::FileTypeList;
 use LINZ::GNSS::FileType;
 
-our $defaultTypes={};
+our $DefaultTypes={};
 
 =head2 $list=new LINZ::GNSS::FileTypeList($cfg)
 
@@ -42,7 +45,13 @@ sub clone
     {
         foreach my $subtype(keys(%{$self->{$type}}))
         {
-            $copy->{$type}->{$subtype}=$self->{$type}->{$subtype}->clone();
+            my $subtypes=$self->{$type}->{$subtype};
+            my @newsubtypes=();
+            foreach my $st (@$subtypes)
+            {
+                push(@newsubtypes,$st->clone());
+            }
+            $copy->{$type}->{$subtype}=\@newsubtypes;
         }
     }
     return $copy;
@@ -74,14 +83,46 @@ sub loadTypes
 {
     my ($self, $cfgtypes)=@_;
 
+
     while (my ($type, $subtypedef) = each %$cfgtypes )
     {
+        my $frequencies = {};
+        my $priorities = {};
         $type=uc($type);
-        while (my ($subtype, $cfgft) = each %$subtypedef )
+        while (my ($subtypes, $cfgft) = each %$subtypedef )
         {
-            $subtype=uc($subtype);
-            $self->{$type}->{$subtype} = 
-                new LINZ::GNSS::FileType($type, $subtype, $cfgft );
+            $subtypes=uc($subtypes);
+            my $subtype=$subtypes;
+            $subtype =~ s/_\d+$//; # Remove suffix for multiply defined subtypes
+            my $filetype = new LINZ::GNSS::FileType($type, $subtype, $cfgft);
+            $frequencies->{$subtype} ||= $filetype->frequency;
+            if( $filetype->frequency ne $frequencies->{$subtype} )
+            {
+                my $freq1 = $filetype->frequency;
+                my $freq2 = $frequencies->{$subtype};
+                croak("Conflicting frequency $freq1 and $freq2 for $type:$subtype\n");
+            }
+            if( $filetype->priority )
+            {
+                $priorities->{$subtype} ||= $filetype->priority;
+                if( $filetype->priority != $priorities->{$subtype} )
+                {
+                    my $p1 = $filetype->priority;
+                    my $p2 = $priorities->{$subtype};
+                    croak("Conflicting priority $p1 and $p2 for $type:$subtype\n");
+                }
+            }
+            $self->{$type}->{$subtype} ||= [];
+            push(@{$self->{$type}->{$subtype}}, $filetype);
+        }
+        # Set priorities on subtypes which haven't been set for all variants.
+        foreach my $subtype (keys %$priorities)
+        {
+            my $priority=$priorities->{$subtype};
+            foreach my $ft (@{$self->{$type}->{$subtype}})
+            {
+                $ft->{priority}=$priority;
+            }
         }
     }
     return $self;
@@ -91,7 +132,7 @@ sub loadTypes
 =head2 $list->unsupportedTypes( $otherlist )
 
 Checks that all the types defined in a DataCenter are defined in an another
-data center (or defaultTypes if not defined).
+data center (or DefaultTypes if not defined).
 
 Returns an array of missing types/subtypes
 
@@ -100,7 +141,7 @@ Returns an array of missing types/subtypes
 sub unsupportedTypes
 {
     my ($self,$other)=@_;
-    $other=$other || $defaultTypes;
+    $other=$other || $DefaultTypes;
     my @missing=();
     foreach my $type (keys %$self )
     {
@@ -110,7 +151,6 @@ sub unsupportedTypes
             next;
         }
         my $subtypes=$self->{$type};
-        
         
         foreach my $subtype (keys %$subtypes)
         {
@@ -145,37 +185,22 @@ sub LoadDefaultTypes
 {
     my( $cfg ) = @_;
     my $ftl = new LINZ::GNSS::FileTypeList($cfg->{datatypes});
-    $LINZ::GNSS::FileTypeList::defaultTypes=$ftl;
-}
-
-=head2 $type = $typelist->getType($type,$subtype)
-
-Returns a type from the type list with the specified type and subtype.  If the type
-does not exist return undefined value.
-
-Can be called as LINZ::GNSS::FileTypeList->getType($type,$subtype) to return the 
-default settings for the type.
-
-=cut
-
-sub getType
-{
-    my($self,$type,$subtype) = @_;
-    $type=uc($type);
-    $subtype=uc($subtype);
-    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
-    return exists $self->{$type} && exists $self->{$type}->{$subtype} ?
-           $self->{$type}->{$subtype} :
-           undef;
+    $LINZ::GNSS::FileTypeList::DefaultTypes=$ftl;
 }
 
 =head2 $type = $typelist->getTypes($type, $subtype); or $type=$typeList->getTypes($request);
 
-Returns a list of types matching the specified type and subtype in a data request, ordered from 
-highest to lowest priority.  The list will contain more than one element if 
+Returns a list of types matching the specified type and subtype in a data request, or
+specified in the call ordered from highest to lowest priority.  
+
+The list will contain more than one element if 
 the subtype is suffixed with '+'.  In this case all subtypes with equal or higher
 priority are included.  Use a subtype of '' to list all subtypes with a priority > 0
-or subtype of '*' to list all subtypes.
+or subtype of '*' to list all subtypes.  
+
+The list will also include all subtypes matching the type and subtype with a suffix of _n
+where n is a number.  This allows for different representations of the same product at 
+different times (eg switch from RINEX2 to RINEX3 filenames).
 
 Can be called as LINZ::GNSS::FileTypeList->getTypes($type,$subtype) to return the 
 default settings for the type.
@@ -185,7 +210,7 @@ default settings for the type.
 sub getTypes
 {
     my ($self, $type, $subtype ) = @_;
-    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
+    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::DefaultTypes }
     if( ref($type) )
     {
         my $request=$type;
@@ -202,14 +227,14 @@ sub getTypes
         if( $subtype ne '' && $subtype ne '*' )
         {
             return @result if ! exists $self->{$type}->{$subtype};
-            push(@result,$self->{$type}->{$subtype});
+            push(@result,@{$self->{$type}->{$subtype}});
             $basepriority=$result[0]->{priority};
         }
         if( $plus )
         {
             foreach my $t (values %{$self->{$type}})
             {
-                push(@result,$t) if $t->{priority} > $basepriority || $subtype eq '*';
+                push(@result,@$t) if $t->[0]->{priority} > $basepriority || $subtype eq '*';
             }
             @result = sort {$b->{priority} <=> $a->{priority}} @result;
         }
@@ -220,7 +245,7 @@ sub getTypes
 =head2 @subtypes = $typelist->getSubTypes($type,$plustypes)
 
 Returns a list of valid subtypes for a type.  If $plustypes is true then
-~The list may include '+' types where there is a higher priority option for a type.
+the list may include '+' types where there is a higher priority option for a type.
 
 May be called as LINZ::GNSS::FileTypeList->getSubTypes($type)
 
@@ -229,16 +254,16 @@ May be called as LINZ::GNSS::FileTypeList->getSubTypes($type)
 sub getSubTypes
 {
     my($self,$type,$plustypes) = @_;
-    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
-    my @types=sort {$b->{priority} <=> $a->{priority} || $a->{subtype} cmp $b->{subtype}} values(%{$self->{$type}});
+    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::DefaultTypes }
+    my @types=sort {$b->[0]->{priority} <=> $a->[0]->{priority} || $a->[0]->{subtype} cmp $b->[0]->{subtype}} values(%{$self->{$type}});
     my @subtypes=();
     foreach my $t (@types)
     {
-        if( $plustypes && $t->{priority} && $t->{priority} < $types[0]->{priority} )
+        if( $plustypes && $t->[0]->{priority} && $t->[0]->{priority} < $types[0]->[0]->{priority} )
         {
-            push(@subtypes,$t->{subtype}.'+');
+            push(@subtypes,$t->[0]->{subtype}.'+');
         }
-        push(@subtypes,$t->{subtype});
+        push(@subtypes,$t->[0]->{subtype});
     }
     return wantarray ? @subtypes : \@subtypes;
 }
@@ -271,8 +296,8 @@ sub setFilename
     my $freq;
     if( $srctype )
     {
-        $filename=$srctype->filename;
-        $freq=$srctype->frequencysecs;
+        $filename=$srctype->[0]->filename;
+        $freq=$srctype->[0]->frequencysecs;
     }
     my $renamed_types=[];
     foreach my $type ($self->getTypes($type,$subtype))
@@ -296,14 +321,14 @@ sub canSetFilename
     my ( $self, $type, $subtype, $filename ) = @_;
     # If new name is blank then nothing to do, so result is always success!
     return 1 if $filename eq '';
-    my $type1 = $self->getType($type,$subtype);
+    my $type1 = $self->getTypes($type,$subtype);
     # If not a valid subtype then cannot rename...
     return 0 if ! $type1;
-    my $type2 = $self->getType($type,$filename);
+    my $type2 = $self->getTypes($type,$filename);
     # If new filename is not a subtype then it is just a straight renaming
     return 1 if ! $type2;
     # Otherwise can rename if their have the same frequency
-    return $type1->frequencysecs == $type2->frequencysecs ? 1 : 0;
+    return $type1->[0]->frequencysecs == $type2->[0]->frequencysecs ? 1 : 0;
 }
 
 =head2 @types=$typelist->types()
@@ -315,7 +340,7 @@ Return an array of all types provided by the data source
 sub types
 {
     my($self)=@_;
-    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::defaultTypes; }
+    if( ! ref($self) ) { $self = $LINZ::GNSS::FileTypeList::DefaultTypes }
     my @basetypes=('ORB','ERP','OBS');
     my @othertypes=grep { $_ ne 'ORB' && $_ ne 'ERP' && $_ ne 'OBS' } sort keys %$self;
     my @result=();
@@ -349,18 +374,21 @@ sub checkRequest
     my($self,$request,$stncodes,$subtype,$now) = @_;
     my $files = undef;
     my $available=0;
+    my $retry = 0;
     $now ||= time();
     foreach my $type ( $self->getTypes($request) )
     {
-        next if $subtype && $type->subtype ne $subtype;
-        my ($time)=$type->availableTime($request);
+        my ($time,$tretry,$failtime)=$type->availableTime($request);
         next if ! $time;
         $available=$time if  ! $available || $time < $available;
         next if $time > $now;
+        $retry ||= $tretry;
+        $retry=$tretry if $tretry && $tretry < $retry;
+
         $files = $type->fileList($request,$stncodes);
         last;
     }
-    return $available, $files;
+    return $available, $files, $retry;
 }
 
 =head2 $spec=getSpec($srcspec)
@@ -376,23 +404,7 @@ sub getFilespec
     my $subtype = $srcspec->{subtype};
     return undef if ! exists $self->{$type};
     return undef if ! exists $self->{$type}->{$subtype};
-    return $self->{$type}->{$subtype}->getFilespec($srcspec,$stncodes);
-}
-
-=head2 $spec=getFilespecType($filespec)
-
-Gets the file type matching the FileSpec object
-
-=cut
-
-sub getFilespecType
-{
-    my($self,$srcspec,$stncodes) = @_;
-    my $type = $srcspec->{type};
-    my $subtype = $srcspec->{subtype};
-    return undef if ! exists $self->{$type};
-    return undef if ! exists $self->{$type}->{$subtype};
-    return $self->{$type}->{$subtype};
+    return $self->{$type}->{$subtype}->[0]->getFilespec($srcspec,$stncodes);
 }
 
 

@@ -49,6 +49,8 @@ use fields qw(
     retrysecs
     max_delay
     max_delaysecs
+    valid_before
+    valid_after
     );
 
 
@@ -59,6 +61,7 @@ use LINZ::GNSS::Time qw(
     $SECS_PER_HOUR
     $SECS_PER_WEEK
     $GNSSTIME0
+    datetime_seconds
 );
 use LINZ::GNSS::Variables qw(ExpandEnv);
 
@@ -97,6 +100,7 @@ our $hourcodes = {
     '23'=>'x',
     };
 
+
 our $DefaultRetention=100;
 
 
@@ -125,8 +129,9 @@ sub new
     $type=uc($type);
     $subtype=uc($subtype);
     require LINZ::GNSS::FileTypeList;
-    my $default = LINZ::GNSS::FileTypeList->getType($type,$subtype);
-    $default ||= {};
+    # The default is either the first matching type/subtype in the filetype list or else empty.
+    my $default = LINZ::GNSS::FileTypeList->getTypes($type,$subtype);
+    $default = $default ? $default->[0] : {};
 
     my $name = $cfgft->{name} || $default->{name} || 'No description available'; 
 
@@ -198,6 +203,30 @@ sub new
     $max_delaysecs *= 60 if $2 !~ /^m/;
     $max_delaysecs *= 24 if $2 =~ /^d/;
 
+    my $valid_before=$cfgft->{valid_before} || $default->{valid_before} || '';
+    if( $valid_before )
+    {
+        eval
+        {
+            $valid_before = datetime_seconds($valid_before);
+        };
+        if( $@ )
+        {
+            croak "Invalid valid_before $valid_before for $type:$subtype\n";
+        }
+    }
+    my $valid_after=$cfgft->{valid_after} || $default->{valid_after} || '';
+    if( $valid_after )
+    {
+        eval
+        {
+            $valid_after = datetime_seconds($valid_after);
+        };
+        if( $@ )
+        {
+            croak "Invalid valid_after $valid_after for $type:$subtype\n";
+        }
+    }   
     $self->{type}=$type;
     $self->{subtype}=$subtype;
     $self->{name}=$name;
@@ -218,6 +247,8 @@ sub new
     $self->{retrysecs}=$retrysecs;
     $self->{max_delay}=$max_delay;
     $self->{max_delaysecs}=$max_delaysecs;
+    $self->{valid_before}=$valid_before;
+    $self->{valid_after}=$valid_after;
 
     return $self;
 }
@@ -320,6 +351,8 @@ sub retention{ return $_[0]->{retention}; }
 sub expires{ return $_[0]->{expires}; }
 sub retry { return $_[0]->{retry}; }
 sub max_delay { return $_[0]->{max_delay }; }
+sub valid_before { return $_[0]->{valid_before}; }
+sub valid_after { return $_[0]->{valid_after}; }
 sub use_station{ return $_[0]->{use_station}; }
 
 =head2 
@@ -399,7 +432,8 @@ Returns three values:
 
 the time the data is expected to be available (timestamp in seconds).
 Returns 0 if the file expires and will never be available for the requested
-time.
+time or the the requested time is outside the valid_before and valid_after
+limits.
 
 =item $retry
 
@@ -415,8 +449,18 @@ the time after which missing data is deemed to be unavailable
 
 sub availableTime
 {
-    my($self,$request) = @_;
+    my($self,$request, $now) = @_;
     # Get the last element if this is a sequence
+
+    $now ||= time();
+    if( $self->valid_before && $request->end_epoch > $self->valid_before )
+    {
+        return 0,0,0;
+    }
+    if( $self->valid_after && $request->start_epoch < $self->valid_after )
+    {
+        return 0,0,0;
+    }
     my $timestamp=$request->end_epoch;
     my $increment=$self->{supplyfreqsecs};
 
@@ -428,7 +472,7 @@ sub availableTime
     if( $self->expires )
     {
         my $failtime=$request->start_epoch+$self->expires*$SECS_PER_DAY;
-        if( $failtime < time() )
+        if( $failtime < $now )
         {
             return 0,0,$failtime;
         }

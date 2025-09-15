@@ -24,37 +24,33 @@ sub new
     $self->{cookies}=HTTP::Cookies->new();
     $self->{filelistpath}=${cfgdc}->{filelisturipath};
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
-    if( $self->{filelistpath} )
+    my $fre=${cfgdc}->{filelistregex};
+    # If we have a file list and no regex, 
+    # then compile a regex from all product filenames that contain a wildcard
+    if( ! $fre ) 
     {
-
-        my $fre=${cfgdc}->{filelistregex};
-        # If we have a file list and no regex, 
-        # then compile a regex from all product filenames that contain a wildcard
-        if( ! $fre ) 
-        {
-            foreach my $df (values %{$cfgdc->{datafiles}} ) {
-                foreach my $dt ( values %$df ) {
-                    my $filename = $dt->{filename};
-                    if( $filename =~ /\*|\?/ )
-                    {
-                        $filename =~ s/\./\\./g;
-                        $filename =~ s/\*/.*/g;
-                        $filename =~ s/\?/./g;
-                        $filename =~ s/\[h\]/[a-x]/gi;
-                        $filename =~ s/\[d\]/\\d/gi;
-                        $filename =~ s/\[(?:yy|ww|hh)\]/\\d\\d/gi;
-                        $filename =~ s/\[ddd\]/\\d\\d\\d/gi;
-                        $filename =~ s/\[dddh\]/\\d\\d\\d[a-x]/gi;
-                        $filename =~ s/\[(?:yyyy|wwww)\]/\\d\\d\\d\\d/gi;
-                        $filename =~ s/\[ssss\]/\\w\\w\\w\\w/gi;
-                        $fre .= $filename."|";
-                    }
+        foreach my $df (values %{$cfgdc->{datafiles}} ) {
+            foreach my $dt ( values %$df ) {
+                my $filename = $dt->{filename};
+                if( $filename =~ /\*|\?/ )
+                {
+                    $filename =~ s/\./\\./g;
+                    $filename =~ s/\*/.*/g;
+                    $filename =~ s/\?/./g;
+                    $filename =~ s/\[h\]/[a-x]/gi;
+                    $filename =~ s/\[d\]/\\d/gi;
+                    $filename =~ s/\[(?:yy|ww|hh)\]/\\d\\d/gi;
+                    $filename =~ s/\[ddd\]/\\d\\d\\d/gi;
+                    $filename =~ s/\[dddh\]/\\d\\d\\d[a-x]/gi;
+                    $filename =~ s/\[(?:yyyy|wwww)\]/\\d\\d\\d\\d/gi;
+                    $filename =~ s/\[ssss\]/\\w\\w\\w\\w/gi;
+                    $fre .= $filename."|";
                 }
             }
-            $fre =~ s/\|$//;
-            $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"");
-            $fre = "\\b($fre)\\b";
         }
+        $fre =~ s/\|$//;
+        $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"");
+        $fre = "\\b($fre)\\b";
         $self->{filelistregex}=qr/$fre/;
         if( $self->{filelistpath} )
         {
@@ -68,7 +64,7 @@ sub getfilelist
 {
     my( $self,$spec)=@_;
     my $path=$spec->path;
-    my $uripath=$self->{filelistpath};
+    my $uripath=$self->{filelistpath} || $path;
     $uripath =~ s/\[path\]/$path/eg;
     $uripath = $spec->expandName($uripath);
     croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri in configuration\n"

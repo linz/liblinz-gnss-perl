@@ -56,7 +56,7 @@ sub _expand
     }
     $errmsg .= ' for '.$context if $context;
     $errmsg .= "\n";
-    croak $errmsg;
+    die $errmsg;
 }
 
 sub ExpandEnv

@@ -106,6 +106,7 @@ sub bucket { return $_[0]->{bucket}}
 sub prefix { return $_[0]->{prefix}}
 sub logger { return $_[0]->{logger}}
 sub _aws_client { return $_[0]->{aws_client}}
+sub _aws_endpoint { return $_[0]->{aws_endpoint}}
 sub _aws_parameters { return $_[0]->{aws_parameters}}
 sub _debug_aws { my $self=shift; return $self->{debug_aws}; }
 

@@ -1077,6 +1077,7 @@ sub getData
     $request = LINZ::GNSS::DataRequest::Parse($request) if ! ref $request;
 
     $self->_logger->debug("Running getData on ".$self->name." to ".$target->name." for request ".$request->reqid);
+    
     my ($when, $files)=$self->checkRequest($request,0,$subtype);
     my $downloaded=[];
 
@@ -1112,89 +1113,117 @@ sub getData
         }
     }
 
-    # Process each file in turn..
+    # Get a list of potential subtypes that can be used for this request
 
-    my $canconnect=1;
-    my $delayed=0;
-    my $error=0;
-    my $supsubtype='';
+    my $types=$self->filetypes->getTypes($request,$subtype);
+
+    # Try each subtype in turn till we find one that works
+
     $when=0;
-
-    foreach my $spec (@$files)
+    my $error=0;
+    my $tmpfiles=[];
+    my $gotfiles=0;
+    my $supsubtype='';
+    foreach my $filetype (@$types)
     {
-        my $id=$self->{fileid}++;
-        my $tempfile="$scratchdir/file$id";
-        eval
+        # Skip if doesn't support the request or isn't available yet
+        my ($time,$tretry,$failtime)=$filetype->availableTime($request);
+        next if ! $time  || $time > time();
+        my $files = $filetype->fileList($request);
+        next if ! $files || ! @$files;
+        $self->_logger->debug("Trying file type ".$filetype->type.':'.$filetype->subtype);
+
+        # Process each file in turn..
+
+        my $canconnect=1;
+        $gotfiles=1;
+
+        foreach my $spec (@$files)
         {
-            my $tospec=$target->filetypes->getFilespec($spec,$target->{stncodes});
-            if( ! $tospec )
-            {
-                croak "Datastore ".$target->name." cannot store ".$spec->{type}.'/'.$spec->{subtype}." files\n";
-            }
-            
-            $supsubtype=$spec->{subtype};
-
-            # If already available, then there's nothing to do
-            # Just add it to the list of downloaded files (so that it is treated as part
-            # of this download)
-            if($target->hasfile($tospec))
-            {
-                push(@$downloaded,$tospec);
-                next;
-            }
-
-            # If this connection has already done the maximum number of downloads per
-            # connection then reset the connection
-
-            if( $self->{_ndownloads} >= $self->{maxdownloads} )
-            {
-                $self->disconnect();
-                $self->{_ndownloads}=0;
-            }
-
-            # If not already connected then connect
-
-            if( ! $self->{connected} )
-            {
-                $canconnect=0;
-                $self->connect();
-                $canconnect=1;
-            }
-
-            # Define the name of the temporary download file...
-
-            my $targetfile=$tospec->{path};
-            $targetfile .= '/' if $targetfile ne '';
-            $targetfile .= $tospec->{filename};
-            $self->_logger->info("Retrieving file $targetfile");
-            $self->_logger->debug("Using scratch location $tempfile");
-
-            # Retrieve the file
-            # Use $delayed to count the number that fail to be retrieved, 
-            # assumed because the file is delayed.
-
+            my $id=$self->{fileid}++;
+            my $tempfile="$scratchdir/file$id";
             eval
             {
-                $self->_getfile($spec,$tempfile);
-            };
-            if( $@ )
-            {
-                my $message=$@;
-                chomp($message);
-                $self->_logger->info("Retrieve failed: $message");
-                unlink($tempfile) if -e $tempfile;
-
-                my ($available,$files, $retry)=$self->filetypes->checkRequest($request);
-                my $now=time();
-                if( ! $available )
+                my $tospec=$target->filetypes->getFilespec($spec,$target->{stncodes});
+                if( ! $tospec )
                 {
-                    die "Download failed - file not available\n";
+                    croak "Datastore ".$target->name." cannot store ".$spec->{type}.'/'.$spec->{subtype}." files\n";
                 }
-                $delayed=1;
-                $retry += $now;
-                $when = $retry if $retry > $when;
-                last;
-            }
+                
+                $supsubtype=$spec->{subtype};
+
+                # If already available, then there's nothing to do
+                # Just add it to the list of downloaded files (so that it is treated as part
+                # of this download)
+                if($target->hasfile($tospec))
+                {
+                    push(@$downloaded,$tospec);
+                    next;
+                }
+
+                # If this connection has already done the maximum number of downloads per
+                # connection then reset the connection
+
+                if( $self->{_ndownloads} >= $self->{maxdownloads} )
+                {
+                    $self->disconnect();
+                    $self->{_ndownloads}=0;
+                }
+
+                # If not already connected then connect
+
+                if( ! $self->{connected} )
+                {
+                    $canconnect=0;
+                    $self->connect();
+                    $canconnect=1;
+                }
+
+                # Define the name of the temporary download file...
+
+                my $targetfile=$tospec->{path};
+                $targetfile .= '/' if $targetfile ne '';
+                $targetfile .= $tospec->{filename};
+                $self->_logger->info("Retrieving file $targetfile");
+                $self->_logger->debug("Using scratch location $tempfile");
+
+                # Retrieve the file
+
+                eval
+                {
+                    push(@$tmpfiles,{file=>$tempfile,spec=>$spec,tospec=>$tospec});
+                    $self->_getfile($spec,$tempfile);
+                };
+                if( $@ )
+                {
+                    my $message=$@;
+                    chomp($message);
+                    $self->_logger->info("Retrieve failed: $message");
+                    $gotfiles=0;
+                    last;
+
+                }
+            };
+        }
+        last if $gotfiles;
+
+        foreach my $f (@$tmpfiles)
+        {
+            unlink($f->{file}) if -e $f->{file};
+        }
+        $tmpfiles=[];
+        my $twhen = time() + $tretry if $tretry;
+        $when = $twhen if ! $when || $twhen < $when;
+        last if ! $canconnect;
+    }
+    # Process each downloaded file
+    foreach my $f (@$tmpfiles)
+    {
+        my $tempfile=$f->{file};
+        eval
+        {
+            my $spec=$f->{spec};
+            my $tospec=$f->{tospec};
 
             # Change the compression if required
             my $fromcomp=$spec->compression;
@@ -1205,8 +1234,9 @@ sub getData
                 LINZ::GNSS::FileCompression::RecompressFile($tempfile,$fromcomp,$tocomp);
             }
 
-            # Move the file to the target directory
+            # Move the file to the target             
             $target->putfile($tempfile,$tospec);
+            $tospec->basepath($target->{basepath});
             push(@$downloaded,$tospec);
         };
         if( $@ )
@@ -1215,21 +1245,16 @@ sub getData
             chomp($message);
             $self->_logger->warn($message);
             $error++;
-            last if ! $canconnect;
         }
         # Don't want the temporary file retained..
         unlink($tempfile) if -e $tempfile;
-    }
-
-    # Update the location of the downloaded files to point to the target base path.
-    foreach my $d (@$downloaded)
-    {
-        $d->basepath($target->{basepath});
-    }
+    };
 
     # Update the request status
 
-    my $status = $error ? UNAVAILABLE : $delayed ? DELAYED : COMPLETED;
+    $when = 0 if $gotfiles;
+
+    my $status = $error ? UNAVAILABLE : $gotfiles ? COMPLETED : DELAYED;
 
     if( $status eq COMPLETED )
     {

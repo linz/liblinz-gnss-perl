@@ -218,7 +218,9 @@ sub LoadConfig
             {
                 $logfile=$ENV{LINZGNSS_LOG_DIR}.'/linzgnss.log';
             }
-            Log::Log4perl->easy_init({level=>$level, file=>">>$logfile"});
+            my $param={level=>$level};
+            $param->{file}=">>$logfile" if $logfile;
+            Log::Log4perl->easy_init($param);
         }
         else
         {

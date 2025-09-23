@@ -510,7 +510,23 @@ sub _expandName
         lc($1) eq 'subtype' ? lc($self->subtype) :
         $1 eq uc($1) ? uc($timeCodes->{lc($1)}) :
         $timeCodes->{lc($1)}
-       /exg; 
+       /exg;
+    my $offsets = {};
+    foreach my $offsetcode ($name =~ /\[\w+([+-]\d+[dh]?)\]/g)
+    {
+        next if $offsets->{$offsetcode};
+        $offsets->{$offsetcode}=1;
+    }
+    foreach my $offsetcode (keys %$offsets)
+    {
+        my ($offset,$unit) = $offsetcode =~ /^([+-]?\d+)([dh]?)$/;
+        $offset *= 3600;
+        $unit = 'd' if ! $unit;
+        $offset *= 24 if $unit eq 'd';
+        # Note: Doesn't handle leap second edge case!
+        my $tcoffset = $self->timeCodes($timeCodes->{timestamp}+$offset);
+        $name =~ s/\[(\w+)\Q$offsetcode\E\]/$tcoffset->{lc($1)}/eg;
+    }
     $name=ExpandEnv($name,"for filetype ".$self->{name});
     return $name;
 }

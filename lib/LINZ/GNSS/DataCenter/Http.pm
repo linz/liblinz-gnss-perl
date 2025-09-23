@@ -5,7 +5,7 @@ package LINZ::GNSS::DataCenter::Http;
 use base "LINZ::GNSS::DataCenter";
 use fields qw (
     cookies
-    filelistpath
+    filelisturi
     filelistregex
     timeout
     );
@@ -16,33 +16,48 @@ use HTTP::Cookies;
 use MIME::Base64;
 use Carp;
 
+our $MaxRedirects=5;
+
 sub new
 {
     my($self,$cfgdc)=@_;
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
     $self->{cookies}=HTTP::Cookies->new();
-    $self->{filelistpath}=${cfgdc}->{filelisturipath};
+    my $filelisturi;
+    if( $cfgdc->{filelisturi} || $cfgdc->{filelisturipath} )
+    {
+        my $filelistpath=${cfgdc}->{filelisturipath} || '[path]';
+        $filelisturi=${cfgdc}->{filelisturi} || $self->{uri}.$filelistpath;
+    }
+    $self->{filelisturi} = $filelisturi;
+
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
     my $fre=${cfgdc}->{filelistregex};
     # If we have a file list and no regex, 
     # then compile a regex from all product filenames that contain a wildcard
+    if( $self->{filelisturi} )
+    {
+        $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 0;
+    }
     if( ! $fre ) 
     {
         foreach my $df (values %{$cfgdc->{datafiles}} ) {
             foreach my $dt ( values %$df ) {
                 my $filename = $dt->{filename};
-                if( $filename =~ /\*|\?/ )
+                # If we are checking for all files, or if a filename has a wildcard
+                # then we need to add it to the regex filelist patterns.
+                if( $filename =~ /\*|\?/ || $self->{_checkfilelist} )
                 {
                     $filename =~ s/\./\\./g;
                     $filename =~ s/\*/.*/g;
                     $filename =~ s/\?/./g;
-                    $filename =~ s/\[h\]/[a-x]/gi;
-                    $filename =~ s/\[d\]/\\d/gi;
-                    $filename =~ s/\[(?:yy|ww|hh)\]/\\d\\d/gi;
-                    $filename =~ s/\[ddd\]/\\d\\d\\d/gi;
-                    $filename =~ s/\[dddh\]/\\d\\d\\d[a-x]/gi;
-                    $filename =~ s/\[(?:yyyy|wwww)\]/\\d\\d\\d\\d/gi;
+                    $filename =~ s/\[h(?:[+-]\d+[dh]?)?\]/[a-x]/gi;
+                    $filename =~ s/\[d(?:[+-]\d+[dh]?)?\]/\\d/gi;
+                    $filename =~ s/\[(?:yy|ww|hh)(?:[+-]\d+[dh]?)?\]/\\d\\d/gi;
+                    $filename =~ s/\[ddd(?:[+-]\d+[dh]?)?\]/\\d\\d\\d/gi;
+                    $filename =~ s/\[dddh(?:[+-]\d+[dh]?)?\]/\\d\\d\\d[a-x]/gi;
+                    $filename =~ s/\[(?:yyyy|wwww)(?:[+-]\d+[dh]?)?\]/\\d\\d\\d\\d/gi;
                     $filename =~ s/\[ssss\]/\\w\\w\\w\\w/gi;
                     $fre .= $filename."|";
                 }
@@ -50,12 +65,7 @@ sub new
         }
         $fre =~ s/\|$//;
         $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"");
-        $fre = "\\b($fre)\\b";
-        $self->{filelistregex}=qr/$fre/;
-        if( $self->{filelistpath} )
-        {
-            $self->{_checkfilelist} = exists $cfgdc->{usefilelist} ? $cfgdc->{usefilelist} : 1;
-        }
+        $self->{filelistregex}=qr/\b($fre)\b/;
     }
     return $self;
 }
@@ -64,12 +74,11 @@ sub getfilelist
 {
     my( $self,$spec)=@_;
     my $path=$spec->path;
-    my $uripath=$self->{filelistpath} || $path;
-    $uripath =~ s/\[path\]/$path/eg;
-    $uripath = $spec->expandName($uripath);
-    croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri in configuration\n"
-        if ! $uripath;
-    my $url=$self->{uri}.$uripath;
+    my $url=$self->{filelisturi};
+    $url =~ s/\[path\]/$path/eg;
+    $url = $spec->expandName($url);
+    croak "Getting file listings is not supported on DataCenter ".$self->name.".  Use FileListUri or FileListUriPath in configuration\n"
+        if ! $url;
     $self->_logger->debug("Retrieving file list from $url");
     my $content=$self->_content($url);
     my $filere=$self->{filelistregex};
@@ -115,7 +124,7 @@ sub _content
     {
         $headers{Authorization}="Basic ".encode_base64("$user:$pwd");
     }
-    my $response=$ua->get($url,%headers);
+    my $response = $ua->get($url, %headers);
     if( $response->code ne '200' )
     {
         croak("Cannot retrieve $url: ".$response->message."\n");

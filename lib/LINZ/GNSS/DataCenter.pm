@@ -418,7 +418,7 @@ Options can include:
 sub LocalDirectory
 {
     my($dir,%opts)=@_;
-    croak("GNSS data target $dir is not a directory\n") if ! -d $dir;
+    croak("GNSS data target $dir is not a directory\n") if ! -d $dir && $dir !~ /^\w+\:\/\//;
     my $name=$opts{name};
     if( ! $name )
     {

@@ -281,7 +281,8 @@ sub new
     $self->{_checkfilelist}=0; # Set to 1 to check a file listing before trying to retrieve a file
     $self->{_ndownloads}=0;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter'.$name);
-    $self->_logger->debug("Created DataCenter $name");
+    my $class = ref($self);
+    $self->_logger->debug("Created DataCenter $name: $class: $uri");
     return $self;
 }
 

@@ -64,7 +64,7 @@ sub new
             }
         }
         $fre =~ s/\|$//;
-        $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"");
+        $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"") if $fre;
         $self->{filelistregex}=qr/\b($fre)\b/;
     }
     return $self;

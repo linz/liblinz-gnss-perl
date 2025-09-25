@@ -74,9 +74,9 @@ Sets the debugging options - can be one of trace, debug, info, warn, error, or f
 
 Disables caching of GNSS data by data retrieval scripts
 
-=item LINZGNSS_CACHE_DIR
+=item LINZGNSS_CACHE_URL (was LINZGNSS_CACHE_DIR)
 
-Sets the directory used for caching of GNSS data.  The default is the bernese datapool
+Sets the directory or writable DataCenter used for caching of GNSS data.  The default is the bernese datapool
 
 =item LINZGNSS_TMP_DIR
 

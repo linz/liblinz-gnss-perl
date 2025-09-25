@@ -448,7 +448,14 @@ sub LocalDirectory
         }
         $filename = lc($filename) if $opts{lowerCaseNames};
         $ft->setFilename($filename);
-        $ft->setPath('') if ! $opts{paths};
+        if( $opts{cache_paths})
+        {
+            $ft->setUniquePath();
+        }
+        elsif( ! $opts{paths} )
+        {
+            $ft->setPath('');
+        }
         $ft->setCompression('none');
     }
     return $dtc;

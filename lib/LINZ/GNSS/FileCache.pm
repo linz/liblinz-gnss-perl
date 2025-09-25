@@ -58,10 +58,13 @@ sub new
     return $self if $ENV{LINZGNSS_NO_CACHE};
     my $datacenter;
     $self->{usedb} = 0;
-    if( $ENV{LINZGNSS_CACHE_DIR} )
+    $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.FileCache');
+    my $cachenv = $ENV{LINZGNSS_CACHE_URL} || $ENV{LINZGNSS_CACHED_DIR};
+    if( $cachenv )
     {
-        $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($ENV{LINZGNSS_CACHE_DIR},
-            compress=>1,paths=>1,name=>'local-cache');
+        $self->_logger->debug("Overriding getdata cache with LINZGNSS_CACHE_URL environment var: $cachenv");
+        $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($cachenv,
+            compress=>1,cache_paths=>1,lowerCaseNames=>1,name=>'linzgnss-cache');
         $datacenter_name='local-cache';
     }
     else
@@ -95,7 +98,6 @@ sub new
     $self->{datacenter} = $datacenter;
     $self->{jobretention} = $DefaultJobRetention;
     $self->{queuelatency} = $DefaultQueueLatency;
-    $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.FileCache');
     my $dbmessage = $self->{dbfile} ? "using $self->{dbfile}" : "- no database";
     $self->_logger->debug("Created Cache for datacenter $datacenter_name $dbmessage");
     return $self;

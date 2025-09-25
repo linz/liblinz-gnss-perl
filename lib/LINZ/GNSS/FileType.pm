@@ -73,6 +73,15 @@ our $freqmap = {
     'weekly'  => $SECS_PER_WEEK,
     };
 
+# Default paths to uniquely locate files of a given frequency
+our $freqpath= {
+    'hourly'  => '[yyyy]/[ddd]/[hh]',
+    '3hourly' => '[yyyy]/[ddd]/[hh]',
+    '6hourly' => '[yyyy]/[ddd]/[hh]',
+    'daily'   => '[yyyy]/[ddd]',
+    'weekly'  => '[wwww]',
+};
+
 our $hourcodes = {
     '00'=>'a',
     '01'=>'b',
@@ -294,6 +303,9 @@ The pattern for the filepath (directory)
 =item $type->setPath( $path )
 Set the pattern for the filepath (directory)
 
+=item $type->setUniquePath
+Sets a path based on the filetype and frequency
+
 =item $type->compression
 The compression used for the files
 
@@ -341,6 +353,7 @@ sub filename{ return $_[0]->{filename}; }
 sub setFilename{ $_[0]->{filename}=$_[1]; }
 sub path{ return $_[0]->{path}; }
 sub setPath{ $_[0]->{path}=$_[1]; }
+sub setUniquePath{ $_[0]->{path}=$_[0]->{type}."/".$_[0]->{subtype}."/".$freqpath->{$_[0]->{frequency}}; }
 sub compression{ return $_[0]->{compression}; }
 sub setCompression{ $_[0]->{compression} = $_[1]; }
 sub priority{ return $_[0]->{priority}; }

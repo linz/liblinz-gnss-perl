@@ -387,7 +387,7 @@ sub _scanSiteId
              \s([\s\w]{4})  # point id
              \s([\s\w]{2})  # point code
              \s(.{9})       # monument id
-             \s\w           # Observation techniques
+             \s[\s\w]       # Observation techniques
              \s(.{22})      # description
              \s([\s\-\d]{3}[\-\s\d]{3}[\-\s\d\.]{5}) # longitude DMS
              \s([\s\-\d]{3}[\-\s\d]{3}[\-\s\d\.]{5}) # latitude DMS

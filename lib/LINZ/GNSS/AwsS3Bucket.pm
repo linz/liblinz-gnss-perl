@@ -223,7 +223,7 @@ sub putFile
     my($self,$sourcefile,$name)=@_;
     if(! -f $sourcefile || ! -r $sourcefile )
     {
-        $self->error("Cannot copy to $sourcefile to S3: not a file");
+        $self->error("Cannot copy $sourcefile to S3: not a file");
         return 0;
     }
     my $s3url=$self->fileUrl($name);

@@ -293,18 +293,22 @@ sub _scanObs3
             }
         }
         elsif( $line =~ /^
-            \>\s(\d\d\d\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d\.]{10})
-            \s\s(\d])
+            \>(?:
+            \s\d\d\d\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d\.]{10}
+            \s\s\d]
+            |
+            \s{30}\d
+            )
             ([\s\d][\s\d]\d)
             /x )
         {
             print $of $line if $of;
-            my $nskip=$8;
+            my $nskip=$1;
             while( $nskip--)
             {
                 $line=<$f>;

@@ -259,7 +259,7 @@ sub _scanObs3
             \s([\s\d]\d)
             \s([\s\d]\d)
             \s([\s\d\.]{10})
-            \s\s([0162345])
+            \s\s([016])
             ([\s\d][\s\d]\d)
             /x )
         {
@@ -282,29 +282,34 @@ sub _scanObs3
                 $nobs++ if $eflag < 2;
                 $self->{endtime} = $endtime if $endtime > $self->{endtime};
             }
+            my $nskip=$nsat = $eflag < 2 ? $nsat : 0;
+
             # Skip for additional satellite ids
             # Number of obs records
             print $of $line if $of && $copy;
-            my $nrec=$nsat;
-            while( $line && $nrec-- )
+            while( $line && $nskip-- )
             {
                 $line=<$f>;
                 print $of $line if $of && $copy;
             }
         }
         elsif( $line =~ /^
-            \>\s(\d\d\d\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d]\d)
-            \s([\s\d\.]{10})
-            \s\s(\d])
+            \>(?:
+            \s\d\d\d\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d]\d
+            \s[\s\d\.]{10}
+            \s\s\d]
+            |
+            \s{30}\d
+            )
             ([\s\d][\s\d]\d)
             /x )
         {
             print $of $line if $of;
-            my $nskip=$8;
+            my $nskip=$1;
             while( $nskip--)
             {
                 $line=<$f>;

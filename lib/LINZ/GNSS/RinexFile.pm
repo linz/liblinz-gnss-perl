@@ -220,7 +220,7 @@ sub _scanHeader
         last if $end;
     }
     die("END OF HEADER missing in $filename\n") if ! $end;
-    die("MARKER NAME missing in $filename\n") if ! $self->{markname};
+    # die("MARKER NAME missing in $filename\n") if ! $self->{markname};
     die("Observation types in header don't match count in $filename\n")
         if $self->{nobstypes} != scalar(@{$self->{obstypes}});
 }

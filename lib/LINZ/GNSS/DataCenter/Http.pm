@@ -66,6 +66,13 @@ sub new
         $fre =~ s/\|$//;
         $self->_logger->debug("Data centre $self->{name}: file list regex \"$fre\"") if $fre;
         $self->{filelistregex}=qr/\b($fre)\b/;
+        my ($user,$pwd)=$self->credentials;
+        if( $user )
+        {
+            $user=~ s/(.).*/$1xxxxxx/;
+            $pwd=~ s/(.).*/$1xxxxxx/;
+            $self->_logger->debug("Using credentials $user:$pwd");
+        }
     }
     return $self;
 }

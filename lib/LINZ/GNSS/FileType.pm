@@ -51,6 +51,10 @@ use fields qw(
     max_delaysecs
     valid_before
     valid_after
+    buffer_before
+    buffer_after
+    bufferbeforesecs
+    bufferaftersecs
     );
 
 
@@ -235,7 +239,22 @@ sub new
         {
             croak "Invalid valid_after $valid_after for $type:$subtype\n";
         }
-    }   
+    }
+    my $buffer_before=$cfgft->{buffer_before} || $default->{buffer_before} || '0 days';
+    $buffer_before=lc($buffer_before);
+    croak "Invalid buffer_before $buffer_before for $type:$subtype\n" if 
+        $buffer_before !~ /^(\d+)\s+(minutes?|hours?|days?)$/;
+    my $bufferbeforesecs=$1*60;
+    $bufferbeforesecs *= 60 if $2 !~ /^m/;
+    $bufferbeforesecs *= 24 if $2 =~ /^d/;
+    my $buffer_after=$cfgft->{buffer_after} || $default->{buffer_after} || '0';
+    $buffer_after=lc($buffer_after);
+    croak "Invalid buffer_after $buffer_after for $type:$subtype\n" if 
+        $buffer_after !~ /^(?:(\d+)\s+(minutes?|hours?|days?)|0)$/;
+    my $bufferaftersecs=$1*60 || 0;
+    $bufferaftersecs *= 60 if $2 !~ /^m/;
+    $bufferaftersecs *= 24 if $2 =~ /^d/;
+
     $self->{type}=$type;
     $self->{subtype}=$subtype;
     $self->{name}=$name;
@@ -258,6 +277,10 @@ sub new
     $self->{max_delaysecs}=$max_delaysecs;
     $self->{valid_before}=$valid_before;
     $self->{valid_after}=$valid_after;
+    $self->{buffer_before}=$buffer_before;
+    $self->{buffer_after}=$buffer_after;
+    $self->{bufferbeforesecs}=$bufferbeforesecs;
+    $self->{bufferaftersecs}=$bufferaftersecs;
 
     return $self;
 }
@@ -342,6 +365,14 @@ The maximum delay before the data is deemed unavailable
 True if the data is for a specific station (ie station must be 
 defined in a data request)
 
+=item $type->buffer_before
+The buffer time added to a request period to identify files required to
+cover the request
+
+=item $type->buffer_after
+The buffer time added to a request period to identify files required to
+cover the request
+
 =back
 
 =cut
@@ -366,6 +397,8 @@ sub retry { return $_[0]->{retry}; }
 sub max_delay { return $_[0]->{max_delay }; }
 sub valid_before { return $_[0]->{valid_before}; }
 sub valid_after { return $_[0]->{valid_after}; }
+sub buffer_before { return $_[0]->{buffer_before}; }
+sub buffer_after { return $_[0]->{buffer_after}; }
 sub use_station{ return $_[0]->{use_station}; }
 
 =head2 
@@ -419,6 +452,8 @@ sub timeCodeSequence
     my($self,$start_epoch,$end_epoch)=@_;
     my $st=$start_epoch;
     my $et=$end_epoch || $st; 
+    $st -= $self->{bufferbeforesecs};
+    $et += $self->{bufferaftersecs};
     croak "Invalid time $start_epoch\n" if ! $st;
     my $inc=$self->{frequencysecs};
     my $tc=$self->timeCodes($st);

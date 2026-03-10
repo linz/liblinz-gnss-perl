@@ -12,7 +12,7 @@
 #       "subtype": "CODE",
 #       "start_days_ago": 5,
 #       "end_days_ago": 0,
-#       "source": "s3://linz-geodetic-positionzpp-uat"
+#       "description": "CODE ION files"
 #     },
 # ]}
 
@@ -90,16 +90,12 @@ sub load_product {
         die "Invalid days ago values: start_days_ago=$start_days_ago, end_days_ago=$end_days_ago\n";
     }
 
+    my $start_yd=format_days_ago($start_days_ago);
+    my $end_yd=format_days_ago($end_days_ago);
     my $name=$product->{description} || "$type:$subtype";
 
-    # Temporary workaround as get_gnss_data with S3 has a bug in handling of undefined target.
-    # Downloading to a temporary directory with -d $target_dir instead of -c to work around this issue.
-    while( $start_days_ago >= $end_days_ago ) {
-        my $date_yd = format_days_ago($start_days_ago);
-        $start_days_ago--;
-        my $command=[$get_gnss_data,"-c","$date_yd","$type:$subtype"];
-        my $cmdline=join(" ", @$command);
-        print("Preloading $name with command: $cmdline\n");
-        system(@$command) == 0 || die "Error preloading $name: @$command\n";
-    }
+    my $command=[$get_gnss_data,"-c","$start_yd-$end_yd","$type:$subtype"];
+    my $cmdline=join(" ", @$command);
+    print("Preloading $name with command: $cmdline\n");
+    system(@$command) == 0 || die "Error preloading $name: @$command\n";
 }

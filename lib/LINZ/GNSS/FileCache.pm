@@ -59,7 +59,8 @@ sub new
     my $datacenter;
     $self->{usedb} = 0;
     $self->{_logger}=Log::Log4perl->get_logger('LINZ.GNSS.FileCache');
-    my $cachenv = $ENV{LINZGNSS_CACHE_URL} || $ENV{LINZGNSS_CACHED_DIR};
+    my $cachenv = $ENV{LINZGNSS_CACHE_URL} || $ENV{LINZGNSS_CACHE_DIR};
+    my $nodb = $ENV{LINZGNSS_CACHE_NODB} || 0;
     if( $cachenv )
     {
         $self->_logger->debug("Overriding getdata cache with LINZGNSS_CACHE_URL environment var: $cachenv");
@@ -74,7 +75,6 @@ sub new
     }
     if( $datacenter->scheme eq 'file' )
     {
-        $self->{usedb} = 1;
         my $basepath=$datacenter->basepath;
         $self->{basepath} = $basepath;
         if( ! -d $basepath )
@@ -85,15 +85,19 @@ sub new
             umask $umask;
             croak "Cannot create LINZ::GNSS::FileCache cache directory at $basepath\n" if @$errval;
         }
-        my $dbfile=$basepath.'/cache.db';
-        my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","",
-            {sqlite_use_immediate_transaction=>1} )
-        || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
-                DBI->errstr."\n";
-        chmod 0664, $dbfile;
-        $self->{dbh} = $dbh;
-        $self->{dbfile} = $dbfile;
-        $self->_setupTables();
+        if( ! $nodb )
+        {
+            $self->{usedb} = 1;
+            my $dbfile=$basepath.'/cache.db';
+            my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","",
+                {sqlite_use_immediate_transaction=>1} )
+            || croak "Cannot create LINZ::GNSS::FileCache cache database $dbfile\n".
+                    DBI->errstr."\n";
+            chmod 0664, $dbfile;
+            $self->{dbh} = $dbh;
+            $self->{dbfile} = $dbfile;
+            $self->_setupTables();
+        }
     }
     $self->{datacenter} = $datacenter;
     $self->{jobretention} = $DefaultJobRetention;

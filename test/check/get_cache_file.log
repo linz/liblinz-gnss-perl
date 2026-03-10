@@ -1,36 +1,38 @@
 2000/01/01 00:00:00 Loading data centres
-2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive
-2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ
-2000/01/01 00:00:00 Created DataCenter UNAVCO
-2000/01/01 00:00:00 Created DataCenter SOPAC
-2000/01/01 00:00:00 Created DataCenter CDDIS
-2000/01/01 00:00:00 Created DataCenter IGN
-2000/01/01 00:00:00 Created DataCenter CODE
-2000/01/01 00:00:00 Created DataCenter GGOS
-2000/01/01 00:00:00 Created DataCenter GGOS_2
-2000/01/01 00:00:00 Created DataCenter GeoNET
-2000/01/01 00:00:00 Created DataCenter Cache
-2000/01/01 00:00:00 Created DataCenter PrvtArchive
-2000/01/01 00:00:00 Created DataCenter bernese
-2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, CDDIS, IGN, GeoNET-PNZ, CODE, PrvtArchive, GGOS, GGOS_2, GeoNET
-2000/01/01 00:00:00 Created DataCenter local-cache
-2000/01/01 00:00:00 Created FileCache for datacenter local-cache using test_cache/cache.db
-2000/01/01 00:00:00 Created DataCenter local
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter CDDIS: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@cddis.gsfc.nasa.gov
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Created DataCenter bernese: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-campaign
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, CDDIS, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Created Cache for datacenter cache using /home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool/cache.db
+2000/01/01 00:00:00 Created DataCenter local: LINZ::GNSS::DataCenter::File: files
 2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:OBS::AUCK:1531958400:1532044799
 2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:OBS::AUCK:1531958400:1532044799
 2000/01/01 00:00:00 Filling request : job:OBS::AUCK:1531958400:1532044799
-2000/01/01 00:00:00 Running getData on GeoNET-PNZ to local-cache for request job:OBS::AUCK:1531958400:1532044799
+2000/01/01 00:00:00 Running getData on GeoNET-PNZ to Cache for request job:OBS::AUCK:1531958400:1532044799
+2000/01/01 00:00:00 Trying file type OBS:DAILY
 2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
 2000/01/01 00:00:00 Request  FillRequest status COMP
-2000/01/01 00:00:00 Adding file rinex/daily/2018/200/AUCK2000.18D.Z for request 
+2000/01/01 00:00:00 Adding file rinex/daily/2018/200/auck2000.18d.Z for request 
 2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:OBS::AUCK:1531958400:1532044799
 2000/01/01 00:00:00 Retrieving request job:OBS::AUCK:1531958400:1532044799 to local
 2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:OBS::AUCK:1531958400:1532044799
-2000/01/01 00:00:00 Running getData on local-cache to local for request job:OBS::AUCK:1531958400:1532044799
+2000/01/01 00:00:00 Running getData on Cache to local for request job:OBS::AUCK:1531958400:1532044799
+2000/01/01 00:00:00 Trying file type OBS:DAILY
 2000/01/01 00:00:00 Retrieving file AUCK2000.18O
 2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
-2000/01/01 00:00:00 Retrieved test_cache/rinex/daily/2018/200/AUCK2000.18D.Z
+2000/01/01 00:00:00 Retrieved /home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool/rinex/daily/2018/200/auck2000.18d.Z
+2000/01/01 00:00:00 Converting compression from hatanaka+compress to none
 2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
 Retrieved OBS:DAILY for AUCK: files/AUCK2000.18O
 636899021 6560465 files/AUCK2000.18O
-4218054451 116 files/cachefile.log
+3453496908 101 files/cachefile.log

@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+#
+# Script to preload the getdata cache with GNSS products that are used during processing.  
+# This should speed up processing, and also ensures that rapid products that are ephemeral will 
+# be available if they are required outside their normal availability window.
+#
+# The configuration file is a JSON file with the following format:
+# {
+#   "products": [
+#     {
+#       "type": "ION",
+#       "subtype": "CODE",
+#       "start_days_ago": 5,
+#       "end_days_ago": 0,
+#       "source": "s3://linz-geodetic-positionzpp-uat"
+#     },
+# ]}
+
+
+use strict;
+use warnings;
+use FindBin;
+use JSON;
+use File::Which qw/which/;
+use File::Temp qw/tempdir/;
+use LINZ::GNSS::Time qw/parse_gnss_date time_elements/;
+
+my $script_dir = $FindBin::Bin;
+
+my $get_gnss_data="$script_dir/get_gnss_data";
+if( ! -x $get_gnss_data )
+{
+    die "Error: Cannot find executable get_gnss_data command\n";
+}
+
+# Read the configuration file
+
+my $config_file = $ARGV[0];
+if (!defined $config_file) {
+    die "Usage: $0 <preload-getdata-config_file.json>\n";
+}
+
+my $products = read_config($config_file);
+foreach my $product (@$products) {
+    eval {
+        load_product($product);
+    };
+    if ($@) {
+        print("WARNING: Error loading product: $@\n");
+    }
+}
+
+sub read_config {
+    my ($file) = @_;
+    open my $fh, '<', $file or die "Could not open file '$file' $!";
+    local $/; # Enable 'slurp' mode
+    my $json_text = <$fh>;
+    close $fh;
+    my $config = decode_json($json_text);
+    my $products = $config->{products};
+    if (!defined $products || ref($products) ne 'ARRAY') {
+        die "Invalid configuration: 'products' key is missing or not an array\n";
+    }
+    return $products;
+}
+
+sub format_days_ago {
+    my ($ndays) = @_;
+    my $epoch = parse_gnss_date("now-$ndays");
+    my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($epoch);
+    return sprintf("%04d:%03d", $year, $doy);
+}
+
+sub load_product {
+    my ($product) = @_;
+    my $type = $product->{type};
+    my $subtype = $product->{subtype};
+    my $start_days_ago = $product->{start_days_ago};
+    my $end_days_ago = $product->{end_days_ago};
+    my $source = $product->{source};
+
+    # Validate the configuration
+    if($type !~ /^\w+$/) {
+        die "Invalid product type: $type\n";
+    }
+    if($subtype !~ /^\w+$/) {
+        die "Invalid product subtype: $subtype\n";
+    }
+    if($start_days_ago !~ /^\d+$/ || $end_days_ago !~ /^\d+$/) {
+        die "Invalid days ago values: start_days_ago=$start_days_ago, end_days_ago=$end_days_ago\n";
+    }
+
+    my $name=$product->{description} || "$type:$subtype";
+
+    # Temporary workaround as get_gnss_data with S3 has a bug in handling of undefined target.
+    # Downloading to a temporary directory with -d $target_dir instead of -c to work around this issue.
+    while( $start_days_ago >= $end_days_ago ) {
+        my $date_yd = format_days_ago($start_days_ago);
+        $start_days_ago--;
+        my $command=[$get_gnss_data,"-c","$date_yd","$type:$subtype"];
+        my $cmdline=join(" ", @$command);
+        print("Preloading $name with command: $cmdline\n");
+        system(@$command) == 0 || die "Error preloading $name: @$command\n";
+    }
+}

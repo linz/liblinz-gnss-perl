@@ -773,8 +773,13 @@ sub getData
     if( ! $self->{usedb} )
     {
         my ($status1,$available1,$downloaded1)=LINZ::GNSS::DataCenter::FillRequest($request,$self->datacenter);
-        my ($status2,$available2,$downloaded2)=$self->datacenter->getData($request,$target);
-        return $status1,$available1,$downloaded2;
+        my $downloaded=[];
+        if( defined($target))
+        {
+            my ($status2,$available2,$downloaded2)=$self->datacenter->getData($request,$target);
+            $downloaded=$downloaded2;
+        }
+        return $status1,$available1,$downloaded;
     }
     my ($lodged) = $self->getRequests(request=>$request);
     my $download= exists($options{download}) ? $options{download} : 1;

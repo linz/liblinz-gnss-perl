@@ -5,9 +5,10 @@
 
 use strict;
 use Getopt::Std;
+use JSON;
 use LINZ::GNSS;
 use LINZ::GNSS::FileCache;
-use LINZ::GNSS::Time qw/seconds_datetime parse_gnss_date seconds_yearday/;
+use LINZ::GNSS::Time qw/seconds_datetime parse_gnss_date seconds_yearday time_elements/;
 use LINZ::GNSS::DataRequest qw(REQUESTED COMPLETED UNAVAILABLE PENDING DELAYED INVALID);
 use LINZ::GNSS::DataCenter;
 use File::Temp qw/tempdir/;
@@ -25,7 +26,7 @@ if( $@ )
 }
 
 my %opts;
-getopts('b:d:f:n:ilshcitC:',\%opts);
+getopts('b:d:f:n:p:ilshcitC:',\%opts);
 
 die "Cannot use -c option with -d, -b, or -n options\n" 
     if $opts{c} && ($opts{b} || $opts{d} || $opts{n});
@@ -35,9 +36,10 @@ my $campaign=$opts{b} || '';
 my $dir=$opts{d} || '.';
 my $dcname=$opts{n} || '';
 my $listonly=$opts{s};
-my $cacheonly=$opts{c};
+my $cacheonly=$opts{c} || $opts{p};
 my $cfgfile=$opts{C} || '';
 my $testsources=$opts{t};
+my $needargs = ! ($listonly || $testsources || $opts{f} || $opts{i} || $opts{p});
 
 LINZ::BERN::BernUtil::SetBerneseEnv() if $havebern;
 LINZ::GNSS::LoadConfig($cfgfile);
@@ -67,28 +69,11 @@ if( $listonly && ! @ARGV )
     exit();
 }
 
-help(!$opts{h}) if $opts{h} || ! @ARGV;
-
-my $date=shift(@ARGV);
-
-if($date =~ /^now(:?-\d+)?$/i)
-{
-    my($year,$dayno)=seconds_yearday(parse_gnss_date($date));
-    $date=sprintf("%04d:%03d",$year,$dayno);
-}
-
-die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n" 
-   if $date !~ /^
-           ([12]\d{3})\:(\d{3})(?:\:(\d\d))?
-           (?:\-(?:
-              (?:([12]\d{3})\:)?(\d{3})(?:\:(\d\d))?
-              |
-              (\d\d))
-              )?
-            $/x;
+help(!$opts{h}) if $opts{h} || ($needargs && ! @ARGV);
 
 if( $testsources )
 {
+    my $date=normaliseDateRange(shift(@ARGV));
     testDataSources($date,@ARGV);
     exit();
 }
@@ -100,6 +85,14 @@ if( $opts{f} )
     open(my $args,"<",$argfile) || die "Cannot open file $argfile\n";
     push(@input,<$args>);
     close($args);
+}
+elsif( $opts{p} )
+{
+    my $config_file = $opts{p};
+    if (! -e $config_file) {
+        die "Error: Cannot find configuration file $config_file\n";
+    }
+    push(@input, compilePreloadRequests($config_file));
 }
 elsif( $opts{i} )
 {
@@ -129,6 +122,7 @@ eval
     foreach my $argdata (@input)
     {
         my @args=split(' ',$argdata);
+        my $date=normaliseDateRange(shift(@args));
 
         my $type=shift(@args);
         next if $type eq '';
@@ -214,6 +208,27 @@ sub help
     });
 }
 
+sub normaliseDateRange 
+{
+    my ($date) = @_;
+    if($date =~ /^now(:?-\d+)?$/i)
+    {
+        my($year,$dayno)=seconds_yearday(parse_gnss_date($date));
+        $date=sprintf("%04d:%03d",$year,$dayno);
+    }
+
+    die "Invalid date or date range $date: format as yyyy:ddd or yyyy:ddd-yyyy:ddd\n" 
+    if $date !~ /^
+            ([12]\d{3})\:(\d{3})(?:\:(\d\d))?
+            (?:\-(?:
+                (?:([12]\d{3})\:)?(\d{3})(?:\:(\d\d))?
+                |
+                (\d\d))
+                )?
+                $/x;
+    return $date;
+}
+
 sub printFileTypes
 {
     my $types='';
@@ -229,6 +244,56 @@ sub printFileTypes
     print "Types marked with a '*' require a station code\n";
 }
 
+
+sub formatDaysAgo {
+    my ($ndays) = @_;
+    my $epoch = parse_gnss_date("now-$ndays");
+    my ($year,$gnssweek,$doy,$wday,$hour) = time_elements($epoch);
+    return sprintf("%04d:%03d", $year, $doy);
+}
+
+sub compilePreloadRequests
+{
+    my ($config_file) = @_;
+    print("Compiling preload cache requests from configuration file: $config_file\n");
+    open my $fh, '<', $config_file or die "ERROR: Cannot open configuration file $config_file: $!\n";
+    my $json_text = do { local $/; <$fh> };
+    close $fh;
+    my $config = eval { decode_json($json_text) } or die "ERROR: Failed to decode JSON from $config_file: $@\n";
+    die "ERROR: Configuration file missing 'products' key\n" unless ref($config->{products}) eq 'ARRAY';
+    my @requests;
+    foreach my $product (@{$config->{products}})
+    {
+        die "ERROR: Product entry must be a hash reference\n" unless ref($product) eq 'HASH';
+        for my $field (qw/type subtype start_days_ago end_days_ago/) {
+            die "ERROR: Product entry missing required field '$field'\n" unless exists $product->{$field};
+        }
+        my $type = $product->{type};
+        my $subtype = $product->{subtype};
+        my $start_days_ago = $product->{start_days_ago};
+        my $end_days_ago = $product->{end_days_ago};
+
+
+        # Validate the configuration
+        if($type !~ /^\w+$/) {
+            die "ERROR: Invalid product type: $type\n";
+        }
+        if($subtype !~ /^\w+$/) {
+            die "ERROR: Invalid product subtype: $subtype\n";
+        }
+        if($start_days_ago !~ /^\d+$/ || $end_days_ago !~ /^\d+$/) {
+            die "ERROR: Invalid days ago values: start_days_ago=$start_days_ago, end_days_ago=$end_days_ago\n";
+        }
+
+        for my $days_ago ($end_days_ago .. $start_days_ago)
+        {
+            my $date = formatDaysAgo($days_ago);
+            push @requests, "$date $type:$subtype";
+        }
+    }
+    print("Compiled requests:\n", join("\n", @requests), "\n");
+    return @requests;
+}
 
 sub testDataSources
 {
@@ -310,6 +375,7 @@ This script can only be used by a user configured to use the Bernese software.
     get_gnss_data [options] date type [station ...]
     get_gnss_data [options] -t date station...
     get_gnss_data [options] -f filename date
+    get_gnss_data [options] -p preload_cache_json_filename
     get_gnss_data [options] -i date
     get_gnss_data -l
     get_gnss_data -s
@@ -374,12 +440,31 @@ Specificies the name of a bernese campaign into which files will be loaded.
 =item -f filename
 
 Specifies that requests will be read from the specified file.  Each line will be treated as 
-as set of arguments (type station ...)
+as set of arguments (date type station ...)
 
 =item -i
 
 Specifies that the requests will be read from the standard input. Each line will be treated as a 
-set of arguments (type station ...)
+set of arguments (date type station ...)
+
+=item -p filename
+
+Specifies that requests will be read from a "preload cache" configuration JSON file, and that
+the products will be loaded into the cache but not downloaded to a target directory.  The configuration file should be in the format:
+
+{
+    "products": [
+        {
+            "type": "OBS",
+            "subtype": "DAILY",
+            "start_days_ago": 10,
+            "end_days_ago": 0,
+            "source": "bernese",
+            "description": "RINEX observation files for the last 10 days"
+        },
+        ...
+    ]
+}
 
 =item -l
 

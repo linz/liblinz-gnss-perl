@@ -1,0 +1,77 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Using credentials cxxxxxx:hxxxxxx
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch/
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Datacenter bernese not defined: DataCenter bernese uses invalid types/subtypes: ORB:CODE
+ at ../lib/LINZ/GNSS.pm line 250.
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Overriding getdata cache with LINZGNSS_CACHE_URL environment var: test_cache
+2000/01/01 00:00:00 Created DataCenter linzgnss-cache: LINZ::GNSS::DataCenter::File: test_cache
+2000/01/01 00:00:00 Created Cache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 Created DataCenter local: LINZ::GNSS::DataCenter::File: files
+2000/01/01 00:00:00 Running getData on CODE to local for request job:ION:FINAL::1658188800:1658275199
+2000/01/01 00:00:00 Trying file type ION:FINAL
+2000/01/01 00:00:00 Retrieving file COD22192.ION
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Retrieving http://ftp.aiub.unibe.ch//CODE/2022/COD22192.ION.Z
+2000/01/01 00:00:00 Retrieved COD22192.ION.Z (69891 bytes) from ftp.aiub.unibe.ch
+2000/01/01 00:00:00 Converting compression from compress to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+Retrieved ION:FINAL: files/COD22192.ION
+==================================================
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Using credentials cxxxxxx:hxxxxxx
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch/
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Datacenter bernese not defined: DataCenter bernese uses invalid types/subtypes: ORB:CODE
+ at ../lib/LINZ/GNSS.pm line 250.
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Overriding getdata cache with LINZGNSS_CACHE_URL environment var: test_cache
+2000/01/01 00:00:00 Created DataCenter linzgnss-cache: LINZ::GNSS::DataCenter::File: test_cache
+2000/01/01 00:00:00 Created Cache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 Created DataCenter local: LINZ::GNSS::DataCenter::File: files
+2000/01/01 00:00:00 Running getData on CODE to local for request job:ION:BUFFER::1658188800:1658275199
+2000/01/01 00:00:00 Trying file type ION:BUFFER
+2000/01/01 00:00:00 Retrieving file COD22191.ION
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Retrieving http://ftp.aiub.unibe.ch//CODE/2022/COD22191.ION.Z
+2000/01/01 00:00:00 Retrieved COD22191.ION.Z (69907 bytes) from ftp.aiub.unibe.ch
+2000/01/01 00:00:00 Retrieving file COD22193.ION
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file2
+2000/01/01 00:00:00 Retrieving http://ftp.aiub.unibe.ch//CODE/2022/COD22193.ION.Z
+2000/01/01 00:00:00 Retrieved COD22193.ION.Z (69683 bytes) from ftp.aiub.unibe.ch
+2000/01/01 00:00:00 Retrieving file COD22194.ION
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file3
+2000/01/01 00:00:00 Retrieving http://ftp.aiub.unibe.ch//CODE/2022/COD22194.ION.Z
+2000/01/01 00:00:00 Retrieved COD22194.ION.Z (69691 bytes) from ftp.aiub.unibe.ch
+2000/01/01 00:00:00 Converting compression from compress to none
+2000/01/01 00:00:00 Converting compression from compress to none
+2000/01/01 00:00:00 Converting compression from compress to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 4
+Retrieved ION:BUFFER: COD22192.ION
+Retrieved ION:BUFFER: files/COD22191.ION
+Retrieved ION:BUFFER: files/COD22193.ION
+Retrieved ION:BUFFER: files/COD22194.ION
+2729735073 308925 files/COD22191.ION
+3163362305 308925 files/COD22192.ION
+4170065519 308925 files/COD22193.ION
+1982528154 308925 files/COD22194.ION
+1194922937 131 files/buffer.log

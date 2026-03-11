@@ -1,0 +1,18 @@
+{
+    "products": [
+        {
+            "type": "ORB",
+            "subtype": "RAPID",
+            "start_days_ago": 5,
+            "end_days_ago": 4,
+            "description": "RAPID ORB files"
+        },
+        {
+            "type": "ORB",
+            "subtype": "FINAL",
+            "start_days_ago": 20,
+            "end_days_ago": 18,
+            "description": "FINAL ORB files"
+        }
+    ]
+}

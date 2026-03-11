@@ -1,0 +1,52 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Using credentials cxxxxxx:hxxxxxx
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch/
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Datacenter bernese not defined: DataCenter bernese uses invalid types/subtypes: ORB:CODE
+ at ../lib/LINZ/GNSS.pm line 250.
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Overriding getdata cache with LINZGNSS_CACHE_URL environment var: test_cache
+2000/01/01 00:00:00 Created DataCenter linzgnss-cache: LINZ::GNSS::DataCenter::File: test_cache
+2000/01/01 00:00:00 Created Cache for datacenter local-cache using test_cache/cache.db
+Valid file types:subtypes are
+   ORB:BROADCAST  Broadcast orbits
+   ORB:CO2      CODE Repro2 orbits
+   ORB:CODE_MGEX  CODE Multi-GNSS orbits
+   ORB:COD_FIN  CODE orbits
+   ORB:COD_RAP  Rapid orbits
+   ORB:FINAL    Final orbits
+   ORB:RAPID    Rapid orbits
+   ORB:ULTRA    Ultra-rapid orbits
+   ERP:CO2      CODE Repro2 earth rotation parameters
+   ERP:CODE     CODE earth rotation parameters
+   ERP:CODE_MGEX  CODE Multi-GNSS earth rotation parameters
+   ERP:FINAL    Final earth rotation parameters
+   ERP:RAPID    Rapid earth rotation parameters
+   ERP:ULTRA    Ultra-rapid earth rotation parameters
+   OBS:DAILY*   Daily RINEX file
+   OBS:HOURLY*  Hourly RINEX file
+   CLK:CODE     Final clock file
+   CLK:FINAL    Final clock file
+   CLK:RAPID    Rapid clock file
+   IGSC:DAILY   IGS daily station solution SINEX file
+   IGSC:WEEKLY  IGS weekly station solution SINEX file
+   ION:BUFFER   Bernese CODE ionosphere model
+   ION:FINAL    Bernese CODE ionosphere model
+   ION:PREDICT  Bernese CODE predicted ionosphere model
+   ION:RAPID    Bernese CODE rapid ionosphere model
+   P1C1:FINAL   CODE monthly P1-C1 DCB solutions (GPS satellites only)
+   P1C1:RAPID   CODE P1-C1 DCB moving average solution (GPS satellites only)
+   P1P2:FINAL   CODE monthly P1-P2 DCB solutions (GPS and Glonass satellites)
+   P1P2:RAPID   CODE P1-P2 DCB moving average solution (GPS and Glonass satellites)
+   TRP:FINAL    Bernese Troposphere parameters
+   VMF:VMF      Vienna atmospheric mapping functions
+Types marked with a '*' require a station code

@@ -1,0 +1,111 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Using credentials cxxxxxx:hxxxxxx
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch/
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Datacenter bernese not defined: DataCenter bernese uses invalid types/subtypes: ORB:CODE
+ at ../lib/LINZ/GNSS.pm line 250.
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Overriding getdata cache with LINZGNSS_CACHE_URL environment var: test_cache
+2000/01/01 00:00:00 Created DataCenter linzgnss-cache: LINZ::GNSS::DataCenter::File: test_cache
+2000/01/01 00:00:00 Created Cache for datacenter local-cache using test_cache/cache.db
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772841600:1772927999
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772841600:1772927999
+2000/01/01 00:00:00 Creating job job
+2000/01/01 00:00:00 Filling request : job:ORB:RAPID::1772841600:1772927999
+2000/01/01 00:00:00 Running getData on SOPAC to linzgnss-cache for request job:ORB:RAPID::1772841600:1772927999
+2000/01/01 00:00:00 Trying file type ORB:RAPID
+2000/01/01 00:00:00 Connecting datacenter SOPAC to host garner.ucsd.edu
+2000/01/01 00:00:00 Connection info: host garner.ucsd.edu
+2000/01/01 00:00:00 Connection info: user anonymous
+2000/01/01 00:00:00 Connection info: timeout 30
+2000/01/01 00:00:00 Connection info: passive 
+2000/01/01 00:00:00 Connection info: host garner.ucsd.edu: user anonymous: password positionz@linz.govt.nz
+2000/01/01 00:00:00 Retrieving file ORB/RAPID/2026/066/igr24086.sp3.z
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file0
+2000/01/01 00:00:00 Getting file listing: Datacenter SOPAC: path /pub/products/2408
+2000/01/01 00:00:00 Retrieving file /pub/products/2408/IGS0OPSRAP_20260660000_01D_15M_ORB.SP3.gz
+2000/01/01 00:00:00 Retrieved IGS0OPSRAP_20260660000_01D_15M_ORB.SP3.gz (100090 bytes) from garner.ucsd.edu
+2000/01/01 00:00:00 Converting compression from gzip to none
+Compiling preload cache requests from configuration file: preload-config.json
+Compiled requests:
+2026:066 ORB:RAPID
+2026:065 ORB:RAPID
+2026:052 ORB:FINAL
+2026:051 ORB:FINAL
+2026:050 ORB:FINAL
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+2000/01/01 00:00:00 Request  FillRequest status COMP
+2000/01/01 00:00:00 Adding file ORB/RAPID/2026/066/igr24086.sp3.z for request 
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772841600:1772927999
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772755200:1772841599
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772755200:1772841599
+2000/01/01 00:00:00 Filling request : job:ORB:RAPID::1772755200:1772841599
+2000/01/01 00:00:00 Running getData on SOPAC to linzgnss-cache for request job:ORB:RAPID::1772755200:1772841599
+2000/01/01 00:00:00 Trying file type ORB:RAPID
+2000/01/01 00:00:00 Retrieving file ORB/RAPID/2026/065/igr24085.sp3.z
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file1
+2000/01/01 00:00:00 Retrieving file /pub/products/2408/IGS0OPSRAP_20260650000_01D_15M_ORB.SP3.gz
+2000/01/01 00:00:00 Retrieved IGS0OPSRAP_20260650000_01D_15M_ORB.SP3.gz (100341 bytes) from garner.ucsd.edu
+2000/01/01 00:00:00 Converting compression from gzip to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+2000/01/01 00:00:00 Request  FillRequest status COMP
+2000/01/01 00:00:00 Adding file ORB/RAPID/2026/065/igr24085.sp3.z for request 
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:RAPID::1772755200:1772841599
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771632000:1771718399
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771632000:1771718399
+2000/01/01 00:00:00 Filling request : job:ORB:FINAL::1771632000:1771718399
+2000/01/01 00:00:00 Running getData on SOPAC to linzgnss-cache for request job:ORB:FINAL::1771632000:1771718399
+2000/01/01 00:00:00 Trying file type ORB:FINAL
+2000/01/01 00:00:00 Retrieving file ORB/FINAL/2026/052/igs24066.sp3.z
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file2
+2000/01/01 00:00:00 Getting file listing: Datacenter SOPAC: path /products/2406
+2000/01/01 00:00:00 Retrieving file /products/2406/IGS0OPSFIN_20260520000_01D_15M_ORB.SP3.gz
+2000/01/01 00:00:00 Retrieved IGS0OPSFIN_20260520000_01D_15M_ORB.SP3.gz (100635 bytes) from garner.ucsd.edu
+2000/01/01 00:00:00 Converting compression from gzip to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+2000/01/01 00:00:00 Request  FillRequest status COMP
+2000/01/01 00:00:00 Adding file ORB/FINAL/2026/052/igs24066.sp3.z for request 
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771632000:1771718399
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771545600:1771631999
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771545600:1771631999
+2000/01/01 00:00:00 Filling request : job:ORB:FINAL::1771545600:1771631999
+2000/01/01 00:00:00 Running getData on SOPAC to linzgnss-cache for request job:ORB:FINAL::1771545600:1771631999
+2000/01/01 00:00:00 Trying file type ORB:FINAL
+2000/01/01 00:00:00 Retrieving file ORB/FINAL/2026/051/igs24065.sp3.z
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file3
+2000/01/01 00:00:00 Retrieving file /products/2406/IGS0OPSFIN_20260510000_01D_15M_ORB.SP3.gz
+2000/01/01 00:00:00 Retrieved IGS0OPSFIN_20260510000_01D_15M_ORB.SP3.gz (100468 bytes) from garner.ucsd.edu
+2000/01/01 00:00:00 Converting compression from gzip to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+2000/01/01 00:00:00 Request  FillRequest status COMP
+2000/01/01 00:00:00 Adding file ORB/FINAL/2026/051/igs24065.sp3.z for request 
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771545600:1771631999
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771459200:1771545599
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771459200:1771545599
+2000/01/01 00:00:00 Filling request : job:ORB:FINAL::1771459200:1771545599
+2000/01/01 00:00:00 Running getData on SOPAC to linzgnss-cache for request job:ORB:FINAL::1771459200:1771545599
+2000/01/01 00:00:00 Trying file type ORB:FINAL
+2000/01/01 00:00:00 Retrieving file ORB/FINAL/2026/050/igs24064.sp3.z
+2000/01/01 00:00:00 Using scratch location /tmp/gnss/file4
+2000/01/01 00:00:00 Retrieving file /products/2406/IGS0OPSFIN_20260500000_01D_15M_ORB.SP3.gz
+2000/01/01 00:00:00 Retrieved IGS0OPSFIN_20260500000_01D_15M_ORB.SP3.gz (100739 bytes) from garner.ucsd.edu
+2000/01/01 00:00:00 Converting compression from gzip to none
+2000/01/01 00:00:00 Returning status COMP: available 0: files: 1
+2000/01/01 00:00:00 Request  FillRequest status COMP
+2000/01/01 00:00:00 Adding file ORB/FINAL/2026/050/igs24064.sp3.z for request 
+2000/01/01 00:00:00 getRequests SQL: select * from requests where reqid=?: job:ORB:FINAL::1771459200:1771545599
+test_cache/cache.db
+test_cache/ORB/FINAL/2026/051/igs24065.sp3.z
+test_cache/ORB/FINAL/2026/052/igs24066.sp3.z
+test_cache/ORB/FINAL/2026/050/igs24064.sp3.z
+test_cache/ORB/RAPID/2026/066/igr24086.sp3.z
+test_cache/ORB/RAPID/2026/065/igr24085.sp3.z

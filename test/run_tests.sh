@@ -106,6 +106,17 @@ rm -f $filedir/*
 rm -rf $P/*
 rm -rf $D/*
 fi
+######################################################
+echo "Preload with db"
+rm -rf $cachedir/*
+$script -p preload-config.json > $outputdir/preload.log 2>&1
+find $cachedir -type f >> $outputdir/preload.log
+
+######################################################
+echo "Preload without db"
+rm -rf $cachedir/*
+LINZGNSS_CACHE_NODB=1 $script -p preload-config.json > $outputdir/preload-nodb.log 2>&1
+find $cachedir -type f >> $outputdir/preload-nodb.log
 
 ######################################################
 # Remove date reference from log files

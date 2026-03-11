@@ -1,0 +1,102 @@
+2000/01/01 00:00:00 Loading data centres
+2000/01/01 00:00:00 Created DataCenter LINZ-GNSSArchive: LINZ::GNSS::DataCenter::GNSSArchive: https://private.archive.geodesy.linz.govt.nz
+2000/01/01 00:00:00 Using credentials cxxxxxx:hxxxxxx
+2000/01/01 00:00:00 Created DataCenter GeoNET-PNZ: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Data centre GeoNET-PNZ: file list regex "\w\w\w\w00..._R_\d\d\d\d\d\d\d\d\d00_01H_30S_MO\.rnx\.gz|\w\w\w\w00..._R_\d\d\d\d\d\d\d0000_01D_30S_MO\.rnx\.gz"
+2000/01/01 00:00:00 Created DataCenter UNAVCO: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@data-out.unavco.org
+2000/01/01 00:00:00 Created DataCenter SOPAC: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@garner.ucsd.edu
+2000/01/01 00:00:00 Created DataCenter IGN: LINZ::GNSS::DataCenter::Ftp: ftp://anonymous:positionz@linz.govt.nz@igs.ign.fr
+2000/01/01 00:00:00 Created DataCenter CODE: LINZ::GNSS::DataCenter::Http: http://ftp.aiub.unibe.ch/
+2000/01/01 00:00:00 Created DataCenter GGOS: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GGOS_2: LINZ::GNSS::DataCenter::Http: https://vmf.geo.tuwien.ac.at
+2000/01/01 00:00:00 Created DataCenter GeoNET: LINZ::GNSS::DataCenter::Http: https://data.geonet.org.nz
+2000/01/01 00:00:00 Created DataCenter Cache: LINZ::GNSS::DataCenter::File: file:///home/ccrook/projects/positionz/packages/liblinz-gnss-perl/test/files-datapool
+2000/01/01 00:00:00 Datacenter bernese not defined: DataCenter bernese uses invalid types/subtypes: ORB:CODE
+ at ../lib/LINZ/GNSS.pm line 250.
+2000/01/01 00:00:00 Prioritized data centres: LINZ-GNSSArchive, UNAVCO, SOPAC, IGN, GeoNET-PNZ, CODE, GGOS, GGOS_2, GeoNET
+2000/01/01 00:00:00 Overriding getdata cache with LINZGNSS_CACHE_URL environment var: test_cache
+2000/01/01 00:00:00 Created DataCenter linzgnss-cache: LINZ::GNSS::DataCenter::File: test_cache
+2000/01/01 00:00:00 Created Cache for datacenter local-cache using test_cache/cache.db
+Data may be retrieved from the following sources:
+
+Data center: LINZ-GNSSArchive (https://private.archive.geodesy.linz.govt.nz)
+    Data types: OBS:DAILY
+                OBS:HOURLY
+      Stations: Any station code.
+
+Data center: UNAVCO (ftp://data-out.unavco.org)
+    Data types: OBS:DAILY
+                OBS:HOURLY
+      Stations: ROB4
+
+Data center: SOPAC (ftp://garner.ucsd.edu)
+    Data types: ORB:FINAL
+                ORB:RAPID
+                ERP:FINAL
+                ERP:RAPID
+                OBS:DAILY
+                OBS:HOURLY
+                CLK:FINAL
+                CLK:RAPID
+      Stations: Any station code.  Explicitly supports the following codes
+                ALIC ASPA BURI CAS1 CEDU COCO DARR DARW DAV1 DAVR FALE JAB1
+                KARR LAE1 MAC1 MCM4 MIN0 MKEA MOBS NNOR NOUM PERT ROB4 STR1
+                STR2 SUNM SYDN TID1 TID2 TIDB TOW2 YAR2 YARR
+  Not stations: 2406 ARTA AUCK AVLN BLUF BTHL CLIM CLRR CMBL CORM DNVK DUND
+                DURV ESBR ESC2 ESRN ESTR GISB GLDB GNBK GSAL GSAM GSBN GSC1
+                GSCC GSCH GSCV GSLI GSNL GSO0 GSOX GSWK HAAS HAMT HANM HAST
+                HIKB HOKI HOLD KAIK KAPT KORO KTIA LEVN LEXA LKTA LOOK MAHA
+                MAHO MAST MAVL METH MQZG MRBL MTBL MTJO NLSN NPLY NRRD OKOH
+                OTAK OUSD PAEK PARW PKNO PPCW PPK2 PPKM PPMK PPOR PPPK PPRS
+                PPSP PPWH PYGR RDLV RGAR RGHD RGKA RGUT TAUP TKHL TORY TRNG
+                TRWH VAK2 VAKA VASH VBRM VDUN VGMT VHAM VHVN VMCS VNPE VNPL
+                VPCT VPMR VPOA VPRK VPTN VRNG VROT VTHM VTIM VTOK VTWA VWAN
+                VWHK VWIG VWKN VWKU VWMR VWPK VZQN WAIM WANG WARK WEST WGTN
+                WGTT WHKT WHNG WITH WRAU WRPA YALD
+
+Data center: IGN (ftp://igs.ign.fr)
+    Data types: OBS:DAILY
+                OBS:HOURLY
+      Stations: OWNG
+
+Data center: GeoNET-PNZ (https://data.geonet.org.nz)
+    Data types: OBS:DAILY
+                OBS:HOURLY
+      Stations: 2406 ARTA AUCK AVLN BLUF BTHL CHAT CHTI CLIM CLRR CMBL CORM
+                DNVK DUND DURV GISB GLDB GNBK HAAS HAMT HANM HAST HIKB HOKI
+                HOLD KAIK KAPT KORO KTIA LEVN LEXA LKTA LOOK MAHA MAHO MAST
+                MAVL METH MQZG MRBL MTBL MTJO NLSN NPLY NRRD OKOH OTAK OUSD
+                PAEK PARW PKNO PYGR RDLV RGAR RGHD RGKA RGUT SCTB TAUP TKHL
+                TORY TRNG TRWH VGMT WAIM WANG WARK WEST WGTN WGTT WHKT WHNG
+                WITH WRAU WRPA YALD
+
+Data center: CODE (http://ftp.aiub.unibe.ch)
+    Data types: ORB:COD_FIN
+                ORB:COD_RAP
+                ERP:CO2
+                ERP:CODE
+                ERP:CODE_MGEX
+                CLK:CODE
+                ION:BUFFER
+                ION:FINAL
+                ION:PREDICT
+                ION:RAPID
+                P1C1:FINAL
+                P1C1:RAPID
+                P1P2:FINAL
+                P1P2:RAPID
+                TRP:FINAL
+
+Data center: GGOS (https://vmf.geo.tuwien.ac.at)
+    Data types: VMF:VMF
+
+Data center: GGOS_2 (https://vmf.geo.tuwien.ac.at)
+    Data types: VMF:VMF
+
+Data center: GeoNET (https://data.geonet.org.nz)
+    Data types: OBS:DAILY
+                OBS:HOURLY
+      Stations: AUCK AVLN BLUF BTHL CHAT CHTI CORM DNVK DUND GISB GLDB HAAS
+                HAMT HANM HAST HIKB HOKI KAIK KTIA LEXA LKTA MAHO MAST MAVL
+                METH MQZG MTJO NLSN NPLY OUSD PYGR SCTB TAUP TRNG TRWH VGMT
+                WAIM WANG WARK WEST WGTN WGTT WHKT WHNG WRPA YALD

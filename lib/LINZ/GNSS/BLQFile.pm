@@ -118,7 +118,7 @@ sub readBlqData
         {
             $computed=$1;
         }
-        elsif( $l =~ /^\$\$\s+(\w+)\s*\,?\s+RADI\s+TANG\s+lon\/lat\:\s+(\S+)\s+(\S+)\s+(\S+)\s*$/ )
+        elsif( $l =~ /^\$\$\s+(\w+)\s*\,?\s+RADI\s+TANG\s+lon\/lat\:\s*(\S+)\s+(\S+)(?:\s+(\S+))?\s*$/ )
         {
             ($code,$lon,$lat,$hgt)=($1,$2,$3,$4);
             last;
@@ -350,6 +350,8 @@ sub calcLoadingFromGrid
 {
     my( $self, $code, $lon, $lat )=@_;
     my $index=$self->gridIndex;
+    $lon += 360 while $lon < $index->{lon0};
+    $lon -= 360 while $lon >= $index->{lon0}+360;
     my $glon=($lon-$index->{lon0})/$index->{dlon};
     my $glat=($lat-$index->{lat0})/$index->{dlat};
     my $ilon=floor($glon);

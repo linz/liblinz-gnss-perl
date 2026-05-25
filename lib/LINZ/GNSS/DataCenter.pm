@@ -67,6 +67,7 @@ use Log::Log4perl;
 use LINZ::GNSS::FileCompression;
 use LINZ::GNSS::DataRequest qw(UNAVAILABLE PENDING DELAYED COMPLETED);
 use LINZ::GNSS::Variables qw(ExpandEnv);
+use LINZ::GNSS::Time qw(seconds_datetime);
 
 our $nextid=0;
 our $centers=[];
@@ -1220,6 +1221,11 @@ sub getData
             unlink($f->{file}) if -e $f->{file};
         }
         $tmpfiles=[];
+        if(  time() > $failtime )
+        {
+            $self->_logger->info("Files overdue - expected at".seconds_datetime($failtime)," UTC.");
+            $error++;
+        }
         my $twhen = time() + $tretry if $tretry;
         $when = $twhen if ! $when || $twhen < $when;
         last if ! $canconnect;

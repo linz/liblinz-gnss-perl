@@ -47,8 +47,8 @@ use fields qw(
     supplyfreqsecs
     retry
     retrysecs
-    max_delay
-    max_delaysecs
+    max_latency
+    max_latencysecs
     valid_before
     valid_after
     buffer_before
@@ -208,13 +208,14 @@ sub new
     $retrysecs *= 60 if $2 !~ /^m/;
     $retrysecs *= 24 if $2 =~ /^d/;
 
-    my $max_delay=$cfgft->{max_delay} || $default->{max_delay} || '30 days';
-    $max_delay=lc($max_delay);
-    croak "Invalid max_delay $max_delay for $type:$subtype\n" if 
-        $max_delay !~ /^(\d+)\s+(minutes?|hours?|days?)$/;
-    my $max_delaysecs=$1*60;
-    $max_delaysecs *= 60 if $2 !~ /^m/;
-    $max_delaysecs *= 24 if $2 =~ /^d/;
+    # include max_delay for backward compatibility...
+    my $max_latency=$cfgft->{max_latency} || $cfgft->{max_delay} || $default->{max_latency} || '30 days';
+    $max_latency=lc($max_latency);
+    croak "Invalid max_latency (was max_delay) $max_latency for $type:$subtype\n" if 
+        $max_latency !~ /^(\d+)\s+(minutes?|hours?|days?)$/;
+    my $max_latencysecs=$1*60;
+    $max_latencysecs *= 60 if $2 !~ /^m/;
+    $max_latencysecs *= 24 if $2 =~ /^d/;
 
     my $valid_before=$cfgft->{valid_before} || $default->{valid_before} || '';
     if( $valid_before )
@@ -273,8 +274,8 @@ sub new
     $self->{supplyfreqsecs}=$supplyfreqsecs;
     $self->{retry}=$retry;
     $self->{retrysecs}=$retrysecs;
-    $self->{max_delay}=$max_delay;
-    $self->{max_delaysecs}=$max_delaysecs;
+    $self->{max_latency}=$max_latency;
+    $self->{max_latencysecs}=$max_latencysecs;
     $self->{valid_before}=$valid_before;
     $self->{valid_after}=$valid_after;
     $self->{buffer_before}=$buffer_before;
@@ -358,7 +359,7 @@ new version of the product).
 =item $type->retry
 The suggested time for retrying a download after it is delayed
 
-=item $type->max_delay
+=item $type->max_latency
 The maximum delay before the data is deemed unavailable
 
 =item $type->use_station 
@@ -394,7 +395,7 @@ sub latency{ return $_[0]->{latency}; }
 sub retention{ return $_[0]->{retention}; }
 sub expires{ return $_[0]->{expires}; }
 sub retry { return $_[0]->{retry}; }
-sub max_delay { return $_[0]->{max_delay }; }
+sub max_latency { return $_[0]->{max_latency }; }
 sub valid_before { return $_[0]->{valid_before}; }
 sub valid_after { return $_[0]->{valid_after}; }
 sub buffer_before { return $_[0]->{buffer_before}; }
@@ -526,7 +527,7 @@ sub availableTime
         }
     }
 
-    return $seconds, $self->{retrysecs}, $seconds+$self->{max_delaysecs};
+    return $seconds, $self->{retrysecs}, $seconds+$self->{max_latencysecs};
 }
 
 # =head2 $name = $type->_expandName( $name, $jobid, $timeCodes, $station, $stncodes )

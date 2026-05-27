@@ -549,9 +549,17 @@ sub WhenAvailable
     my $available=undef;
     foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
     {
+        eval{
         my ($when, $files) =  $center->checkRequest($request);
         next if ! $when;
         $available = $when if ! $available || $when < $available;
+        };
+        if( $@ )
+        {
+            my $reqstring = $request->asString();
+            my $centername = $center->name;
+            $center->_logger->warn("Error checking DataCenter $centername for request $reqstring: $@");
+        }
     }
     return $available;
 }
@@ -600,23 +608,34 @@ sub FillRequest
         my @unmatch_centers=();
         foreach my $center (@$LINZ::GNSS::DataCenter::prioritized_centers)
         {
-            # Try matching exact station
-            my ($when) = $center->checkRequest($request,1,$subtype);
-            if( $when )
+            eval
             {
-                push(@centers,$center);
-                next;
-            }
-            # Try matching inexactly
-            ($when) = $center->checkRequest($request,0,$subtype);
-            if( $when )
+                # Try matching exact station
+                my ($when) = $center->checkRequest($request,1,$subtype);
+                if( $when )
+                {
+                    push(@centers,$center);
+                    next;
+                }
+                # Try matching inexactly
+                ($when) = $center->checkRequest($request,0,$subtype);
+                if( $when )
+                {
+                    push(@unmatch_centers,$center);
+                }
+            };
+            if( $@ )
             {
-                push(@unmatch_centers,$center);
+                my $reqstring = $request->asString();
+                my $centername = $center->name;
+                $center->_logger->warn("Error checking DataCenter $centername for request $reqstring: $@");
             }
         }
 
         foreach my $center (@centers, @unmatch_centers)
         {
+            eval
+            {
             my ($result, $when, $files) = $center->getData($request,$target,$subtype);
             next if $result eq UNAVAILABLE;
             $available=$when if ! $available || $when < $available;
@@ -634,6 +653,13 @@ sub FillRequest
             elsif( $result eq PENDING && $status ne DELAYED )
             {
                 $status = $result;
+            }
+            };
+            if( $@ )
+            {
+                my $reqstring = $request->asString();
+                my $centername = $center->name;
+                $center->_logger->warn("Error getting data from DataCenter $centername for request $reqstring: $@");
             }
         }
         last if $status eq COMPLETED;
@@ -1198,21 +1224,17 @@ sub getData
 
                 # Retrieve the file
 
-                eval
-                {
-                    push(@$tmpfiles,{file=>$tempfile,spec=>$spec,tospec=>$tospec});
-                    $self->_getfile($spec,$tempfile);
-                };
-                if( $@ )
-                {
-                    my $message=$@;
-                    chomp($message);
-                    $self->_logger->info("Retrieve failed: $message");
-                    $gotfiles=0;
-                    last;
+                push(@$tmpfiles,{file=>$tempfile,spec=>$spec,tospec=>$tospec});
+                $self->_getfile($spec,$tempfile);
 
-                }
             };
+            if( $@ )
+            {
+                my $message=$@;
+                chomp($message);
+                $self->_logger->warn("Retrieving file failed: $message");
+                $gotfiles=0;
+            }
         }
         last if $gotfiles;
 

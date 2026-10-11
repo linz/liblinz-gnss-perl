@@ -8,6 +8,8 @@ use fields qw (
     filelisturi
     filelistregex
     timeout
+    authhosts
+    allowdowngrade
     );
 
 use LWP::UserAgent;
@@ -24,6 +26,16 @@ sub new
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
     $self->{cookies}=HTTP::Cookies->new();
+
+    # Hosts to which the credentials are sent, including when reached by a redirect,
+    # eg a separate login server.  The data centre host is always included.
+    my $authhosts=$cfgdc->{authhosts} || [];
+    $authhosts=join(' ',@$authhosts) if ref($authhosts) eq 'ARRAY';
+    $self->{authhosts}={ map { lc($_) => 1 } ($self->{host}, split(' ',$authhosts)) };
+
+    # Follow redirects from https to http (refused by default by newer versions of LWP)
+    $self->{allowdowngrade}=($cfgdc->{allowdowngrade} || '') =~ /^(1|y|yes|true|on)$/i ? 1 : 0;
+
     my $filelisturi;
     if( $cfgdc->{filelisturi} || $cfgdc->{filelisturipath} )
     {
@@ -71,7 +83,7 @@ sub new
         {
             $user=~ s/(.).*/$1xxxxxx/;
             $pwd=~ s/(.).*/$1xxxxxx/;
-            $self->_logger->debug("Using credentials $user:$pwd");
+            $self->_logger->debug("Using credentials $user:$pwd for ".join(' ',sort keys %{$self->{authhosts}}));
         }
     }
     return $self;
@@ -126,12 +138,30 @@ sub _content
     $ua->env_proxy;
     $ua->cookie_jar($self->{cookies});
     $ua->timeout($self->{timeout});
-    my %headers=();
+    $ua->allow_downgrade(1) if $self->{allowdowngrade} && $ua->can('allow_downgrade');
     if( $user )
     {
-        $headers{Authorization}="Basic ".encode_base64("$user:$pwd");
+        # Add the credentials to each request in the redirect chain that goes to one of
+        # the authorised hosts, over https or the data centre's own scheme.  Remove them
+        # from any other request (older versions of LWP copy them across redirects).
+        my $auth="Basic ".encode_base64("$user:$pwd",'');
+        my $authhosts=$self->{authhosts};
+        my $scheme=$self->{scheme};
+        $ua->add_handler(request_prepare => sub {
+            my ($request)=@_;
+            my $uri=$request->uri;
+            if( $authhosts->{lc($uri->host)} && ($uri->scheme eq 'https' || $uri->scheme eq $scheme) )
+            {
+                $request->header(Authorization=>$auth);
+            }
+            else
+            {
+                $request->remove_header('Authorization');
+            }
+            return;
+        });
     }
-    my $response = $ua->get($url, %headers);
+    my $response = $ua->get($url);
     if( $response->code ne '200' )
     {
         croak("Cannot retrieve $url: ".$response->message."\n");

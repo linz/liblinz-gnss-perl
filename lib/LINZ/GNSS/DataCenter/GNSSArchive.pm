@@ -11,6 +11,7 @@ use fields qw (
     );
 
 use LINZ::GNSS::DataCenter;
+use LINZ::GNSS::Variables qw(ExpandEnv);
 use URI::URL;
 use JSON;
 use LWP::UserAgent;
@@ -24,7 +25,8 @@ sub new
     $self=fields::new($self) unless ref $self;
     $self->SUPER::new($cfgdc);
     $self->{access}=lc($cfgdc->{access}) || 'private';
-    $self->{authuri}=$cfgdc->{authkeyuri};
+    # Allows the auth endpoint (urlAuth for users, machineAuth for client credentials) to be set from the environment
+    $self->{authuri}=ExpandEnv($cfgdc->{authkeyuri},"authkeyuri of datacenter ".$self->name) if $cfgdc->{authkeyuri};
     $self->{alturi}=$cfgdc->{alternativeuri};
     if( ! $self->{authuri} && $self->{access} ne 'public' )
     {

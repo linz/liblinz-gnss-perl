@@ -900,16 +900,17 @@ sub _readCredentials
         eval
         {
             my $userdef=decode_json($json);
-            $user=$userdef->{username};
-            $pwd=$userdef->{password};
+            # client_id/client_secret are the GNSS Archive machine (client credentials) account
+            $user=$userdef->{username} // $userdef->{client_id};
+            $pwd=$userdef->{password} // $userdef->{client_secret};
         };
     }
     else
     {
         while( my $line=<$crdf> )
         {
-            $user=$1 if ! $user && $line =~ /^\s*user(?:name)?\s+(\S.*?)\s*$/i;
-            $pwd=$1 if ! $pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
+            $user=$1 if ! $user && $line =~ /^\s*(?:user(?:name)?|client_id)\s+(\S.*?)\s*$/i;
+            $pwd=$1 if ! $pwd && $line =~ /^\s*(?:password|client_secret)\s+(\S.*?)\s*$/i;
         }
     }
     croak("Credentials file $credfile doesn't define user") if ! defined($user);

@@ -52,6 +52,11 @@ is_deeply([readcreds('both.txt',
     "user bob\npassword secret\nclient_id cid\nclient_secret csecret\n")],
     ['bob', 'secret'], 'text user/password preferred over client credentials');
 
+# Keys may be mixed between the two formats (each is looked up independently)
+
+is_deeply([readcreds('mixed.json', '{"username":"bob","client_secret":"csecret"}')],
+    ['bob', 'csecret'], 'json username with client_secret');
+
 # Missing user is an error
 
 eval { readcreds('empty.txt', "password secret\n") };

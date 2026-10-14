@@ -14,7 +14,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libconfig-general-perl libarchive-zip-perl libdbd-sqlite3-perl \
             libdbi-perl libipc-run-perl liblog-log4perl-perl \
-            libtime-modules-perl libmath-libm-perl liburi-perl \
+            libtime-parsedate-perl libmath-libm-perl liburi-perl \
             libxml-simple-perl libxml-libxml-perl libfile-which-perl \
             libfile-copy-recursive-perl libwww-perl libperlio-gzip-perl \
             libmodule-build-perl gzip ncompress

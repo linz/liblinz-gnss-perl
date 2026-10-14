@@ -52,10 +52,23 @@ is_deeply([readcreds('both.txt',
     "user bob\npassword secret\nclient_id cid\nclient_secret csecret\n")],
     ['bob', 'secret'], 'text user/password preferred over client credentials');
 
-# Keys may be mixed between the two formats (each is looked up independently)
+# Precedence does not depend on the order of lines in the file
+
+is_deeply([readcreds('order.txt',
+    "client_id cid\nclient_secret csecret\nuser bob\npassword secret\n")],
+    ['bob', 'secret'], 'text user/password preferred when client credentials come first');
+
+is_deeply([readcreds('order.json',
+    '{"client_id":"cid","client_secret":"csecret","username":"bob","password":"secret"}')],
+    ['bob', 'secret'], 'json user/password preferred when client credentials come first');
+
+# User and client credentials are never mixed
 
 is_deeply([readcreds('mixed.json', '{"username":"bob","client_secret":"csecret"}')],
-    ['bob', 'csecret'], 'json username with client_secret');
+    ['bob', undef], 'json username is not paired with client_secret');
+
+is_deeply([readcreds('mixed.txt', "client_secret csecret\nuser bob\n")],
+    ['bob', undef], 'text user is not paired with client_secret');
 
 # Missing user is an error
 

@@ -12,7 +12,7 @@ Data centers are pluggable subclasses of `LINZ::GNSS::DataCenter` in `lib/LINZ/G
 
 - `bin/`: command line tools. `get_gnss_data` is the main one (get/cache/preload data, list types and sources).
 - `lib/LINZ/GNSS/FileCache.pm`: the local cache (SQLite index plus files). `DailyProcessor.pm`: batch daily processing driver.
-- `conf/getdata.conf`: default config, installed to `/etc/bernese52/` (see `inc/MyBuilder.pm`). It is also the reference for every config option, in comments.
+- `conf/getdata.conf`: default config, installed to `/etc/bernese52/` (see `inc/MyBuilder.pm`). `bernese52` is an obsolete name (Bernese is now 5.4, managed elsewhere) that is still listed as the default but is normally overridden: deployments point at their own config with `LINZGNSS_CONFIG_FILE` or `-C`. It is also the reference for every config option, in comments.
 - `test/getdata.conf`: separate config used only by the tests. Keep it in sync by hand when changing `conf/getdata.conf` behaviour the tests rely on.
 
 ## Commands
@@ -31,8 +31,8 @@ There is no unit test suite. The only CI (`.github/workflows/push.yml`) is a smo
 ## Conventions and gotchas
 
 - **`.gitignore` ignores `test`**, yet `test/` files are tracked. New test files need `git add -f`.
-- Behaviour is driven by environment variables as well as config: `LINZGNSS_CONFIG_FILE`, `LINZGNSS_CACHE_DIR`, `LINZGNSS_NO_CACHE`, `LINZGNSS_CACHE_NODB`, `LINZGNSS_TMP_DIR`, `LINZGNSS_LOG_DIR`, `LINZGNSS_DEBUG`, `POSITIONZ_REFSTATION_DIR`. Check these before assuming a config value is in effect.
-- `conf/getdata.conf` uses `${D||default}` and `[ssss]`/`yyyy`/`ddd` style substitutions. Variables `$D` and `$P` are the datapool and campaign directories.
+- Behaviour is driven by environment variables as well as config: `LINZGNSS_CONFIG_FILE`, `LINZGNSS_CACHE_DIR`, `LINZGNSS_NO_CACHE`, `LINZGNSS_CACHE_NODB`, `LINZGNSS_TMP_DIR`, `LINZGNSS_LOG_DIR`, `LINZGNSS_DEBUG`, `POSITIONZ_REFSTATION_DIR`, `D`. Check these before assuming a config value is in effect.
+- `conf/getdata.conf` uses `${D||default}` and `[ssss]`/`yyyy`/`ddd` style substitutions. Variables `$D` and `$P` are the datapool and campaign directories. When the `D` environment variable is set it overrides the defaults in the config, so paths such as `/var/lib/bernese52/datapool` are only fallbacks. The code itself does not read `D`; only the config substitutions do.
 - Credentials: a data center's `CredentialsFile` overrides `User`/`Password`, which override credentials embedded in `Uri`. Http data centers only send credentials to the data center host, plus any `AuthHosts`, and only over https unless the Uri is http (recent change; see the commented `AllowDowngrade` option in `conf/getdata.conf`).
 - A failure in one data center must not abort the request: the code continues on to the next. Keep that when editing `DataCenter.pm` or the subclasses.
 - Optional dependency `LINZ::BERN` is not required. `bin/get_gnss_data` prints a warning and disables some functions without it, and the test script strips that warning from logs.

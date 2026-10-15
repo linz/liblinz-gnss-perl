@@ -15,7 +15,7 @@ code. The commented `conf/getdata.conf` documents the configuration options.
 | `lib/LINZ/GNSS/` | The modules. `FileCache.pm` is the local cache. |
 | `lib/LINZ/GNSS/DataCenter/` | Data center types: `Ftp`, `Http`, `File`, `S3Bucket`, `GNSSArchive`. |
 | `bin/` | Command line tools. `get_gnss_data` is the main one. |
-| `conf/getdata.conf` | Default configuration, installed to `<prefix>/etc/bernese52` (`/etc/bernese52` for prefix `/usr`). |
+| `conf/getdata.conf` | Default configuration, installed to `<prefix>/etc/bernese52` (`/etc/bernese52` for prefix `/usr`). `bernese52` is an obsolete name that is still listed as the default and may be overridden (see below). |
 | `test/` | Test scripts, the configuration they use (`test/getdata.conf`), and expected output (`test/check`). |
 | `debian/` | Debian packaging. |
 
@@ -61,7 +61,10 @@ bin/get_gnss_data -n LINZ-GNSSArchive 2018:200 OBS AUCK    # use one data center
 
 The date is `yyyy:ddd` (year and day of year). Without `LINZGNSS_CONFIG_FILE` or
 `-C cfgfile`, the configuration is read from `/etc/bernese52/getdata.conf`, which exists only
-once the package is installed. See the POD in `bin/get_gnss_data` for all options.
+once the package is installed. `bernese52` is an obsolete name (Bernese is now 5.4, managed
+elsewhere) that is still listed as the default but is normally overridden with
+`LINZGNSS_CONFIG_FILE` or `-C`. Likewise, setting the `D` environment variable overrides the
+datapool defaults in the config (for example `/var/lib/bernese52/datapool`). See the POD in `bin/get_gnss_data` for all options.
 
 ## Tests
 

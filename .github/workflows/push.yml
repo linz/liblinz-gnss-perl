@@ -28,6 +28,17 @@ jobs:
             libfile-copy-recursive-perl libwww-perl libperlio-gzip-perl \
             libmodule-build-perl gzip ncompress
 
+      # linz-rinex-rnxcmp is an internal repo, so build the Hatanaka tools from the
+      # GSI source release instead, installed where test/getdata.conf expects them.
+      - name: Build RNXCMP (rnx2crx, crx2rnx)
+        run: |
+          curl -sSfLO https://terras.gsi.go.jp/ja/crx2rnx/RNXCMP_4.2.0_src.tar.gz
+          echo "9a452d2908a27c5b3152cc424e048847221c065e97f6b1f1a585c7b0c34fbace  RNXCMP_4.2.0_src.tar.gz" | sha256sum -c -
+          mkdir rnxcmp && tar -xzf RNXCMP_4.2.0_src.tar.gz -C rnxcmp --strip-components=1
+          gcc rnxcmp/source/rnx2crx.c -o rnx2crx
+          gcc rnxcmp/source/crx2rnx.c -o crx2rnx
+          sudo install -m 755 rnx2crx crx2rnx /usr/bin/
+
       - name: Write GNSS archive credentials
         env:
           GNSS_ARCHIVE_CREDENTIALS: ${{ secrets.GNSS_ARCHIVE_CREDENTIALS }}

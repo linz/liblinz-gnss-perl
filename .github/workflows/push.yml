@@ -14,9 +14,6 @@ jobs:
           repository: linz/liblinz-geodetic-perl
           path: liblinz-geodetic-perl
 
-      - name: Add liblinz-geodetic-perl to PERL5LIB
-        run: echo "PERL5LIB=$GITHUB_WORKSPACE/liblinz-geodetic-perl/lib" >> "$GITHUB_ENV"
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -39,24 +36,30 @@ jobs:
           gcc rnxcmp/source/crx2rnx.c -o crx2rnx
           sudo install -m 755 rnx2crx crx2rnx /usr/bin/
 
-      - name: Write GNSS archive credentials
+      # The full suite (test/run_tests.sh) needs the nonprod GNSS archive, which is
+      # only reachable from the LINZ network, and compares against test/check, which
+      # was generated elsewhere. Hosted runners can't run it, so only smoke test here.
+      - name: Compile modules and scripts
         env:
-          GNSS_ARCHIVE_CREDENTIALS: ${{ secrets.GNSS_ARCHIVE_CREDENTIALS }}
+          PERL5LIB: ${{ github.workspace }}/lib:${{ github.workspace }}/liblinz-geodetic-perl/lib
         run: |
-          # JSON: {"username": "...", "password": "..."}, as referenced by test/getdata.conf
-          mkdir -p "$HOME/.credentials"
-          printf '%s\n' "$GNSS_ARCHIVE_CREDENTIALS" > "$HOME/.credentials/linz-gnss-archive-credentials.json"
-          chmod 600 "$HOME/.credentials/linz-gnss-archive-credentials.json"
-          # run_tests.sh only checks that this file exists
-          touch "$HOME/.gnss-archive-credentials"
+          find lib -name '*.pm' | sort | while read -r f; do
+            perl -c "$f" || exit 1
+          done
+          perl -c bin/get_gnss_data
 
-      - name: Run tests
+      - name: List data types and sources
         working-directory: test
+        env:
+          PERL5LIB: ${{ github.workspace }}/lib:${{ github.workspace }}/liblinz-geodetic-perl/lib
+          LINZGNSS_CONFIG_FILE: ./getdata.conf
         run: |
-          ./run_tests.sh | tee test_output.txt
-          # run_tests.sh finishes with a diff against test/check
-          # and always exits 0, so fail if the diff reported differences.
-          if sed -n '/^Differences/,$p' test_output.txt | grep -q '^[<>0-9]'; then
-            echo "Test output differs from expected results"
-            exit 1
-          fi
+          # getdata.conf loads archive credentials from a file, but -l and -s make no
+          # network requests, so placeholder credentials are enough.
+          mkdir -p "$HOME/.credentials"
+          echo '{"username": "placeholder", "password": "placeholder"}' > "$HOME/.credentials/linz-gnss-archive-credentials.json"
+          export LINZGNSS_CACHE_DIR="$RUNNER_TEMP/cache"
+          mkdir -p "$LINZGNSS_CACHE_DIR"
+          ../bin/get_gnss_data -l
+          ../bin/get_gnss_data -s | tee sources.txt
+          grep -q '^Data center: ' sources.txt

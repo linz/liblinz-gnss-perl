@@ -1,0 +1,65 @@
+name: ci
+
+on: push
+
+jobs:
+  smoke_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # LINZ::Geodetic::* (liblinz-geodetic-perl) is not available as an apt package
+      - uses: actions/checkout@v4
+        with:
+          repository: linz/liblinz-geodetic-perl
+          path: liblinz-geodetic-perl
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libconfig-general-perl libarchive-zip-perl libdbd-sqlite3-perl \
+            libdbi-perl libipc-run-perl liblog-log4perl-perl \
+            libtime-parsedate-perl libmath-libm-perl liburi-perl \
+            libxml-simple-perl libxml-libxml-perl libfile-which-perl \
+            libfile-copy-recursive-perl libwww-perl libperlio-gzip-perl \
+            libmodule-build-perl gzip ncompress
+
+      # linz-rinex-rnxcmp is an internal repo, so build the Hatanaka tools from the
+      # GSI source release instead, installed where test/getdata.conf expects them.
+      - name: Build RNXCMP (rnx2crx, crx2rnx)
+        run: |
+          curl -sSfLO https://terras.gsi.go.jp/ja/crx2rnx/RNXCMP_4.2.0_src.tar.gz
+          echo "9a452d2908a27c5b3152cc424e048847221c065e97f6b1f1a585c7b0c34fbace  RNXCMP_4.2.0_src.tar.gz" | sha256sum -c -
+          mkdir rnxcmp && tar -xzf RNXCMP_4.2.0_src.tar.gz -C rnxcmp --strip-components=1
+          gcc rnxcmp/source/rnx2crx.c -o rnx2crx
+          gcc rnxcmp/source/crx2rnx.c -o crx2rnx
+          sudo install -m 755 rnx2crx crx2rnx /usr/bin/
+
+      # The full suite (test/run_tests.sh) needs the nonprod GNSS archive, which is
+      # only reachable from the LINZ network, and compares against test/check, which
+      # was generated elsewhere. Hosted runners can't run it, so only smoke test here.
+      - name: Compile modules and scripts
+        env:
+          PERL5LIB: ${{ github.workspace }}/lib:${{ github.workspace }}/liblinz-geodetic-perl/lib
+        run: |
+          find lib -name '*.pm' | sort | while read -r f; do
+            perl -c "$f" || exit 1
+          done
+          perl -c bin/get_gnss_data
+
+      - name: List data types and sources
+        working-directory: test
+        env:
+          PERL5LIB: ${{ github.workspace }}/lib:${{ github.workspace }}/liblinz-geodetic-perl/lib
+          LINZGNSS_CONFIG_FILE: ./getdata.conf
+        run: |
+          # getdata.conf loads archive credentials from a file, but -l and -s make no
+          # network requests, so placeholder credentials are enough.
+          mkdir -p "$HOME/.credentials"
+          echo '{"username": "placeholder", "password": "placeholder"}' > "$HOME/.credentials/linz-gnss-archive-credentials.json"
+          export LINZGNSS_CACHE_DIR="$RUNNER_TEMP/cache"
+          mkdir -p "$LINZGNSS_CACHE_DIR"
+          ../bin/get_gnss_data -l
+          ../bin/get_gnss_data -s | tee sources.txt
+          grep -q '^Data center: ' sources.txt

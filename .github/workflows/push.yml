@@ -8,6 +8,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # LINZ::Geodetic::* (liblinz-geodetic-perl) is not available as an apt package
+      - uses: actions/checkout@v4
+        with:
+          repository: linz/liblinz-geodetic-perl
+          path: liblinz-geodetic-perl
+
+      - name: Add liblinz-geodetic-perl to PERL5LIB
+        run: echo "PERL5LIB=$GITHUB_WORKSPACE/liblinz-geodetic-perl/lib" >> "$GITHUB_ENV"
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

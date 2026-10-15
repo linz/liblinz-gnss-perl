@@ -49,16 +49,19 @@ perl -I . Build.PL
 ## Using `get_gnss_data`
 
 ```sh
-export PERL5LIB=lib                 # when running from the source tree
-bin/get_gnss_data -l                # list file types
-bin/get_gnss_data -s                # list configured data centers and file types
-bin/get_gnss_data -d outdir 2018:200 OBS AUCK        # download into outdir
-bin/get_gnss_data -n LINZ-GNSSArchive 2018:200 OBS AUCK   # use one data center
+# When running from the source tree:
+export PERL5LIB=lib
+export LINZGNSS_CONFIG_FILE=conf/getdata.conf
+
+bin/get_gnss_data -l                                       # list file types
+bin/get_gnss_data -s                                       # list configured data centers and file types
+bin/get_gnss_data -d outdir 2018:200 OBS AUCK              # download into outdir
+bin/get_gnss_data -n LINZ-GNSSArchive 2018:200 OBS AUCK    # use one data center
 ```
 
-The date is `yyyy:ddd` (year and day of year). `-C cfgfile` selects a configuration file
-instead of the default, as does the `LINZGNSS_CONFIG_FILE` environment variable. See the
-POD in `bin/get_gnss_data` for all options.
+The date is `yyyy:ddd` (year and day of year). Without `LINZGNSS_CONFIG_FILE` or
+`-C cfgfile`, the configuration is read from `/etc/bernese52/getdata.conf`, which exists only
+once the package is installed. See the POD in `bin/get_gnss_data` for all options.
 
 ## Tests
 

@@ -120,13 +120,13 @@ Get Authorization cookies for GNSS Archive
 sub connect
 {
     my($self) = @_;
-    my ($user,$pwd)=$self->credentials();
+    my ($client_id,$client_secret)=$self->credentials();
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
     my $authuri=$self->{authuri};
     if( $self->{authuri}  )
     {
-        my $authhdr="Basic ".encode_base64("$user:$pwd",'');
+        my $authhdr="Basic ".encode_base64("$client_id:$client_secret",'');
         my $response=$ua->get($authuri,"Authorization"=>$authhdr);
         if( $response->code ne '200')
         {

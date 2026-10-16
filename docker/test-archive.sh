@@ -2,8 +2,8 @@
 # Test the connection to the GNSS archive and download a file from it.
 #
 # Environment:
-#   GNSS_ARCHIVE_CREDENTIALS_FILE  credentials file, either JSON with "username" and
-#                                  "password" or lines "user ..." and "password ..."
+#   GNSS_ARCHIVE_CREDENTIALS_FILE  credentials file, either JSON with "client_id" and
+#                                  "client_secret" or lines "client_id ..." and "client_secret ..."
 #   ARCHIVE_DATE                   yyyy:ddd of the file to download (default 2018:200)
 #   ARCHIVE_STATION                station code (default AUCK)
 #   ARCHIVE_SUBTYPE                OBS subtype, DAILY or HOURLY (default DAILY)
@@ -39,7 +39,7 @@ if [ ! -r "$mounted_creds" ]; then
 fi
 
 # get_gnss_data reads credentials as JSON only if the file name ends in .json, otherwise as
-# "user ..." / "password ..." lines. The mounted file always has the same name, so copy it
+# "client_id ..." / "client_secret ..." lines. The mounted file always has the same name, so copy it
 # under the name that matches its content and use that copy, so both formats work.
 credsdir=$(mktemp -d) || fail "cannot create a temporary directory"
 if grep -q '^[[:space:]]*{' "$mounted_creds"; then
@@ -60,7 +60,7 @@ echo "== 1. Data center configuration"
 get_gnss_data -s | grep -A3 LINZ-GNSSArchive || fail "LINZ-GNSSArchive is not configured"
 
 echo "== 2. Authentication request ($authuri)"
-# Reads the user name and password the way DataCenter::_readCredentials does.
+# Reads the client_id and client_secret the way DataCenter::_readCredentials does.
 # The password goes to curl through stdin so it is not visible in the process list.
 body=$(mktemp)
 status=$(perl -MJSON -0777 -e '
@@ -70,11 +70,11 @@ status=$(perl -MJSON -0777 -e '
         my ($user, $pwd);
         if ($file =~ /\.json$/) {
             my $def = eval { decode_json($text) };
-            ($user, $pwd) = ($def->{username}, $def->{password}) if $def;
+            ($user, $pwd) = ($def->{client_id}, $def->{client_secret}) if $def;
         } else {
             for my $line (split /\n/, $text) {
-                $user = $1 if !$user && $line =~ /^\s*user(?:name)?\s+(\S.*?)\s*$/i;
-                $pwd = $1 if !$pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
+                $user = $1 if !$user && $line =~ /^\s*client_id\s+(\S.*?)\s*$/i;
+                $pwd = $1 if !$pwd && $line =~ /^\s*client_secret\s+(\S.*?)\s*$/i;
             }
         }
         exit 2 if !defined $user || !defined $pwd;

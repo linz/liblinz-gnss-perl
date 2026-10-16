@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in this repo. There is no README or `doc/`; the POD in the modules and the commented `conf/getdata.conf` are the documentation.
+Guidance for AI coding agents working in this repo. Human docs are `README.md`, `CONTRIBUTING.md` (releases) and `docs/`; the POD in the modules and the commented `conf/getdata.conf` document the code and config.
 
 ## What this is
 
@@ -12,18 +12,18 @@ Data centers are pluggable subclasses of `LINZ::GNSS::DataCenter` in `lib/LINZ/G
 
 - `bin/`: command line tools. `get_gnss_data` is the main one (get/cache/preload data, list types and sources).
 - `lib/LINZ/GNSS/FileCache.pm`: the local cache (SQLite index plus files). `DailyProcessor.pm`: batch daily processing driver.
-- `conf/getdata.conf`: default config, installed to `/etc/bernese52/` (see `inc/MyBuilder.pm`). It is also the reference for every config option, in comments.
+- `conf/getdata.conf`: default config, installed to `/etc/bernese52/` (see `inc/MyBuilder.pm`). `bernese52` is an obsolete name (Bernese is now 5.4, managed elsewhere) that is still listed as the default but is normally overridden: deployments point at their own config with `LINZGNSS_CONFIG_FILE` or `-C`. It is also the reference for every config option, in comments.
 - `test/getdata.conf`: separate config used only by the tests. Keep it in sync by hand when changing `conf/getdata.conf` behaviour the tests rely on.
 
 ## Commands
 
 ```bash
-perl Build.PL && ./Build       # build
+perl -I . Build.PL && ./Build  # build; -I . because Build.PL loads inc::MyBuilder
 cd test && ./run_tests.sh      # integration tests, optionally with one name: http httpa gnssa gnssp cache buffer
 cd test/make_rinex2 && ./test.sh
 ```
 
-There is no unit test suite and no CI workflow in the repo.
+There is no unit test suite. The only CI (`.github/workflows/push.yml`) is a smoke test: `perl -c` on every module and `bin/get_gnss_data`, then `get_gnss_data -l` and `-s`. It does not run `run_tests.sh`.
 
 - `test/run_tests.sh` runs `bin/get_gnss_data` against live remote servers and diffs its logs against `test/check/`. It needs network access and `~/.gnss-archive-credentials`. If the credentials file is missing it prints a message and exits without failing. If either is unavailable, say so; don't claim the tests passed.
 - Run scripts from the source tree with `PERL5LIB=lib`. `test/run_tests.sh` sets `../lib` itself.
@@ -31,10 +31,10 @@ There is no unit test suite and no CI workflow in the repo.
 ## Conventions and gotchas
 
 - **`.gitignore` ignores `test`**, yet `test/` files are tracked. New test files need `git add -f`.
-- Behaviour is driven by environment variables as well as config: `LINZGNSS_CONFIG_FILE`, `LINZGNSS_CACHE_DIR`, `LINZGNSS_NO_CACHE`, `LINZGNSS_CACHE_NODB`, `LINZGNSS_TMP_DIR`, `LINZGNSS_LOG_DIR`, `LINZGNSS_DEBUG`, `POSITIONZ_REFSTATION_DIR`. Check these before assuming a config value is in effect.
-- `conf/getdata.conf` uses `${D||default}` and `[ssss]`/`yyyy`/`ddd` style substitutions. Variables `$D` and `$P` are the datapool and campaign directories.
+- Behaviour is driven by environment variables as well as config: `LINZGNSS_CONFIG_FILE`, `LINZGNSS_CACHE_DIR`, `LINZGNSS_NO_CACHE`, `LINZGNSS_CACHE_NODB`, `LINZGNSS_TMP_DIR`, `LINZGNSS_LOG_DIR`, `LINZGNSS_DEBUG`, `POSITIONZ_REFSTATION_DIR`, `D`. Check these before assuming a config value is in effect.
+- `conf/getdata.conf` uses `${D||default}` and `[ssss]`/`yyyy`/`ddd` style substitutions. Variables `$D` and `$P` are the datapool and campaign directories. When the `D` environment variable is set it overrides the defaults in the config, so paths such as `/var/lib/bernese52/datapool` are only fallbacks. The code itself does not read `D`; only the config substitutions do.
 - Credentials: a data center's `CredentialsFile` overrides `User`/`Password`, which override credentials embedded in `Uri`. Http data centers only send credentials to the data center host, plus any `AuthHosts`, and only over https unless the Uri is http (recent change; see the commented `AllowDowngrade` option in `conf/getdata.conf`).
 - A failure in one data center must not abort the request: the code continues on to the next. Keep that when editing `DataCenter.pm` or the subclasses.
 - Optional dependency `LINZ::BERN` is not required. `bin/get_gnss_data` prints a warning and disables some functions without it, and the test script strips that warning from logs.
 - Test logs in `test/check/` are the expected output, with dates and temp dirs normalised by `run_tests.sh`. If you intentionally change log output, update them.
-- Runtime dependencies are listed in two places that must stay consistent: `Build.PL` (`requires`) and `debian/control` (`Depends`). Add new modules to both. Releases are tracked in `debian/changelog`.
+- Runtime dependencies are listed in two places that must stay consistent: `Build.PL` (`requires`) and `debian/control` (`Depends`). Add new modules to both. Releases are git tags like `1.115.0-1` (see `CONTRIBUTING.md`); `debian/changelog` has not been updated since `1.97.0-1`.

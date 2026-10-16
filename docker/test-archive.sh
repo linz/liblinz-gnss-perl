@@ -67,18 +67,18 @@ status=$(perl -MJSON -0777 -e '
         my ($file) = @ARGV;
         open(my $fh, "<", $file) or exit 1;
         my $text = <$fh>;
-        my ($user, $pwd);
+        my ($client_id, $client_secret);
         if ($file =~ /\.json$/) {
             my $def = eval { decode_json($text) };
-            ($user, $pwd) = ($def->{client_id}, $def->{client_secret}) if $def;
+            ($client_id, $client_secret) = ($def->{client_id}, $def->{client_secret}) if $def;
         } else {
             for my $line (split /\n/, $text) {
-                $user = $1 if !$user && $line =~ /^\s*client_id\s+(\S.*?)\s*$/i;
-                $pwd = $1 if !$pwd && $line =~ /^\s*client_secret\s+(\S.*?)\s*$/i;
+                $client_id = $1 if !$client_id && $line =~ /^\s*client_id\s+(\S.*?)\s*$/i;
+                $client_secret = $1 if !$client_secret && $line =~ /^\s*client_secret\s+(\S.*?)\s*$/i;
             }
         }
-        exit 2 if !defined $user || !defined $pwd;
-        print "user = \"$user:$pwd\"\n";
+        exit 2 if !defined $client_id || !defined $client_secret;
+        print "user = \"$client_id:$client_secret\"\n";
     ' "$creds" |
     curl -sS -K - -o "$body" -w '%{http_code}' "$authuri") \
     || fail "cannot connect to $authuri. The nonprod archive is only reachable from the LINZ network."

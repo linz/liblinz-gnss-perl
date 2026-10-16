@@ -87,9 +87,11 @@ non-zero exit code:
 
 1. Checks that `LINZ-GNSSArchive` is configured (`get_gnss_data -s`).
 2. Makes the `AuthKeyUri` request and expects `200` with `cookies`.
-3. Downloads one `OBS:DAILY` file with `get_gnss_data` and checks that it is in
-   `docker/output/` on the host. This is a check of the connection, not the full test suite
-   (`test/run_tests.sh`).
+3. Downloads one `OBS:DAILY` file with `get_gnss_data` and checks that it arrived. The
+   file is written to `docker/output/<station>-<date>-<subtype>/` on the host. The
+   directory is emptied first and the cache is not used, so a file from an earlier run
+   can't pass as a new download. This is a check of the connection, not the full test
+   suite (`test/run_tests.sh`).
 
 ### Options
 
@@ -112,12 +114,15 @@ ARCHIVE_DATE=2026:276 ARCHIVE_STATION=GSAA docker compose run --rm archive-test
 ```
 
 The credentials file is mounted into the container at run time and is not copied into the
-image.
+image. Either format from step 1 works: the script checks which one the file is.
 
 The script asks for `OBS:DAILY` explicitly. If the subtype is left out, `get_gnss_data`
-uses the first subtype by priority, which is `HOURLY`, so it tries the last hourly file of
-the day (`/rnx2_hourly_30s/<yyyy>/<ddd>/23/<ssss><ddd>x.<yy>d.gz`) instead of the daily file
-(`/rnx2_daily_30s/<yyyy>/<ddd>/<ssss><ddd>0.<yy>d.gz`).
+tries the subtypes in priority order, which is `DAILY` and then `HOURLY` (`DAILY` has
+priority 2 and `HOURLY` priority 1 in `test/getdata.conf`, and the higher number is tried
+first). If the daily file can't be retrieved, it then tries the last hourly file of the day
+(`/rnx2_hourly_30s/<yyyy>/<ddd>/23/<ssss><ddd>x.<yy>d.gz`), so a failed daily download
+shows up as a request for an hourly URL. Asking for `OBS:DAILY` keeps the test on the
+daily file (`/rnx2_daily_30s/<yyyy>/<ddd>/<ssss><ddd>0.<yy>d.gz`).
 
 ### DNS
 

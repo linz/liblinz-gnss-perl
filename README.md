@@ -84,7 +84,7 @@ What it needs:
 
 - Network access to the data centers in `test/getdata.conf`.
 - The file `~/.gnss-archive-credentials` to exist. The script only checks that it exists. If it doesn't, the script prints a message and exits without running any tests.
-- Credentials for the GNSS archive, in the file named by `CredentialsFile` in `test/getdata.conf`, which is `$GNSS_ARCHIVE_CREDENTIALS_FILE` if set, otherwise `~/.credentials/linz-gnss-archive-credentials.json`. See [Testing the connection to the GNSS archive](docs/testing-gnss-archive-connection.md).
+- Client credentials (`client_id` and `client_secret` of a machine account) for the GNSS archive, in the file named by `CredentialsFile` in `test/getdata.conf`, which is `$GNSS_ARCHIVE_CREDENTIALS_FILE` if set, otherwise `~/.credentials/linz-gnss-archive-credentials.json`. See [Testing the connection to the GNSS archive](docs/testing-gnss-archive-connection.md).
 - `rnx2crx` and `crx2rnx` in `/usr/bin`.
 
 `test/getdata.conf` points the GNSS archive at the nonprod URLs
@@ -115,5 +115,5 @@ connection.
 ### GNSS archive connection
 
 To check that credentials and the connection to the GNSS archive work, including the
-`AuthKeyUri` authentication request and a file download, follow
+`AuthKeyUri` (`/v1/machineAuth`) authentication request and a file download, follow
 [Testing the connection to the GNSS archive](docs/testing-gnss-archive-connection.md).

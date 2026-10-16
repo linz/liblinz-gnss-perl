@@ -876,7 +876,7 @@ If a credentials_file is specified then it can either be a JSON formatted
 file with file extension .json, or a text formatted file.  The JSON format 
 should look like:
 
-{"username": "the-user-name": "password":"the-password"}
+{"username": "the-user-name", "password":"the-password"}
 
 The text format file should include lines
 

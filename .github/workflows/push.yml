@@ -57,7 +57,7 @@ jobs:
           # getdata.conf loads archive credentials from a file, but -l and -s make no
           # network requests, so placeholder credentials are enough.
           mkdir -p "$HOME/.credentials"
-          echo '{"username": "placeholder", "password": "placeholder"}' > "$HOME/.credentials/linz-gnss-archive-credentials.json"
+          echo '{"client_id": "placeholder", "client_secret": "placeholder"}' > "$HOME/.credentials/linz-gnss-archive-credentials.json"
           export LINZGNSS_CACHE_DIR="$RUNNER_TEMP/cache"
           mkdir -p "$LINZGNSS_CACHE_DIR"
           ../bin/get_gnss_data -l

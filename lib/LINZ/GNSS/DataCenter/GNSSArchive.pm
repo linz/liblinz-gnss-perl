@@ -36,6 +36,63 @@ sub new
     }
     return $self;
 }
+=head2 $self->_readCredentials($credfile)
+
+Reads the GNSS Archive machine account from a credentials file.  The archive
+authenticates automated consumers with the OAuth2 client credentials flow
+(the /machineAuth endpoint), so the file must define a client_id and
+client_secret.  User names and passwords are not supported, as they cannot be
+used once MFA is enabled.
+
+A file with extension .json should look like
+
+{"client_id": "the-client-id", "client_secret": "the-client-secret"}
+
+otherwise it should have lines
+
+   client_id the-client-id
+   client_secret the-client-secret
+
+Only the first such lines are read, other lines are ignored.  Returns the
+client_id and client_secret, which are used as the Basic authorization
+credentials for the AuthKeyUri request.
+
+=cut
+
+sub _readCredentials
+{
+    my ($self,$credfile)=@_;
+    open(my $crdf,'<',$credfile) ||
+        croak("Cannot open credentials file $credfile for DataCenter ".$self->name);
+    my %cred;
+    if( $credfile =~ /\.json$/ )
+    {
+        my $json=join('',<$crdf>);
+        my $def=eval { decode_json($json) };
+        croak("Credentials file $credfile for DataCenter ".$self->name." is not valid JSON\n") if ref($def) ne 'HASH';
+        %cred=map { $_ => $def->{$_} } qw(client_id client_secret);
+    }
+    else
+    {
+        while( my $line=<$crdf> )
+        {
+            if( $line =~ /^\s*(client_id|client_secret)\s+(\S.*?)\s*$/i )
+            {
+                my $key=lc($1);
+                $cred{$key}=$2 if ! defined $cred{$key};
+            }
+        }
+    }
+    close($crdf);
+    foreach my $key (qw(client_id client_secret))
+    {
+        croak("Credentials file $credfile for DataCenter ".$self->name." doesn't define $key. ".
+            "The GNSS Archive requires client credentials (client_id and client_secret), not a user name and password\n")
+            if ! defined($cred{$key}) || $cred{$key} eq '';
+    }
+    return @cred{qw(client_id client_secret)};
+}
+
 =head2 $center->searchUri
 
 Get the URI to retrieve a file list from the GNSS Archive
@@ -63,13 +120,13 @@ Get Authorization cookies for GNSS Archive
 sub connect
 {
     my($self) = @_;
-    my ($user,$pwd)=$self->credentials();
+    my ($client_id,$client_secret)=$self->credentials();
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
     my $authuri=$self->{authuri};
     if( $self->{authuri}  )
     {
-        my $authhdr="Basic ".encode_base64("$user:$pwd");
+        my $authhdr="Basic ".encode_base64("$client_id:$client_secret",'');
         my $response=$ua->get($authuri,"Authorization"=>$authhdr);
         if( $response->code ne '200')
         {

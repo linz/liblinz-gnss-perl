@@ -883,24 +883,8 @@ The text format file should include lines
    user the-user-name
    password the-password
 
-(username can be used instead of user).  Only the first such lines will be 
-read.  Lines not matching this are are ignored.
-
-The GNSS Archive machine (client credentials) account is defined in the same 
-way using client_id and client_secret in place of the user name and password, 
-for example
-
-{"client_id": "the-client-id", "client_secret":"the-client-secret"}
-
-or the text lines
-
-   client_id the-client-id
-   client_secret the-client-secret
-
-The client_id and client_secret are used as the user and password, and are used 
-only if the file does not define a user name.  The pairs are never mixed, so 
-user/password is used in preference to client_id/client_secret wherever each 
-appears in the file.
+Only the first such lines will be read.  Lines not matching this are
+are ignored.
 
 =cut
 
@@ -909,31 +893,25 @@ sub _readCredentials
     my ($self,$credfile)=@_;
     open(my $crdf,$credfile) || 
         croak("Cannot open credentials files $credfile for DataCenter ".$self->name);
-    my %cred;
+    my ($user,$pwd);
     if( $credfile =~ /\.json$/ )
     {
         my $json=join('',<$crdf>);
         eval
         {
             my $userdef=decode_json($json);
-            %cred=map { $_ => $userdef->{$_} } qw(user password client_id client_secret);
-            $cred{user}=$userdef->{username};
+            $user=$userdef->{username};
+            $pwd=$userdef->{password};
         };
     }
     else
     {
         while( my $line=<$crdf> )
         {
-            if( $line =~ /^\s*(user(?:name)?|password|client_id|client_secret)\s+(\S.*?)\s*$/i )
-            {
-                my $key=lc($1);
-                $key='user' if $key eq 'username';
-                $cred{$key}=$2 if ! defined $cred{$key};
-            }
+            $user=$1 if ! $user && $line =~ /^\s*user(?:name)?\s+(\S.*?)\s*$/i;
+            $pwd=$1 if ! $pwd && $line =~ /^\s*password\s+(\S.*?)\s*$/i;
         }
     }
-    # Use one complete pair, so that user and client credentials are never mixed
-    my ($user,$pwd)=defined($cred{user}) ? @cred{qw(user password)} : @cred{qw(client_id client_secret)};
     croak("Credentials file $credfile doesn't define user") if ! defined($user);
     return $user,$pwd;
 }

@@ -1,6 +1,5 @@
 #!/usr/bin/perl
-# Tests for LINZ::GNSS::DataCenter::GNSSArchive authentication settings:
-# AuthKeyUri environment expansion (urlAuth / machineAuth) and connect.
+# Tests for LINZ::GNSS::DataCenter::GNSSArchive client credentials authentication
 # Run with: perl -I../lib gnssarchive.t  (from the test directory)
 
 use strict;
@@ -13,8 +12,6 @@ use LWP::UserAgent;
 use LINZ::GNSS::DataCenter;
 
 my $dir = tempdir(CLEANUP => 1);
-
-my $URL_AUTH     = 'https://search.archive.geodesy.linz.govt.nz/v1/urlAuth';
 my $MACHINE_AUTH = 'https://search.archive.geodesy.linz.govt.nz/v1/machineAuth';
 
 sub credfile
@@ -29,101 +26,75 @@ sub credfile
 
 sub newcenter
 {
-    my (%cfg) = @_;
+    my ($creds) = @_;
     return LINZ::GNSS::DataCenter::Create({
         name => 'testarchive',
         type => 'GNSSArchive',
         datafiles => {},
         uri  => 'https://private.archive.geodesy.linz.govt.nz',
-        %cfg,
+        authkeyuri => $MACHINE_AUTH,
+        credentialsfile => $creds,
     });
 }
 
-# The default used in conf/getdata.conf
-my $conf_authuri = '${LINZ_GNSS_ARCHIVE_AUTH_URL||' . $URL_AUTH . '}';
+sub creds { return [newcenter(credfile(@_))->credentials] }
 
-# AuthKeyUri handling
+# Reading client credentials
 
+is_deeply(creds('c.json', '{"client_id":"cid","client_secret":"csecret"}'),
+    ['cid', 'csecret'], 'json client_id/client_secret');
+is_deeply(creds('c.txt', "client_id cid\nclient_secret csecret\n"),
+    ['cid', 'csecret'], 'text client_id/client_secret');
+is_deeply(creds('c2.txt', "# comment\nclient_id first\nclient_id second\nclient_secret csecret\n"),
+    ['first', 'csecret'], 'text: first definition is used, other lines ignored');
+
+# User/password files are rejected
+
+foreach my $case (
+    ['u.json', '{"username":"bob","password":"secret"}'],
+    ['u.txt', "user bob\npassword secret\n"],
+    ['partial.json', '{"client_id":"cid"}'],
+    ['partial.txt', "client_secret csecret\n"],
+    ['bad.json', 'not json'],
+)
 {
-    local $ENV{LINZ_GNSS_ARCHIVE_AUTH_URL};
-    delete $ENV{LINZ_GNSS_ARCHIVE_AUTH_URL};
-
-    is(newcenter(authkeyuri => $URL_AUTH)->{authuri}, $URL_AUTH,
-        'literal AuthKeyUri is used unchanged');
-
-    is(newcenter(authkeyuri => $conf_authuri)->{authuri}, $URL_AUTH,
-        'defaults to urlAuth when LINZ_GNSS_ARCHIVE_AUTH_URL is not set');
+    my ($name, $content) = @$case;
+    my $path = credfile($name, $content);
+    eval { newcenter($path) };
+    like($@, qr/client_id|client_secret|not valid JSON/, "$name is rejected");
 }
 
-{
-    local $ENV{LINZ_GNSS_ARCHIVE_AUTH_URL} = $MACHINE_AUTH;
-    is(newcenter(authkeyuri => $conf_authuri)->{authuri}, $MACHINE_AUTH,
-        'LINZ_GNSS_ARCHIVE_AUTH_URL overrides the default (machineAuth)');
-}
-
-{
-    local $ENV{LINZ_GNSS_ARCHIVE_AUTH_URL};
-    delete $ENV{LINZ_GNSS_ARCHIVE_AUTH_URL};
-
-    eval { newcenter() };
-    like($@, qr/needs AuthKeyUri defined/, 'private archive without AuthKeyUri croaks');
-
-    my $public = eval { newcenter(access => 'public') };
-    ok($public && !$public->{authuri}, 'public archive does not need AuthKeyUri');
-}
-
-# connect: request URL, Basic auth header and cookies, for each endpoint
+# connect: GET to machineAuth with Basic client_id:client_secret
 
 my @requests;
 my $response_code = 200;
 {
     no warnings 'redefine';
-    *LWP::UserAgent::get = sub
-    {
-        my ($ua, $url, %headers) = @_;
-        push @requests, { url => $url, auth => $headers{Authorization} };
-        return HTTP::Response->new($response_code, $response_code == 200 ? 'OK' : 'Unauthorized',
-            [], '{"cookies":["session=abc123; Path=/; Secure","other=xyz; Path=/"]}');
+    *LWP::UserAgent::get = sub {
+        my ($ua, $url, %hdr) = @_;
+        push @requests, { url => $url, auth => $hdr{Authorization} };
+        my $r = HTTP::Response->new($response_code, $response_code == 200 ? 'OK' : 'Unauthorized');
+        $r->content('{"cookies":["session=abc123; Path=/","other=xyz; Path=/"]}');
+        return $r;
     };
+    *LINZ::GNSS::DataCenter::Http::connect = sub { 1 };
 }
 
-my %cases = (
-    urlAuth => {
-        uri   => $URL_AUTH,
-        creds => credfile('user.json', '{"username":"bob","password":"secret"}'),
-        id    => 'bob', secret => 'secret',
-    },
-    machineAuth => {
-        uri   => $MACHINE_AUTH,
-        creds => credfile('client.json', '{"client_id":"cid","client_secret":"csecret"}'),
-        id    => 'cid', secret => 'csecret',
-    },
-);
-
-foreach my $name (sort keys %cases)
 {
-    my $case = $cases{$name};
-    @requests = ();
-    $response_code = 200;
-    my $center = newcenter(authkeyuri => $case->{uri}, credentialsfile => $case->{creds});
+    my $center = newcenter(credfile('ok.json', '{"client_id":"cid","client_secret":"csecret"}'));
     $center->connect();
-
-    is(scalar(@requests), 1, "$name: one auth request made");
-    is($requests[0]{url}, $case->{uri}, "$name: auth request sent to $case->{uri}");
-    is($requests[0]{auth}, 'Basic ' . encode_base64("$case->{id}:$case->{secret}"),
-        "$name: Basic auth header built from credentials file");
-    is_deeply($center->{authcookies}, ['session=abc123', 'other=xyz'],
-        "$name: cookies from auth response are kept");
+    is(scalar(@requests), 1, 'one auth request made');
+    is($requests[0]{url}, $MACHINE_AUTH, 'auth request sent to machineAuth');
+    is($requests[0]{auth}, 'Basic ' . encode_base64('cid:csecret', ''),
+        'Basic auth header built from client_id and client_secret');
+    is_deeply($center->{authcookies}, ['session=abc123', 'other=xyz'], 'cookies from auth response are kept');
 }
 
-# Authentication failure
-
 {
-    @requests = ();
     $response_code = 401;
-    my $center = newcenter(authkeyuri => $MACHINE_AUTH, credentialsfile => $cases{machineAuth}{creds});
+    my $center = newcenter(credfile('ok.json', '{"client_id":"cid","client_secret":"csecret"}'));
     eval { $center->connect() };
-    like($@, qr/AuthKeyUri failed/, 'connect croaks if the auth endpoint rejects the credentials');
+    like($@, qr/AuthKeyUri failed/, 'connect croaks if the credentials are rejected');
 }
 
 done_testing();

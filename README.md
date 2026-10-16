@@ -10,14 +10,14 @@ code. The commented `conf/getdata.conf` documents the configuration options.
 
 ## Layout
 
-| Path | Contents |
-| ---- | -------- |
-| `lib/LINZ/GNSS/` | The modules. `FileCache.pm` is the local cache. |
-| `lib/LINZ/GNSS/DataCenter/` | Data center types: `Ftp`, `Http`, `File`, `S3Bucket`, `GNSSArchive`. |
-| `bin/` | Command line tools. `get_gnss_data` is the main one. |
-| `conf/getdata.conf` | Default configuration, installed to `<prefix>/etc/bernese52` (`/etc/bernese52` for prefix `/usr`). `bernese52` is an obsolete name that is still listed as the default and may be overridden (see below). |
-| `test/` | Test scripts, the configuration they use (`test/getdata.conf`), and expected output (`test/check`). |
-| `debian/` | Debian packaging. |
+| Path                        | Contents                                                                                                                                                                                                  |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/LINZ/GNSS/`            | The modules. `FileCache.pm` is the local cache.                                                                                                                                                           |
+| `lib/LINZ/GNSS/DataCenter/` | Data center types: `Ftp`, `Http`, `File`, `S3Bucket`, `GNSSArchive`.                                                                                                                                      |
+| `bin/`                      | Command line tools. `get_gnss_data` is the main one.                                                                                                                                                      |
+| `conf/getdata.conf`         | Default configuration, installed to `<prefix>/etc/bernese52` (`/etc/bernese52` for prefix `/usr`). `bernese52` is an obsolete name that is still listed as the default and may be overridden (see below). |
+| `test/`                     | Test scripts, the configuration they use (`test/getdata.conf`), and expected output (`test/check`).                                                                                                       |
+| `debian/`                   | Debian packaging.                                                                                                                                                                                         |
 
 ## Dependencies
 
@@ -117,6 +117,3 @@ connection.
 To check that credentials and the connection to the GNSS archive work, including the
 `AuthKeyUri` authentication request and a file download, follow
 [Testing the connection to the GNSS archive](docs/testing-gnss-archive-connection.md).
-The same checks run in a container with `docker compose run --rm archive-test` (see
-"Using Docker" in that guide). Set `ARCHIVE_DNS` to the DNS server the host uses for the
-nonprod archive, or the container may not resolve its host name.

@@ -90,6 +90,19 @@ my $response_code = 200;
     is_deeply($center->{authcookies}, ['session=abc123', 'other=xyz'], 'cookies from auth response are kept');
 }
 
+# Cognito client ids and secrets are long enough for the encoded header to pass 76
+# characters, where encode_base64 would otherwise insert a line break
+{
+    @requests = ();
+    $response_code = 200;
+    my ($id, $secret) = ('i' x 26, 's' x 52);
+    my $center = newcenter(credfile('long.json', qq({"client_id":"$id","client_secret":"$secret"})));
+    $center->connect();
+    is($requests[0]{auth}, 'Basic ' . encode_base64("$id:$secret", ''),
+        'Basic auth header has no line breaks for long credentials');
+    unlike($requests[0]{auth}, qr/\s\S*\s/, 'header is a single token pair');
+}
+
 {
     $response_code = 401;
     my $center = newcenter(credfile('ok.json', '{"client_id":"cid","client_secret":"csecret"}'));

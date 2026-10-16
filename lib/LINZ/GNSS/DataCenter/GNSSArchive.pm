@@ -126,7 +126,7 @@ sub connect
     my $authuri=$self->{authuri};
     if( $self->{authuri}  )
     {
-        my $authhdr="Basic ".encode_base64("$user:$pwd");
+        my $authhdr="Basic ".encode_base64("$user:$pwd",'');
         my $response=$ua->get($authuri,"Authorization"=>$authhdr);
         if( $response->code ne '200')
         {

@@ -1,0 +1,30 @@
+# Test the GNSS archive connection and download a file. See
+# docs/testing-gnss-archive-connection.md.
+#
+#   docker compose run --rm archive-test
+#
+# The nonprod archive is only reachable from the LINZ network. The credentials file is
+# mounted at run time and is never copied into the image.
+services:
+  archive-test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      ARCHIVE_DATE: ${ARCHIVE_DATE:-2018:200}
+      ARCHIVE_STATION: ${ARCHIVE_STATION:-}
+      ARCHIVE_SUBTYPE: ${ARCHIVE_SUBTYPE:-DAILY}
+      ARCHIVE_PRIVATE: ${ARCHIVE_PRIVATE:-}
+    # Containers don't use the host's split DNS, so the nonprod host name may not resolve
+    # even when the host is on the LINZ network or VPN. Set ARCHIVE_DNS to the DNS server
+    # the host uses for it (see `resolvectl status`, e.g. the VPN tunnel link).
+    dns:
+      - ${ARCHIVE_DNS:-1.1.1.1}
+    secrets:
+      - gnss-archive-credentials.json
+    volumes:
+      - ./docker/output:/out
+
+secrets:
+  gnss-archive-credentials.json:
+    file: ${GNSS_ARCHIVE_CREDENTIALS_FILE:-${HOME}/.credentials/linz-gnss-archive-credentials.json}

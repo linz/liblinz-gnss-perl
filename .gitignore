@@ -11,3 +11,5 @@ temp
 config
 debian/.debhelper
 .vscode
+docker/output
+/.env

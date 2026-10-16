@@ -117,3 +117,6 @@ connection.
 To check that credentials and the connection to the GNSS archive work, including the
 `AuthKeyUri` authentication request and a file download, follow
 [Testing the connection to the GNSS archive](docs/testing-gnss-archive-connection.md).
+The same checks run in a container with `docker compose run --rm archive-test` (see
+"Using Docker" in that guide). Set `ARCHIVE_DNS` to the DNS server the host uses for the
+nonprod archive, or the container may not resolve its host name.

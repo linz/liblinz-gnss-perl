@@ -48,6 +48,12 @@ jobs:
           done
           perl -c bin/get_gnss_data
 
+      # No network access: checks the GNSS Archive URLs default to production
+      - name: Check GNSS Archive defaults to production
+        env:
+          PERL5LIB: ${{ github.workspace }}/lib:${{ github.workspace }}/liblinz-geodetic-perl/lib
+        run: prove -v test/archive_domain.t
+
       - name: List data types and sources
         working-directory: test
         env:

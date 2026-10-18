@@ -6,6 +6,7 @@
 
 use strict;
 use warnings;
+use File::Temp ();
 use FindBin;
 use Test::More;
 
@@ -47,6 +48,15 @@ SKIP: {
     my $loaded = eval { require LINZ::GNSS::DataCenter::GNSSArchive; 1 };
     skip( 'GNSSArchive dependencies not installed', 2 ) if !$loaded && !$ENV{CI};
     ok( $loaded, 'load LINZ::GNSS::DataCenter::GNSSArchive' ) or BAIL_OUT("cannot load GNSSArchive: $@");
+
+    # DataCenter::new clones the default file types and builds its scratch directory
+    # path from globals that are normally set up when the config is loaded
+    require LINZ::GNSS::FileTypeList;
+    LINZ::GNSS::FileTypeList::LoadDefaultTypes( {} );
+    {
+        no warnings 'once';
+        $LINZ::GNSS::DataCenter::scratchdir = File::Temp::tempdir( CLEANUP => 1 );
+    }
 
     my $dc = LINZ::GNSS::DataCenter::GNSSArchive->new(
         {

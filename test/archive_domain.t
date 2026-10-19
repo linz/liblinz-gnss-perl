@@ -46,7 +46,7 @@ foreach my $key ( sort keys %prod ) {
 # runtime dependencies: skipped where they are missing, but never skipped in CI.
 SKIP: {
     my $loaded = eval { require LINZ::GNSS::DataCenter::GNSSArchive; 1 };
-    skip( 'GNSSArchive dependencies not installed', 2 ) if !$loaded && !$ENV{CI};
+    skip( 'GNSSArchive dependencies not installed', 3 ) if !$loaded && !$ENV{CI};
     ok( $loaded, 'load LINZ::GNSS::DataCenter::GNSSArchive' ) or BAIL_OUT("cannot load GNSSArchive: $@");
 
     # DataCenter::new clones the default file types and builds its scratch directory

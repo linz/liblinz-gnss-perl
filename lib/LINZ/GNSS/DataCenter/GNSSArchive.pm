@@ -27,10 +27,9 @@ sub new
     $self->{access}=lc($cfgdc->{access}) || 'private';
     $self->{authuri}=$cfgdc->{authkeyuri};
     $self->{alturi}=$cfgdc->{alternativeuri};
-    # Uri is expanded by LINZ::GNSS::DataCenter, these need expanding here so that
+    # Uri is expanded by LINZ::GNSS::DataCenter, AuthKeyUri needs expanding here so that
     # ${ENV||default} can be used to select the archive environment
     $self->{authuri}=ExpandEnv($self->{authuri},"AuthKeyUri of datacenter ".$self->name) if $self->{authuri};
-    $self->{alturi}=ExpandEnv($self->{alturi},"AlternativeUri of datacenter ".$self->name) if $self->{alturi};
     if( ! $self->{authuri} && $self->{access} ne 'public' )
     {
         croak("GNSSArchive datacenter ".$self->name." needs AuthKeyUri defined\n");

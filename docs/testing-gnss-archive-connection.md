@@ -26,6 +26,10 @@ See the [README](../README.md) for the dependencies and for running the full tes
    touch ~/.gnss-archive-credentials     # only needed by run_tests.sh
    ```
 
+   To use the nonprod archive with the default `conf/getdata.conf`, set
+   `GNSS_ARCHIVE_DOMAIN=nonprod.gnss-archive.awsint.linz.govt.nz` (the default is the production
+   domain `archive.geodesy.linz.govt.nz`). Use a machine account for that environment.
+
    To use a different location, set `GNSS_ARCHIVE_CREDENTIALS_FILE` (used by
    `test/getdata.conf`). The default `conf/getdata.conf` reads `GNSS_ARCHIVE_AUTH_FILE`
    instead, defaulting to `~/linz-gnss-credentials`.

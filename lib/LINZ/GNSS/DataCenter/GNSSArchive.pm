@@ -11,6 +11,7 @@ use fields qw (
     );
 
 use LINZ::GNSS::DataCenter;
+use LINZ::GNSS::Variables qw(ExpandEnv);
 use URI::URL;
 use JSON;
 use LWP::UserAgent;
@@ -26,6 +27,9 @@ sub new
     $self->{access}=lc($cfgdc->{access}) || 'private';
     $self->{authuri}=$cfgdc->{authkeyuri};
     $self->{alturi}=$cfgdc->{alternativeuri};
+    # Uri is expanded by LINZ::GNSS::DataCenter, AuthKeyUri needs expanding here so that
+    # ${ENV||default} can be used to select the archive environment
+    $self->{authuri}=ExpandEnv($self->{authuri},"AuthKeyUri of datacenter ".$self->name) if $self->{authuri};
     if( ! $self->{authuri} && $self->{access} ne 'public' )
     {
         croak("GNSSArchive datacenter ".$self->name." needs AuthKeyUri defined\n");

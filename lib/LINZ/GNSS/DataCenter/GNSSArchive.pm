@@ -40,26 +40,36 @@ sub new
     }
     return $self;
 }
+
 =head2 $self->_readCredentials($credfile)
 
-Reads the GNSS Archive machine account from a credentials file.  The archive
-authenticates automated consumers with the OAuth2 client credentials flow
-(the /machineAuth endpoint), so the file must define a client_id and
-client_secret.  User names and passwords are not supported, as they cannot be
-used once MFA is enabled.
+Reads the GNSS Archive credentials from a credentials file.  The file can
+hold either the client_id and client_secret of a machine account, or a
+username and password.  These are sent as the Basic authorization
+credentials of the AuthKeyUri request.
 
 A file with extension .json should look like
 
 {"client_id": "the-client-id", "client_secret": "the-client-secret"}
+
+or
+
+{"username": "the-user-name", "password": "the-password"}
 
 otherwise it should have lines
 
    client_id the-client-id
    client_secret the-client-secret
 
-Only the first such lines are read, other lines are ignored.  Returns the
-client_id and client_secret, which are used as the Basic authorization
-credentials for the AuthKeyUri request.
+or
+
+   user the-user-name
+   password the-password
+
+(username is accepted in place of user).  Only the first of each line is
+read, other lines are ignored.  If the file defines both a complete
+client_id/client_secret pair and a username/password, the client_id and
+client_secret are used.  The two pairs are never mixed.
 
 =cut
 
@@ -67,34 +77,34 @@ sub _readCredentials
 {
     my ($self,$credfile)=@_;
     open(my $crdf,'<',$credfile) ||
-        croak("Cannot open credentials file $credfile for DataCenter ".$self->name);
+        croak("Cannot open credentials file $credfile for DataCenter ".$self->name."\n");
     my %cred;
     if( $credfile =~ /\.json$/ )
     {
         my $json=join('',<$crdf>);
         my $def=eval { decode_json($json) };
-        croak("Credentials file $credfile for DataCenter ".$self->name." is not valid JSON\n") if ref($def) ne 'HASH';
-        %cred=map { $_ => $def->{$_} } qw(client_id client_secret);
+        croak("Credentials file $credfile for DataCenter ".$self->name." is not valid JSON\n")
+            if ref($def) ne 'HASH';
+        %cred=map { $_ => $def->{$_} } qw(client_id client_secret username password);
     }
     else
     {
         while( my $line=<$crdf> )
         {
-            if( $line =~ /^\s*(client_id|client_secret)\s+(\S.*?)\s*$/i )
-            {
-                my $key=lc($1);
-                $cred{$key}=$2 if ! defined $cred{$key};
-            }
+            next if $line !~ /^\s*(client_id|client_secret|user(?:name)?|password)\s+(\S.*?)\s*$/i;
+            my ($key,$value)=(lc($1),$2);
+            $key='username' if $key eq 'user';
+            $cred{$key}=$value if ! defined $cred{$key};
         }
     }
     close($crdf);
-    foreach my $key (qw(client_id client_secret))
-    {
-        croak("Credentials file $credfile for DataCenter ".$self->name." doesn't define $key. ".
-            "The GNSS Archive requires client credentials (client_id and client_secret), not a user name and password\n")
-            if ! defined($cred{$key}) || $cred{$key} eq '';
-    }
-    return @cred{qw(client_id client_secret)};
+    my $defined=sub { defined($cred{$_[0]}) && $cred{$_[0]} ne '' };
+    return @cred{qw(client_id client_secret)}
+        if $defined->('client_id') && $defined->('client_secret');
+    return @cred{qw(username password)}
+        if $defined->('username') && $defined->('password');
+    croak("Credentials file $credfile for DataCenter ".$self->name.
+        " must define either client_id and client_secret, or username and password\n");
 }
 
 =head2 $center->searchUri
@@ -124,13 +134,14 @@ Get Authorization cookies for GNSS Archive
 sub connect
 {
     my($self) = @_;
-    my ($client_id,$client_secret)=$self->credentials();
+    # Either a client_id and client_secret or a username and password (see _readCredentials)
+    my ($user,$pwd)=$self->credentials();
     my $ua=new LWP::UserAgent;
     $ua->env_proxy;
     my $authuri=$self->{authuri};
     if( $self->{authuri}  )
     {
-        my $authhdr="Basic ".encode_base64("$client_id:$client_secret",'');
+        my $authhdr="Basic ".encode_base64("$user:$pwd",'');
         my $response=$ua->get($authuri,"Authorization"=>$authhdr);
         if( $response->code ne '200')
         {

@@ -27,6 +27,7 @@ use Date::Parse;
 use Log::Log4perl;
 use File::Which;
 use Carp qw(croak);
+use JSON::PP;
 
 our $default_awsbin=which('aws') || '/usr/bin/aws';
 our $idenv='AWS_ACCESS_KEY_ID';
@@ -56,7 +57,6 @@ sub new()
 {
     my( $class, %args ) = @_;
     my $self=bless {}, $class;
-    $self->{aws_client}=$default_awsbin;
     my $cfg=$args{config};
     $self->{logger}=Log::Log4perl->get_logger('LINZ.GNSS.AwsS3Bucket');
     $self->{aws_access_key_id}=$args{access_key_id};
@@ -65,11 +65,11 @@ sub new()
     my $cfg_prefix=$args{config_prefix} || '';
     foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
     {
-        my $value=$self->{$item} || '';
-        $value=$args{$cfg_prefix.$item} if ! $value;
+        my $value=$args{$cfg_prefix.$item};
         $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
-        $self->{$item}=$value;
+        $self->{$item}=$value || '';
     }
+    $self->{aws_client} ||= $default_awsbin;
     $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
     $self->error("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;
@@ -349,6 +349,31 @@ Returns true (1) if a file exists, false (0) otherwise.
 =cut
 
 sub fileExists { my ($self,$file)=@_; return $self->fileStats($file) ? 1 : 0; }
+
+=head2 $bucket->listFiles($dir)
+
+Returns a reference to an array of the names (without the directory part)
+of the files directly under the "directory" $dir.  Keys in deeper
+"subdirectories" are not included.  Returns an empty list if there are no
+matching files, and croaks if the bucket cannot be listed.
+
+=cut
+
+sub listFiles
+{
+    my($self,$dir)=@_;
+    my $bucket=$self->bucket;
+    my $prefix=$self->fileKey($dir);
+    $prefix .= '/' if $prefix ne '' && $prefix !~ /\/$/;
+    my ($ok,$out,$err)=$self->_runAws('s3api','list-objects-v2',
+        '--bucket',$bucket,'--prefix',$prefix,'--delimiter','/',
+        '--query','Contents[].Key','--output','json');
+    $self->error("Cannot list files in s3://$bucket/$prefix: $err") if ! $ok;
+    my $keys=($out =~ /\S/) ? decode_json($out) : undef;
+    $keys=[] if ref($keys) ne 'ARRAY';
+    my @files=grep { $_ ne '' } map { substr($_,length($prefix)) } @$keys;
+    return \@files;
+}
 
 =head2 $bucket->syncToBucket($sourcedir,$targetkey,[delete=>1])
 

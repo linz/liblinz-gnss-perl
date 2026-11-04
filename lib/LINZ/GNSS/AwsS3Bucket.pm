@@ -27,6 +27,7 @@ use Date::Parse;
 use Log::Log4perl;
 use File::Which;
 use Carp qw(croak);
+use JSON::PP;
 
 our $default_awsbin=which('aws') || '/usr/bin/aws';
 our $idenv='AWS_ACCESS_KEY_ID';
@@ -349,6 +350,31 @@ Returns true (1) if a file exists, false (0) otherwise.
 =cut
 
 sub fileExists { my ($self,$file)=@_; return $self->fileStats($file) ? 1 : 0; }
+
+=head2 $bucket->listFiles($dir)
+
+Returns a reference to an array of the names (without the directory part)
+of the files directly under the "directory" $dir.  Keys in deeper
+"subdirectories" are not included.  Returns an empty list if there are no
+matching files, and croaks if the bucket cannot be listed.
+
+=cut
+
+sub listFiles
+{
+    my($self,$dir)=@_;
+    my $bucket=$self->bucket;
+    my $prefix=$self->fileKey($dir);
+    $prefix .= '/' if $prefix ne '' && $prefix !~ /\/$/;
+    my ($ok,$out,$err)=$self->_runAws('s3api','list-objects-v2',
+        '--bucket',$bucket,'--prefix',$prefix,'--delimiter','/',
+        '--query','Contents[].Key','--output','json');
+    $self->error("Cannot list files in s3://$bucket/$prefix: $err") if ! $ok;
+    my $keys=($out =~ /\S/) ? decode_json($out) : undef;
+    $keys=[] if ref($keys) ne 'ARRAY';
+    my @files=grep { $_ ne '' } map { substr($_,length($prefix)) } @$keys;
+    return \@files;
+}
 
 =head2 $bucket->syncToBucket($sourcedir,$targetkey,[delete=>1])
 

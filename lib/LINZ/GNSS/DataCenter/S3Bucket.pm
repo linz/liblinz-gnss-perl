@@ -31,6 +31,12 @@ Extra parameters passed to the aws client (eg --profile xxx).
 
 If set, files cannot be uploaded to the bucket.
 
+=item UseFileList
+
+If set, the bucket is listed to check that a file exists before
+retrieving it.  Listings are always used for filenames containing
+wildcards (* or ?).
+
 =back
 
 Credentials (User/Password or CredentialsFile) are used as the AWS
@@ -48,6 +54,7 @@ sub new
     my $params=$cfgdc->{s3awsparameters} // '';
     $self->{awsparams}=ExpandEnv($params,"S3AwsParameters of datacenter $name");
     $self->{readonly}=($cfgdc->{readonly} || '') =~ /^(1|y|yes|true|on)$/i ? 1 : 0;
+    $self->{_checkfilelist}=($cfgdc->{usefilelist} || '') =~ /^(1|y|yes|true|on)$/i ? 1 : 0;
     return $self;
 }
 
@@ -109,6 +116,19 @@ sub getfile
     croak("Failed to retrieve $file from ".$self->name."\n") if ! -f $target;
     my $size=-s $target;
     $self->_logger->info("Retrieved $file ($size bytes) from ".$self->name);
+}
+
+# List the files under the spec's path, used to resolve wildcard filenames
+# (and to check files exist if UseFileList is set)
+
+sub getfilelist
+{
+    my($self,$spec)=@_;
+    $self->connect;
+    my $path=$spec->path;
+    my $files=$self->{bucket}->listFiles($path);
+    $self->_logger->debug("Found ".scalar(@$files)." files in $path on ".$self->name);
+    return $files;
 }
 
 # Check whether a file is in the bucket

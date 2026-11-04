@@ -1,21 +1,23 @@
 # Testing the connection to the GNSS archive
 
 The `GNSSArchive` data center first requests `AuthKeyUri` (the `/v1/machineAuth` endpoint, HTTP basic authentication with
-the machine account `client_id` and `client_secret`) and expects a `200` response with a JSON body containing a
+the machine account `client_id` and `client_secret`, or a username and password) and expects a `200` response with a JSON body containing a
 `cookies` list. It then downloads files from `Uri` using those cookies. The steps below
 check each stage. Run the commands from the root of the repository.
 
 See the [README](../README.md) for the dependencies and for running the full test suite.
 
-1. Create the credentials file. A `.json` file looks like:
+1. Create the credentials file. A `.json` file for a machine account looks like:
 
    ```json
    { "client_id": "the-client-id", "client_secret": "the-client-secret" }
    ```
 
-   A text file with lines `client_id the-client-id` and `client_secret the-client-secret` is also accepted.
-   User names and passwords are not supported: they cannot be used once MFA is enabled. Machine
-   accounts are created as described in `docs/MACHINE_ACCOUNTS.md` in the gnss-data-archive repository.
+   A text file with lines `client_id the-client-id` and `client_secret the-client-secret` is
+   also accepted. During the transition to machine accounts, a username and password can be
+   used instead: `{ "username": "the-user-name", "password": "the-password" }`, or lines
+   `user the-user-name` and `password the-password`. If a file has both, the `client_id` and
+   `client_secret` are used. User names and passwords stop working once MFA is enabled.
    Do not commit this file.
 
    ```sh
@@ -28,7 +30,7 @@ See the [README](../README.md) for the dependencies and for running the full tes
 
    To use the nonprod archive with the default `conf/getdata.conf`, set
    `GNSS_ARCHIVE_DOMAIN=nonprod.gnss-archive.awsint.linz.govt.nz` (the default is the production
-   domain `archive.geodesy.linz.govt.nz`). Use a machine account for that environment.
+   domain `archive.geodesy.linz.govt.nz`). Use credentials for that environment.
 
    To use a different location, set `GNSS_ARCHIVE_CREDENTIALS_FILE` (used by
    `test/getdata.conf`). The default `conf/getdata.conf` reads `GNSS_ARCHIVE_AUTH_FILE`
@@ -49,7 +51,7 @@ See the [README](../README.md) for the dependencies and for running the full tes
    curl -i -u '<client_id>' '<AuthKeyUri>'
    ```
 
-   `curl` asks for the client secret. Expect `HTTP/... 200` and a JSON body with `cookies`. Any
+   `curl` asks for the client secret (or use the username and password). Expect `HTTP/... 200` and a JSON body with `cookies`. Any
    other status is what makes `get_gnss_data` fail with
    `Connection to LINZ-GNSSArchive AuthKeyUri failed: ...`.
 
@@ -167,7 +169,7 @@ echo 'ARCHIVE_DNS=<dns-server-ip>' >> .env
   `docker compose config | grep ARCHIVE_`. Set the variable before the command, not after
   the service name: anything after `archive-test` is run as a command instead.
 - **`AuthKeyUri returned HTTP 401`.** The credentials were rejected. Check that the file
-  holds the client_id and client_secret of a machine account for the nonprod archive.
+  holds a client_id and client_secret (or a username and password) for the nonprod archive.
 - **`Cannot retrieve ...: Forbidden` (403).** Authentication worked but the file could not
   be read. The archive may return 403 for a file that doesn't exist for that date or
   station, as well as for one the user can't access. Try a station and date that you know

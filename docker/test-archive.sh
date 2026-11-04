@@ -3,7 +3,9 @@
 #
 # Environment:
 #   GNSS_ARCHIVE_CREDENTIALS_FILE  credentials file, either JSON with "client_id" and
-#                                  "client_secret" or lines "client_id ..." and "client_secret ..."
+#                                  "client_secret" (or "username" and "password"), or lines
+#                                  "client_id ..." and "client_secret ..." (or "user ..." and
+#                                  "password ...")
 #   ARCHIVE_DATE                   yyyy:ddd of the file to download (default 2018:200)
 #   ARCHIVE_STATION                station code (default AUCK)
 #   ARCHIVE_SUBTYPE                OBS subtype, DAILY or HOURLY (default DAILY)
@@ -39,7 +41,7 @@ if [ ! -r "$mounted_creds" ]; then
 fi
 
 # get_gnss_data reads credentials as JSON only if the file name ends in .json, otherwise as
-# "client_id ..." / "client_secret ..." lines. The mounted file always has the same name, so copy it
+# "client_id ..." / "client_secret ..." or "user ..." / "password ..." lines. The mounted file always has the same name, so copy it
 # under the name that matches its content and use that copy, so both formats work.
 credsdir=$(mktemp -d) || fail "cannot create a temporary directory"
 if grep -q '^[[:space:]]*{' "$mounted_creds"; then
@@ -60,25 +62,30 @@ echo "== 1. Data center configuration"
 get_gnss_data -s | grep -A3 LINZ-GNSSArchive || fail "LINZ-GNSSArchive is not configured"
 
 echo "== 2. Authentication request ($authuri)"
-# Reads the client_id and client_secret the way DataCenter::_readCredentials does.
-# The password goes to curl through stdin so it is not visible in the process list.
+# Reads the credentials the way GNSSArchive::_readCredentials does: a client_id and
+# client_secret if both are defined, otherwise a user name and password.
+# They go to curl through stdin so they are not visible in the process list.
 body=$(mktemp)
 status=$(perl -MJSON -0777 -e '
         my ($file) = @ARGV;
         open(my $fh, "<", $file) or exit 1;
         my $text = <$fh>;
-        my ($client_id, $client_secret);
+        my %c;
         if ($file =~ /\.json$/) {
             my $def = eval { decode_json($text) };
-            ($client_id, $client_secret) = ($def->{client_id}, $def->{client_secret}) if $def;
+            %c = %$def if ref($def) eq "HASH";
         } else {
             for my $line (split /\n/, $text) {
-                $client_id = $1 if !$client_id && $line =~ /^\s*client_id\s+(\S.*?)\s*$/i;
-                $client_secret = $1 if !$client_secret && $line =~ /^\s*client_secret\s+(\S.*?)\s*$/i;
+                next if $line !~ /^\s*(client_id|client_secret|user(?:name)?|password)\s+(\S.*?)\s*$/i;
+                my $k = lc($1);
+                $k = "username" if $k eq "user";
+                $c{$k} = $2 if !defined $c{$k};
             }
         }
-        exit 2 if !defined $client_id || !defined $client_secret;
-        print "user = \"$client_id:$client_secret\"\n";
+        my ($user, $pwd) = (defined $c{client_id} && $c{client_id} ne "" && defined $c{client_secret} && $c{client_secret} ne "")
+            ? @c{qw(client_id client_secret)} : @c{qw(username password)};
+        exit 2 if !defined $user || $user eq "" || !defined $pwd || $pwd eq "";
+        print "user = \"$user:$pwd\"\n";
     ' "$creds" |
     curl -sS -K - -o "$body" -w '%{http_code}' "$authuri") \
     || fail "cannot connect to $authuri. The nonprod archive is only reachable from the LINZ network."

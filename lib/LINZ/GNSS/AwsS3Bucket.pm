@@ -57,7 +57,6 @@ sub new()
 {
     my( $class, %args ) = @_;
     my $self=bless {}, $class;
-    $self->{aws_client}=$default_awsbin;
     my $cfg=$args{config};
     $self->{logger}=Log::Log4perl->get_logger('LINZ.GNSS.AwsS3Bucket');
     $self->{aws_access_key_id}=$args{access_key_id};
@@ -66,11 +65,11 @@ sub new()
     my $cfg_prefix=$args{config_prefix} || '';
     foreach my $item ('bucket','prefix','aws_parameters','aws_client','debug_aws')
     {
-        my $value=$self->{$item} || '';
-        $value=$args{$cfg_prefix.$item} if ! $value;
+        my $value=$args{$cfg_prefix.$item};
         $value = $cfg->get('s3_'.$item,'') if $cfg && ! $value;
-        $self->{$item}=$value;
+        $self->{$item}=$value || '';
     }
+    $self->{aws_client} ||= $default_awsbin;
     $self->{debug_aws}=1 if  $ENV{LINZGNSS_DEBUG_AWS} eq 'debug';
     my $bucket=$self->bucket;
     $self->error("LINZ::GNSS::AwsS3Bucket::new - bucket name not defined\n") if ! $bucket;

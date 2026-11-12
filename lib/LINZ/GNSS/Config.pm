@@ -374,7 +374,7 @@ sub getAll {
     my ($self) = @_;
     my $expanded = {};
     foreach my $key ( keys %{ $self->{keys} } ) {
-        $expanded->$key = $self->get($key);
+        $expanded->{$key} = $self->get($key);
     }
     return $expanded;
 }

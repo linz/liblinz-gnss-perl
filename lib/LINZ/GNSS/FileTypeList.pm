@@ -205,10 +205,11 @@ sub LoadDefaultTypes
     $LINZ::GNSS::FileTypeList::DefaultTypes=$ftl;
 }
 
-=head2 $type = $typelist->getTypes($type, $subtype); or $type=$typeList->getTypes($request);
+=head2 $type = $typelist->getTypes($type, $subtype); or $type=$typeList->getTypes($request [,$subtype]);
 
 Returns a list of types matching the specified type and subtype in a data request, or
-specified in the call ordered from highest to lowest priority.  
+specified in the call ordered from highest to lowest priority.  If a subtype is passed
+with a request then it is used instead of the request's subtype.
 
 The list will contain more than one element if 
 the subtype is suffixed with '+'.  In this case all subtypes with equal or higher
@@ -236,7 +237,8 @@ sub getTypes
     {
         my $request=$type;
         $type=$request->type;
-        $subtype=$request->supplied_subtype || $request->subtype;
+        # A subtype passed with the request selects just that subtype
+        $subtype=$subtype || $request->supplied_subtype || $request->subtype;
     }
     $type=uc($type);
     $subtype=uc($subtype);
@@ -403,7 +405,7 @@ sub checkRequest
     my $available=0;
     my $retry = 0;
     $now ||= time();
-    foreach my $type ( $self->getTypes($request) )
+    foreach my $type ( $self->getTypes($request,$subtype) )
     {
         my ($time,$tretry,$failtime)=$type->availableTime($request);
         next if ! $time;

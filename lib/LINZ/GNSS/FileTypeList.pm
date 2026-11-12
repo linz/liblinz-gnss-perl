@@ -89,8 +89,12 @@ sub loadTypes
         my $frequencies = {};
         my $priorities = {};
         $type=uc($type);
-        while (my ($subtypes, $cfgft) = each %$subtypedef )
+        # Variants of a subtype (eg DAILY, DAILY_1, DAILY_2) are tried in the order they
+        # are added here.  Add them in a fixed order, not hash order, which Perl randomises
+        # on every run.
+        foreach my $subtypes (_variantOrder(keys %$subtypedef))
         {
+            my $cfgft=$subtypedef->{$subtypes};
             $subtypes=uc($subtypes);
             my $subtype=$subtypes;
             $subtype =~ s/_\d+$//; # Remove suffix for multiply defined subtypes
@@ -126,6 +130,19 @@ sub loadTypes
         }
     }
     return $self;
+}
+
+# Orders subtype names so that variants of the same subtype are tried in a fixed order:
+# the name without a suffix first, then the _n suffixes in numeric order (DAILY, DAILY_1,
+# DAILY_2, ..., DAILY_10).  Names are compared case insensitively.
+
+sub _variantOrder
+{
+    my @keyed = map {
+        my ($base,$n) = uc($_) =~ /^(.*?)(?:_(\d+))?$/;
+        [$_, $base, defined($n) ? $n : -1]
+    } @_;
+    return map { $_->[0] } sort { $a->[1] cmp $b->[1] || $a->[2] <=> $b->[2] } @keyed;
 }
 
 
@@ -188,10 +205,11 @@ sub LoadDefaultTypes
     $LINZ::GNSS::FileTypeList::DefaultTypes=$ftl;
 }
 
-=head2 $type = $typelist->getTypes($type, $subtype); or $type=$typeList->getTypes($request);
+=head2 $type = $typelist->getTypes($type, $subtype); or $type=$typeList->getTypes($request [,$subtype]);
 
 Returns a list of types matching the specified type and subtype in a data request, or
-specified in the call ordered from highest to lowest priority.  
+specified in the call ordered from highest to lowest priority.  If a subtype is passed
+with a request then it is used instead of the request's subtype.
 
 The list will contain more than one element if 
 the subtype is suffixed with '+'.  In this case all subtypes with equal or higher
@@ -199,8 +217,12 @@ priority are included.  Use a subtype of '' to list all subtypes with a priority
 or subtype of '*' to list all subtypes.  
 
 The list will also include all subtypes matching the type and subtype with a suffix of _n
-where n is a number.  This allows for different representations of the same product at 
-different times (eg switch from RINEX2 to RINEX3 filenames).
+where n is a number.  This allows for different representations of the same product at
+different times (eg switch from RINEX2 to RINEX3 filenames).  These variants are listed,
+and so tried, in a fixed order: the subtype without a suffix first, then the suffixes
+in numeric order (eg DAILY, DAILY_1, DAILY_2).  The order they are written in the
+configuration file is not used.  Subtypes with equal priority are listed in
+alphabetical order.
 
 Can be called as LINZ::GNSS::FileTypeList->getTypes($type,$subtype) to return the 
 default settings for the type.
@@ -215,7 +237,8 @@ sub getTypes
     {
         my $request=$type;
         $type=$request->type;
-        $subtype=$request->supplied_subtype || $request->subtype;
+        # A subtype passed with the request selects just that subtype
+        $subtype=$subtype || $request->supplied_subtype || $request->subtype;
     }
     $type=uc($type);
     $subtype=uc($subtype);
@@ -232,11 +255,17 @@ sub getTypes
         }
         if( $plus )
         {
-            foreach my $t (values %{$self->{$type}})
+            foreach my $st (sort keys %{$self->{$type}})
             {
+                my $t=$self->{$type}->{$st};
                 push(@result,@$t) if $t->[0]->{priority} > $basepriority || $subtype eq '*';
             }
-            @result = sort {$b->{priority} <=> $a->{priority}} @result;
+            # Sort on priority, keeping the current order for equal priorities (so that
+            # variants stay in order) without relying on sort being stable.
+            my $i=0;
+            @result = map { $_->[1] }
+                sort { $b->[1]->{priority} <=> $a->[1]->{priority} || $a->[0] <=> $b->[0] }
+                map { [$i++, $_] } @result;
         }
     }
     return wantarray ? @result : \@result;
@@ -376,7 +405,7 @@ sub checkRequest
     my $available=0;
     my $retry = 0;
     $now ||= time();
-    foreach my $type ( $self->getTypes($request) )
+    foreach my $type ( $self->getTypes($request,$subtype) )
     {
         my ($time,$tretry,$failtime)=$type->availableTime($request);
         next if ! $time;

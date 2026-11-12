@@ -192,8 +192,10 @@ sub station
        if ! exists($self->{stations}->{$code});
     if( $solnid eq '' )
     {
-        my @solns=keys(%{$self->{station}->{solnid}});
-        croak("Requested station $code doesn't have a unique solution\n");
+        my @solns=keys(%{$self->{stations}->{$code}});
+        croak("Requested station $code doesn't have a unique solution\n")
+            if scalar(@solns) != 1;
+        $solnid=$solns[0];
     }
     else
     {
@@ -481,7 +483,7 @@ sub _compileStationList
 
     # Form a list of stations with estimated coordinates
     my @solnstns;
-    foreach my $k (%$stations)
+    foreach my $k (keys %$stations)
     {
         push(@solnstns,grep {$_->{estimated}} values %{$stations->{$k}});
     }

@@ -138,6 +138,39 @@ sub IsValidCompression
     return 1;
 }
 
+=head2 $ok=LINZ::GNSS::FileCompression::FileHeaderMatchesCompression($filename,$compression)
+
+Checks whether the start of a file matches the outermost (last) layer of a
+compression such as 'hatanaka+compress'.  compress and gzip are recognised by
+their magic numbers and hatanaka by the COMPACT RINEX header line.  Inner
+layers are not checked.  Returns true for 'none' and for compression types that
+it does not recognise.
+
+INTERIM: this is only used for files read from the getdata cache (see
+LINZ::GNSS::DataCenter setCheckCompression), which until the cache compression
+was fixed (LocalDirectory with compress=>1) held uncompressed files under
+compressed file names.  Once the cache has been fixed up this function should
+be removed, and a cached file that fails to decompress should fail to load from
+the cache altogether, so the file is fetched from its source instead.
+
+=cut
+
+sub FileHeaderMatchesCompression
+{
+    my( $filename, $compression ) = @_;
+    my @layers=grep { $_ ne 'none' } split(/\+/,lc($compression));
+    return 1 if ! @layers;
+    my $layer=$layers[-1];
+    open( my $fh, '<:raw', $filename ) || croak "Cannot open $filename to check its compression\n";
+    my $header='';
+    read( $fh, $header, 256 );
+    close($fh);
+    return $header =~ /^\x1f\x9d/ if $layer eq 'compress';
+    return $header =~ /^\x1f\x8b/ if $layer eq 'gzip';
+    return $header =~ /^[^\n]*COMPACT RINEX/ if $layer eq 'hatanaka';
+    return 1;
+}
+
 =head2 LINZ::GNSS::FileCompression::RecompressFile($filename,$fromcomp,$tocomp,$tofilename)
 
 Convert a file $filename from a source compression $fromcomp to a target compression $tocomp.  

@@ -66,6 +66,11 @@ sub new
         $self->_logger->debug("Overriding getdata cache with LINZGNSS_CACHE_URL environment var: $cachenv");
         $datacenter=LINZ::GNSS::DataCenter::LocalDirectory($cachenv,
             compress=>1,cache_paths=>1,lowerCaseNames=>1,name=>'linzgnss-cache');
+        # INTERIM: accept files cached uncompressed under compressed names before the
+        # cache compression was fixed. Remove once the cache has been fixed up, when a
+        # cached file that fails to decompress should instead fail to load from the
+        # cache and be fetched from its source.
+        $datacenter->setCheckCompression(1);
         $datacenter_name='local-cache';
     }
     else

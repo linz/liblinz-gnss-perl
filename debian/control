@@ -32,7 +32,7 @@ Depends: ${misc:Depends} liblinz-geodetic-perl,
     linz-coordsys,
     gzip,
     ncompress
-Recommends: awscli
+Recommends: awscli, python3-boto3
 Description: LINZ::GNSS perl modules for managing GNSS data downloads
  LINZ::GNSS perl modules
  .

@@ -42,6 +42,7 @@ use Log::Log4perl;
 use File::Which;
 use Carp qw(croak);
 use JSON::PP;
+use File::Spec;
 
 our $default_awsbin=which('aws') || '/usr/bin/aws';
 our $idenv='AWS_ACCESS_KEY_ID';
@@ -273,7 +274,8 @@ sub _helper
     return $helper;
 }
 
-# Send a request to the helper.  Returns the reply (with ok true or false according to whether
+# Send a request to the helper.  Paths in requests must be absolute, as the helper keeps the
+# working directory it was started in.  Returns the reply (with ok true or false according to whether
 # S3 succeeded), or undef if the aws client is to be used instead.  If the helper fails it is
 # restarted once, and if it fails again the aws client is used from then on.
 
@@ -294,6 +296,8 @@ sub _request
         delete $helpers{"$$\0".$self->{helperkey}};
     }
     my $msg="Cannot use the python S3 helper";
+    # Remember the failure so that other buckets with the same settings use the aws client too
+    $helper_failed{$self->{helperkey}} ||= "helper failed twice";
     $self->{helperkey}=undef;
     $self->error($msg) if $self->{requirehelper};
     $self->logger->warn("$msg: using the aws client from now on");
@@ -425,7 +429,7 @@ sub putFile
     my $timetag=(stat($sourcefile))[9];
     my $utctag=strftime("%Y-%m-%dT%H:%M:%S",gmtime($timetag));
     my $reply=$self->_request({op=>'put',bucket=>$self->bucket,key=>$self->fileKey($name),
-        source=>$sourcefile,metadata=>{mtime=>$utctag}});
+        source=>File::Spec->rel2abs($sourcefile),metadata=>{mtime=>$utctag}});
     if( $reply )
     {
         my $ok=$reply->{ok} ? 1 : 0;
@@ -478,7 +482,7 @@ sub getFile
         return 0;
     }
     my $reply=$self->_request({op=>'get',bucket=>$self->bucket,key=>$self->fileKey($name),
-        target=>$targetfile});
+        target=>File::Spec->rel2abs($targetfile)});
     if( $reply )
     {
         if( ! $reply->{ok} )

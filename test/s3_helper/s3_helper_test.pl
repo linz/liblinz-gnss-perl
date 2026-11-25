@@ -12,6 +12,7 @@ use strict;
 use warnings;
 use Log::Log4perl qw(:easy);
 use File::Temp qw(tempdir);
+use File::Which;
 use LINZ::GNSS::AwsS3Bucket;
 use LINZ::GNSS::DataCenter;
 use LINZ::GNSS::DataCenter::S3Bucket;
@@ -136,6 +137,20 @@ if( grep { $_ eq 'python' || ($_ eq 'auto' && ! $ENV{TEST_AUTO_CLIENT}) } @clien
     my $bucket=newbucket('python',$prefix);
     $bucket->putFile($source,'file.dat');
 
+    # Relative paths are relative to the current directory, not the one the helper started in
+
+    {
+        mkdir("$tmpdir/cwd");
+        chdir("$tmpdir/cwd") || die "Cannot change to $tmpdir/cwd\n";
+        writefile('relative.dat',$content,$mtime);
+        $bucket->putFile('relative.dat','relative.dat');
+        $bucket->getFile('relative.dat','relative-copy.dat');
+        ok((readfile("$tmpdir/cwd/relative-copy.dat") // '') eq $content,
+            "cwd: relative paths used after a change of directory");
+        $bucket->deleteFile('relative.dat');
+        chdir('/');
+    }
+
     # Forked processes start their own helpers, and leave the parent's running
 
     my @pids;
@@ -191,6 +206,33 @@ if( grep { $_ eq 'python' || ($_ eq 'auto' && ! $ENV{TEST_AUTO_CLIENT}) } @clien
     waitpid($pid,0);
     ok(($? >> 8) == 3,"exit: exit status kept when the helper is stopped (".($? >> 8).")");
     $bucket->deleteFile('file.dat');
+}
+
+# Once the helper has failed (restarted and failed again), other buckets with the same
+# settings use the aws client without trying it again
+
+if( grep { $_ eq 'python' } @clients )
+{
+    local %LINZ::GNSS::AwsS3Bucket::helpers=();
+    local %LINZ::GNSS::AwsS3Bucket::helper_failed=();
+    # A python that starts the helper but closes its output after the ready line, so that
+    # every request fails, including after the helper is restarted.  It counts its starts.
+    my $python=which('python3');
+    my $wrapper="$tmpdir/failing-python";
+    my $starts="$tmpdir/failing-python.starts";
+    writefile($wrapper,"#!/bin/sh\necho start >> \"$starts\"\n\"$python\" \"\$@\" | head -n 1\n");
+    chmod(0755,$wrapper);
+    my $nstarts=sub { my $c=readfile($starts) // ''; return scalar(() = $c =~ /start/g); };
+    local $ENV{LINZGNSS_S3_PYTHON}=$wrapper;
+    my $bucket=newbucket('auto','failing/');
+    ok($bucket->client eq 'aws',"failed helper: bucket falls back to the aws client");
+    ok($nstarts->() == 2,"failed helper: helper started and restarted once (".$nstarts->()." starts)");
+    ok(! $bucket->fileExists('nothing.dat'),"failed helper: aws client requests work");
+    ok(join('',values %LINZ::GNSS::AwsS3Bucket::helper_failed) eq 'helper failed twice',
+        "failed helper: failure is remembered for the connection settings");
+    my $other=newbucket('auto','failing2/');
+    ok($other->client eq 'aws',"failed helper: other bucket with the same settings uses the aws client");
+    ok($nstarts->() == 2,"failed helper: no helper started for the other bucket (".$nstarts->()." starts)");
 }
 
 # Falling back to the aws client if the helper cannot start

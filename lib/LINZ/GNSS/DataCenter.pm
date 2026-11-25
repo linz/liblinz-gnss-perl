@@ -30,6 +30,7 @@ they hold information.
 =cut
 
 package LINZ::GNSS::DataCenter;
+# checkcompression is INTERIM: see setCheckCompression
 use fields qw (
     id
     name
@@ -48,6 +49,7 @@ use fields qw (
     connected
     fileid
     maxdownloads
+    checkcompression
     _logger
     _filelistcache
     _checkfilelist
@@ -408,7 +410,7 @@ Options can include:
 
 =item * lowerCaseNames=>1   Saved file names will be lower case
 
-=item * compress=>1         Retain default compression
+=item * compress=>1         Keep the default compression and file name suffixes (default is uncompressed files). A type with 'auto' compression has it resolved once from an example file name.
 
 =item * paths=>1            Keep default paths within directory (default is just use filename)
 
@@ -441,7 +443,22 @@ sub LocalDirectory
     foreach my $ft ($dtc->filetypes->types)
     {
         my $filename=uc($ft->filename);
-        if( ! $opts{compress} )
+        my $compression='none';
+        if( $opts{compress} )
+        {
+            # Keep the configured compression. Resolve 'auto' once for the type from
+            # an example file name expanded from the original template: the
+            # CompressionSuffices patterns need expanded codes (eg [yy] as digits),
+            # and are case sensitive while the name may be lower cased below.
+            $compression=$ft->compression;
+            if( $compression eq 'auto' )
+            {
+                my $example=eval { $ft->_expandName($ft->filename,'job',$ft->timeCodes(time()),'ssss') };
+                $example=$ft->filename if ! defined $example;
+                $compression=LINZ::GNSS::FileCompression::InferCompressionType($example);
+            }
+        }
+        else
         {
             $filename =~ s/\.Z$//;
             $filename =~ s/\.GZ$//;
@@ -457,7 +474,7 @@ sub LocalDirectory
         {
             $ft->setPath('');
         }
-        $ft->setCompression('none');
+        $ft->setCompression($compression);
     }
     return $dtc;
 }
@@ -705,6 +722,24 @@ Accessor functions for attributes of the data centre. Attributes are:
 sub name { return $_[0]->{name}; }
 sub uri { return $_[0]->{uri}; }
 sub filetypes { return $_[0]->{filetypes}; }
+
+=head2 $center->setCheckCompression($check)
+
+When set, a file retrieved from the data center with a compression other than
+'none' is checked with LINZ::GNSS::FileCompression::FileHeaderMatchesCompression
+before it is converted to the target compression.  If the start of the file does
+not match the outermost compression layer the file is treated as uncompressed.
+
+INTERIM: the checkcompression attribute is set only for the getdata cache, to
+read files cached before the cache compression was fixed (LocalDirectory with
+compress=>1), which are uncompressed under compressed file names.  Once the cache
+has been fixed up this attribute and FileHeaderMatchesCompression should be
+removed, and a cached file that fails to decompress should fail to load from the
+cache altogether, so the file is fetched from its source instead.
+
+=cut
+
+sub setCheckCompression { $_[0]->{checkcompression} = $_[1]; }
 sub stations { return sort(keys(%{$_[0]->{stncodes}})); }
 sub excludestations { return sort(keys(%{$_[0]->{excludestations}})); }
 sub priority { return $_[0]->{priority}; }
@@ -1264,6 +1299,13 @@ sub getData
             # Change the compression if required
             my $fromcomp=$spec->compression;
             my $tocomp=$tospec->compression;
+            if( $self->{checkcompression} && $fromcomp ne 'none' &&
+                ! LINZ::GNSS::FileCompression::FileHeaderMatchesCompression($tempfile,$fromcomp) )
+            {
+                # INTERIM: see setCheckCompression
+                $self->_logger->info("Cached file ".$spec->filename." is not $fromcomp compressed: treating it as uncompressed");
+                $fromcomp='none';
+            }
             if($fromcomp ne $tocomp)
             {
                 $self->_logger->debug("Converting compression from $fromcomp to $tocomp");

@@ -408,7 +408,7 @@ Options can include:
 
 =item * lowerCaseNames=>1   Saved file names will be lower case
 
-=item * compress=>1         Retain default compression
+=item * compress=>1         Keep the default compression and file name suffixes (default is uncompressed files)
 
 =item * paths=>1            Keep default paths within directory (default is just use filename)
 
@@ -441,7 +441,17 @@ sub LocalDirectory
     foreach my $ft ($dtc->filetypes->types)
     {
         my $filename=uc($ft->filename);
-        if( ! $opts{compress} )
+        my $compression='none';
+        if( $opts{compress} )
+        {
+            # Keep the compression the file name implies. Resolve 'auto' from the
+            # original file name, as the suffix patterns are case sensitive and
+            # the name may be changed to lower case below.
+            $compression=$ft->compression;
+            $compression=LINZ::GNSS::FileCompression::InferCompressionType($ft->filename)
+                if $compression eq 'auto';
+        }
+        else
         {
             $filename =~ s/\.Z$//;
             $filename =~ s/\.GZ$//;
@@ -457,7 +467,7 @@ sub LocalDirectory
         {
             $ft->setPath('');
         }
-        $ft->setCompression('none');
+        $ft->setCompression($compression);
     }
     return $dtc;
 }

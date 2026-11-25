@@ -21,7 +21,11 @@ Data centers are pluggable subclasses of `LINZ::GNSS::DataCenter` in `lib/LINZ/G
 perl -I . Build.PL && ./Build  # build; -I . because Build.PL loads inc::MyBuilder
 cd test && ./run_tests.sh      # integration tests, optionally with one name: http httpa gnssa gnssp cache buffer
 cd test/make_rinex2 && ./test.sh
+test/s3_helper/run_s3_helper_test.sh <image> [clients]   # S3 helper and aws client, against LocalStack (Docker)
+test/retry/run_retry_test.sh <image>    # retries, reused connections and transfer counts, against a stub server (Docker)
 ```
+
+The two Docker tests run in an image that has this library's dependencies installed (for example the gnss-datum-processing image or linz-bernese54-py), using the modules from this tree. They need no network access or credentials.
 
 There is no unit test suite. The only CI (`.github/workflows/push.yml`) is a smoke test: `perl -c` on every module and `bin/get_gnss_data`, then `get_gnss_data -l` and `-s`. It does not run `run_tests.sh`.
 

@@ -49,11 +49,17 @@ use fields qw (
     connected
     fileid
     maxdownloads
+    maxretries
+    retrydelay
+    maxretrydelay
+    maxretrywait
     checkcompression
     _logger
     _filelistcache
     _checkfilelist
     _ndownloads
+    _retrywait
+    _retrylimitlogged
     );
 
 # scratchdir, fileid, and ftp are managed internally to 
@@ -70,6 +76,9 @@ use LINZ::GNSS::FileCompression;
 use LINZ::GNSS::DataRequest qw(UNAVAILABLE PENDING DELAYED COMPLETED);
 use LINZ::GNSS::Variables qw(ExpandEnv);
 use LINZ::GNSS::Time qw(seconds_datetime);
+use LINZ::GNSS::TransferError;
+use Time::HiRes;
+use Scalar::Util qw(blessed);
 
 our $nextid=0;
 our $centers=[];
@@ -79,6 +88,16 @@ our $ftp_password='none';
 our $ftp_timeout=30;
 our $ftp_passive='default';
 our $http_timeout=30;
+
+# Default retry settings, used if a data center does not set MaxRetries, RetryDelay,
+# MaxRetryDelay or MaxRetryWait.  See the new function.
+our $default_maxretries=3;
+our $default_retrydelay=5;
+our $default_maxretrydelay=120;
+our $default_maxretrywait=600;
+
+# Counts of requests to each data center by this process (see TransferStats)
+our %transferstats=();
 
 sub makepublicpath
 {
@@ -164,6 +183,17 @@ MaxDownloads is the number of files downloaded on one connection before the conn
 is closed and reopened.  0 means no limit.  The default is 50, or no limit for data
 centers whose defaultMaxDownloads method returns 0 (S3Bucket).
 
+A request that fails in a way that may succeed if repeated (HTTP 408, 425, 429, 500,
+502, 503 or 504, a connection failure or timeout, or a transient FTP error) is retried.
+The data center is reconnected and the request repeated up to MaxRetries times (default 3,
+0 to not retry).  The wait before the first retry is RetryDelay seconds (default 5),
+doubling for each later retry, with up to 25% added at random.  If the server sends a
+Retry-After time that is used instead.  A wait longer than MaxRetryDelay seconds (default
+120) is not made, and the request fails.  The total time spent waiting to retry requests
+to the data center is limited to MaxRetryWait seconds (default 600), after which requests
+to it are not retried.  Requests that fail for other reasons (for example the file is not
+found) are not retried.
+
 The URI can either be an ftp or local file scheme (eg ftp://user:password@ftp.somewhere)
 or a file base scheme (eg file:///home/gps/data).  
 
@@ -234,6 +264,19 @@ sub new
     my $maxdownloads=$cfgdc->{maxdownloads};
     $maxdownloads=(defined($maxdownloads) && $maxdownloads =~ /\S/)
         ? $maxdownloads+0 : $self->defaultMaxDownloads();
+    my %retry=(
+        maxretries=>$default_maxretries,
+        retrydelay=>$default_retrydelay,
+        maxretrydelay=>$default_maxretrydelay,
+        maxretrywait=>$default_maxretrywait,
+        );
+    foreach my $item (keys %retry)
+    {
+        my $value=$cfgdc->{$item};
+        next if ! defined($value) || $value !~ /\S/;
+        croak("DataCenter $name: invalid $item $value\n") if $value !~ /^\s*\d+(?:\.\d*)?\s*$/;
+        $retry{$item}=$value+0;
+    }
 
     # Create a scratch directory that is unique
     # Use the data centre id and the process id ($$) to achieve this
@@ -253,6 +296,8 @@ sub new
     $self->{scratchdir}=$scratchdir;
     $self->{uri}=$uri;
     $self->{maxdownloads}=$maxdownloads;
+    $self->{$_}=$retry{$_} foreach keys %retry;
+    $self->{_retrywait}=0;
 
     # Crude handling for S3 urls
     my $testuri=$uri;
@@ -1022,7 +1067,7 @@ sub cachedFileList
         # If we fail to get the file list then assume invalid path and therefore no files
         $self->{_filelistcache}->{$path}=[];
         $self->_logger->debug("Getting file listing: Datacenter ".$self->name.": path ",$path);
-        $self->{_filelistcache}->{$path}=$self->getfilelist($spec);
+        $self->{_filelistcache}->{$path}=$self->_withRetry("file list of $path",sub { $self->getfilelist($spec) });
         $self->{_ndownloads} += 1;
     }
     return $self->{_filelistcache}->{$path};
@@ -1071,9 +1116,167 @@ sub _getfile
     my($self,$spec,$target)=@_;
     my $path=$spec->path;
     my $filename=$self->_findMatchingFilename($spec,1);
-    my $result=$self->getfile($path,$filename,$target);
+    my $result=$self->_withRetry("$path/$filename",sub
+    {
+        unlink($target) if -e $target;
+        $self->getfile($path,$filename,$target);
+    });
     $self->{_ndownloads} += 1;
     return $result;
+}
+
+=head2 $result=$center->_withRetry($description,$sub,%options)
+
+Runs $sub (a request to the data center) and returns its result.  If it fails with
+a LINZ::GNSS::TransferError that is retryable, then the data center is disconnected,
+and after waiting it is reconnected and $sub is run again, as set by the MaxRetries,
+RetryDelay, MaxRetryDelay and MaxRetryWait configuration.  Other errors, and the
+last error if retries are exhausted, are passed on (died with).
+
+$description identifies the request in log messages.  Each run of $sub is counted as
+a request in the transfer statistics unless the option count=>0 is given (as for
+connecting, which is not itself a request for data).  Before each retry the data
+center is reconnected, unless the option reconnect=>0 is given (when $sub connects).
+
+=cut
+
+sub _withRetry
+{
+    my($self,$description,$sub,%options)=@_;
+    my $count=exists $options{count} ? $options{count} : 1;
+    my $reconnect=exists $options{reconnect} ? $options{reconnect} : 1;
+    my $name=$self->name;
+    my $stats=($transferstats{$name} ||= {
+        requests=>0, succeeded=>0, unavailable=>0, failed=>0,
+        retries=>0, throttled=>0, waited=>0 });
+    my $retry=0;
+    while( 1 )
+    {
+        my $result;
+        $stats->{requests}++ if $count;
+        my $ok=eval
+        {
+            # Reconnect before a retry (the data center is disconnected after a failure)
+            $self->connect() if $retry && $reconnect && ! $self->{connected};
+            $result=$sub->();
+            1;
+        };
+        if( $ok )
+        {
+            $stats->{succeeded}++ if $count;
+            return $result;
+        }
+        my $error=$@;
+        $stats->{throttled}++ if blessed($error) && $error->isa('LINZ::GNSS::TransferError') && $error->throttled;
+        if( ! LINZ::GNSS::TransferError::IsRetryable($error) )
+        {
+            $stats->{unavailable}++ if $count;
+            die $error;
+        }
+
+        # Work out how long to wait, and whether retrying is allowed
+        my $message="$error";
+        $message =~ s/\s+$//;
+        my $delay=$error->retry_after;
+        if( ! defined($delay) )
+        {
+            $delay=$self->{retrydelay}*(2**$retry);
+            $delay += rand($delay/4);
+        }
+        my $reason;
+        if( $retry >= $self->{maxretries} )
+        {
+            $reason=$self->{maxretries} ? "after $self->{maxretries} retries" : "";
+        }
+        elsif( $delay > $self->{maxretrydelay} )
+        {
+            $reason=sprintf("as the wait (%.0f s) is longer than MaxRetryDelay",$delay);
+        }
+        elsif( $self->{_retrywait}+$delay > $self->{maxretrywait} )
+        {
+            $reason="as the time waiting to retry requests to $name has reached MaxRetryWait";
+        }
+        if( defined($reason) )
+        {
+            $stats->{failed}++ if $count;
+            $self->_logger->warn("Not retrying $description from $name $reason: $message") if $reason;
+            die $error;
+        }
+
+        $retry++;
+        $stats->{retries}++;
+        $stats->{waited} += $delay;
+        $self->{_retrywait} += $delay;
+        $self->_logger->warn(sprintf("Retrying %s from %s in %.1f s (retry %d of %d): %s",
+            $description,$name,$delay,$retry,$self->{maxretries},$message));
+        eval { $self->disconnect() if $self->{connected}; };
+        Time::HiRes::sleep($delay) if $delay > 0;
+    }
+}
+
+=head2 $stats=LINZ::GNSS::DataCenter::TransferStats()
+
+Returns a hash, keyed on data center name, of the counts of requests made by this
+process to each data center.  Each is a hash with keys requests (data requests
+made, including retries), succeeded, unavailable (failed for a reason not worth
+retrying, such as file not found), failed (failed after retrying, or when retrying
+was not allowed), retries, throttled (HTTP 429 or 503 responses), and waited (seconds
+spent waiting to retry).  A forked process has its own counts.
+
+=cut
+
+sub TransferStats
+{
+    return { map { $_ => { %{$transferstats{$_}} } } keys %transferstats };
+}
+
+=head2 @lines=LINZ::GNSS::DataCenter::TransferSummary()
+
+Returns a line summarising the requests to each data center that was used, for
+example
+
+  Data center CDDIS: 12 requests: 10 succeeded, 1 unavailable, 1 failed; 3 retries, 2 throttled, waited 34 s
+
+=cut
+
+sub TransferSummary
+{
+    my @lines;
+    foreach my $name (sort keys %transferstats)
+    {
+        my $s=$transferstats{$name};
+        next if ! $s->{requests} && ! $s->{retries};
+        push(@lines,sprintf("Data center %s: %d requests: %d succeeded, %d unavailable, %d failed; %d retries, %d throttled, waited %.0f s",
+            $name,@{$s}{qw(requests succeeded unavailable failed retries throttled waited)}));
+    }
+    return @lines;
+}
+
+=head2 LINZ::GNSS::DataCenter::LogTransferSummary()
+
+Writes the TransferSummary lines to the LINZ.GNSS.DataCenter log, at warn level for
+data centers that had retries, throttled or failed requests, and info level otherwise.
+
+=cut
+
+sub LogTransferSummary
+{
+    my $logger=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter');
+    my @lines=TransferSummary();
+    foreach my $name (sort keys %transferstats)
+    {
+        my $s=$transferstats{$name};
+        next if ! $s->{requests} && ! $s->{retries};
+        my $line=shift(@lines);
+        if( $s->{retries} || $s->{throttled} || $s->{failed} )
+        {
+            $logger->warn($line);
+        }
+        else
+        {
+            $logger->info($line);
+        }
+    }
 }
 
 # Get a list of files available at the specified path, used to handle wildcard requests
@@ -1261,7 +1464,7 @@ sub getData
                 if( ! $self->{connected} )
                 {
                     $canconnect=0;
-                    $self->connect();
+                    $self->_withRetry("connection",sub { $self->connect() },count=>0,reconnect=>0);
                     $canconnect=1;
                 }
 

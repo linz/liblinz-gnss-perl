@@ -10,6 +10,8 @@ use fields qw (
     timeout
     authhosts
     allowdowngrade
+    _useragents
+    _useragentpid
     );
 
 use LWP::UserAgent;
@@ -17,6 +19,7 @@ use HTTP::Request;
 use HTTP::Cookies;
 use MIME::Base64;
 use Carp;
+use LINZ::GNSS::TransferError;
 
 our $MaxRedirects=5;
 
@@ -46,6 +49,8 @@ sub new
 
     $self->{timeout} = $cfgdc->{timeout} || $LINZ::GNSS::DataCenter::http_timeout;
     my $fre=${cfgdc}->{filelistregex};
+    # A configured FileListRegex identifies the file name in each line of the listing
+    $self->{filelistregex}=qr/$fre/m if $fre;
     # If we have a file list and no regex, 
     # then compile a regex from all product filenames that contain a wildcard
     if( $self->{filelisturi} )
@@ -129,46 +134,85 @@ sub getfile
     $self->_logger->info("Retrieved $file ($size bytes) from $host");    
 }
 
+=head2 $center->_useragent($kind)
+
+Returns an LWP::UserAgent for requests to the data center, created the first time it
+is needed and then reused so that connections are kept open between requests.  $kind
+is 'content' for the agent used by _content (with the data center cookies, and the
+credentials sent to AuthHosts), or 'plain' for one with neither (used by subclasses
+that manage authorisation themselves).
+
+The agents are discarded when the data center is disconnected.  A forked process
+creates its own rather than sharing its parent's connections.
+
+=cut
+
+sub _useragent
+{
+    my ($self, $kind) = @_;
+    $kind ||= 'content';
+    if( ! $self->{_useragents} || ($self->{_useragentpid} // 0) != $$ )
+    {
+        $self->{_useragents}={};
+        $self->{_useragentpid}=$$;
+    }
+    return $self->{_useragents}->{$kind} if $self->{_useragents}->{$kind};
+    my $ua=LWP::UserAgent->new(keep_alive=>4);
+    $ua->env_proxy;
+    $ua->timeout($self->{timeout});
+    $ua->allow_downgrade(1) if $self->{allowdowngrade} && $ua->can('allow_downgrade');
+    if( $kind eq 'content' )
+    {
+        $ua->cookie_jar($self->{cookies});
+        my ($user,$pwd)=$self->credentials;
+        if( $user )
+        {
+            # Add the credentials to each request in the redirect chain that goes to one of
+            # the authorised hosts, over https or the data centre's own scheme.  Remove them
+            # from any other request (older versions of LWP copy them across redirects).
+            my $auth="Basic ".encode_base64("$user:$pwd",'');
+            my $authhosts=$self->{authhosts};
+            my $scheme=$self->{scheme};
+            $ua->add_handler(request_prepare => sub {
+                my ($request)=@_;
+                my $uri=$request->uri;
+                if( $authhosts->{lc($uri->host)} && ($uri->scheme eq 'https' || $uri->scheme eq $scheme) )
+                {
+                    $request->header(Authorization=>$auth);
+                }
+                else
+                {
+                    $request->remove_header('Authorization');
+                }
+                return;
+            });
+        }
+    }
+    $self->{_useragents}->{$kind}=$ua;
+    return $ua;
+}
+
+sub disconnect
+{
+    my($self) = @_;
+    $self->{_useragents}=undef;
+    $self->SUPER::disconnect();
+}
+
+# Get the content of a url.  Dies with a LINZ::GNSS::TransferError if the request
+# fails, which says whether it is worth retrying.
+
 sub _content
 {
     my ($self, $url) = @_;
     $self->_logger->debug("Retrieving $url");    
-    my ($user,$pwd)=$self->credentials;
-    my $ua=new LWP::UserAgent;
-    $ua->env_proxy;
-    $ua->cookie_jar($self->{cookies});
-    $ua->timeout($self->{timeout});
-    $ua->allow_downgrade(1) if $self->{allowdowngrade} && $ua->can('allow_downgrade');
-    if( $user )
-    {
-        # Add the credentials to each request in the redirect chain that goes to one of
-        # the authorised hosts, over https or the data centre's own scheme.  Remove them
-        # from any other request (older versions of LWP copy them across redirects).
-        my $auth="Basic ".encode_base64("$user:$pwd",'');
-        my $authhosts=$self->{authhosts};
-        my $scheme=$self->{scheme};
-        $ua->add_handler(request_prepare => sub {
-            my ($request)=@_;
-            my $uri=$request->uri;
-            if( $authhosts->{lc($uri->host)} && ($uri->scheme eq 'https' || $uri->scheme eq $scheme) )
-            {
-                $request->header(Authorization=>$auth);
-            }
-            else
-            {
-                $request->remove_header('Authorization');
-            }
-            return;
-        });
-    }
-    my $response = $ua->get($url);
+    my $response = $self->_useragent('content')->get($url);
     if( $response->code ne '200' )
     {
-        croak("Cannot retrieve $url: ".$response->message."\n");
+        die LINZ::GNSS::TransferError->FromHttpResponse($response,"Cannot retrieve $url");
     }
     my $content=$response->content;
     return $content;
 }
-
 
 1;

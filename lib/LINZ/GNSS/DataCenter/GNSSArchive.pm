@@ -18,6 +18,7 @@ use LWP::UserAgent;
 use HTTP::Request;
 use MIME::Base64;
 use Carp;
+use LINZ::GNSS::TransferError;
 
 sub new
 {
@@ -136,8 +137,7 @@ sub connect
     my($self) = @_;
     # Either a client_id and client_secret or a username and password (see _readCredentials)
     my ($user,$pwd)=$self->credentials();
-    my $ua=new LWP::UserAgent;
-    $ua->env_proxy;
+    my $ua=$self->_useragent('plain');
     my $authuri=$self->{authuri};
     if( $self->{authuri}  )
     {
@@ -146,7 +146,7 @@ sub connect
         if( $response->code ne '200')
         {
             $self->_logger->warn("Connection to ".$self->name." AuthKeyUri failed: ".$response->message);
-            croak("Connection to ".$self->name." AuthKeyUri failed: ".$response->message."\n");
+            die LINZ::GNSS::TransferError->FromHttpResponse($response,"Connection to ".$self->name." AuthKeyUri failed");
         }
         my $uri=new URI::URL($self->{uri});
         my $netloc=$uri->netloc;
@@ -171,8 +171,7 @@ sub connect
 sub getfile
 {
     my($self,$path,$file,$target)=@_;
-    my $ua=new LWP::UserAgent;
-    $ua->env_proxy;
+    my $ua=$self->_useragent('plain');
     my $response;
     foreach my $base ($self->{uri},$self->{alturi})
     {
@@ -190,8 +189,9 @@ sub getfile
     my $name=$self->name;
     if($response->code ne '200')
     {
-        $self->_logger->warn("Cannot retrieve $file from $name: ".$response->message."\n");
-        croak("Cannot retrieve $file from $name: ".$response->message."\n");
+        my $error=LINZ::GNSS::TransferError->FromHttpResponse($response,"Cannot retrieve $file from $name");
+        $self->_logger->warn("$error") if ! $error->retryable;
+        die $error;
     }
     open(my $f,">:raw",$target) || die "Cannot open file\n";
     print $f $response->content;

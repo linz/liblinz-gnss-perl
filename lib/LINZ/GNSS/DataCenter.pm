@@ -410,7 +410,7 @@ Options can include:
 
 =item * lowerCaseNames=>1   Saved file names will be lower case
 
-=item * compress=>1         Keep the default compression and file name suffixes (default is uncompressed files)
+=item * compress=>1         Keep the default compression and file name suffixes (default is uncompressed files). A type with 'auto' compression has it resolved once from an example file name.
 
 =item * paths=>1            Keep default paths within directory (default is just use filename)
 
@@ -446,12 +446,17 @@ sub LocalDirectory
         my $compression='none';
         if( $opts{compress} )
         {
-            # Keep the compression the file name implies. Resolve 'auto' from the
-            # original file name, as the suffix patterns are case sensitive and
-            # the name may be changed to lower case below.
+            # Keep the configured compression. Resolve 'auto' once for the type from
+            # an example file name expanded from the original template: the
+            # CompressionSuffices patterns need expanded codes (eg [yy] as digits),
+            # and are case sensitive while the name may be lower cased below.
             $compression=$ft->compression;
-            $compression=LINZ::GNSS::FileCompression::InferCompressionType($ft->filename)
-                if $compression eq 'auto';
+            if( $compression eq 'auto' )
+            {
+                my $example=eval { $ft->_expandName($ft->filename,'job',$ft->timeCodes(time()),'ssss') };
+                $example=$ft->filename if ! defined $example;
+                $compression=LINZ::GNSS::FileCompression::InferCompressionType($example);
+            }
         }
         else
         {

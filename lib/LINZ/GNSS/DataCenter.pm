@@ -160,6 +160,10 @@ chosen.
 The default for data centers that support it is to check the directory listing before
 trying to fetch a file.  Set to 0 to not do this.
 
+MaxDownloads is the number of files downloaded on one connection before the connection
+is closed and reopened.  0 means no limit.  The default is 50, or no limit for data
+centers whose defaultMaxDownloads method returns 0 (S3Bucket).
+
 The URI can either be an ftp or local file scheme (eg ftp://user:password@ftp.somewhere)
 or a file base scheme (eg file:///home/gps/data).  
 
@@ -167,6 +171,16 @@ File based data centers can be both source and target data centres.  Ftp based d
 are only supported as sources.
 
 =cut
+
+=head2 $center->defaultMaxDownloads
+
+The number of files downloaded on one connection before it is reset, used when the
+configuration does not set MaxDownloads.  0 means no limit.  Subclasses for which
+reconnecting has no benefit override this.
+
+=cut
+
+sub defaultMaxDownloads { return 50; }
 
 sub new
 {
@@ -217,7 +231,9 @@ sub new
         else { $excludestations->{uc($s)}=$s; }
     }
     my $priority=$cfgdc->{priority} || 0;
-    my $maxdownloads=($cfgdc->{maxdownloads}+0) || 50;
+    my $maxdownloads=$cfgdc->{maxdownloads};
+    $maxdownloads=(defined($maxdownloads) && $maxdownloads =~ /\S/)
+        ? $maxdownloads+0 : $self->defaultMaxDownloads();
 
     # Create a scratch directory that is unique
     # Use the data centre id and the process id ($$) to achieve this
@@ -1234,7 +1250,7 @@ sub getData
                 # If this connection has already done the maximum number of downloads per
                 # connection then reset the connection
 
-                if( $self->{_ndownloads} >= $self->{maxdownloads} )
+                if( $self->{maxdownloads} > 0 && $self->{_ndownloads} >= $self->{maxdownloads} )
                 {
                     $self->disconnect();
                     $self->{_ndownloads}=0;

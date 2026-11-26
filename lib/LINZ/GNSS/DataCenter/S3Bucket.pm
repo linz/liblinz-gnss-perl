@@ -17,7 +17,8 @@ use LINZ::GNSS::Variables qw(ExpandEnv);
 
 DataCenter backed by an AWS S3 bucket, defined by a Uri of the form
 s3://bucket-name/key/prefix.  Operations are delegated to
-LINZ::GNSS::AwsS3Bucket (which runs the aws client).
+LINZ::GNSS::AwsS3Bucket (which uses a python/boto3 helper process, or the aws
+client if the helper cannot be started).
 
 Configuration options (in addition to the common DataCenter options):
 
@@ -31,6 +32,12 @@ Extra parameters passed to the aws client (eg --profile xxx).
 
 If set, files cannot be uploaded to the bucket.
 
+=item MaxDownloads
+
+Number of files downloaded before the connection is reset.  The default for S3Bucket
+data centers is 0 (no limit), as there is no connection to reset and doing so would
+restart the helper process.
+
 =item UseFileList
 
 If set, the bucket is listed to check that a file exists before
@@ -41,9 +48,13 @@ wildcards (* or ?).
 
 Credentials (User/Password or CredentialsFile) are used as the AWS
 access key id and secret access key.  If none are given the aws client's
-normal credential chain is used.
+normal credential chain (of the helper or the aws client) is used.
 
 =cut
+
+# No limit to the downloads on one connection, as resetting it only restarts the helper
+
+sub defaultMaxDownloads { return 0; }
 
 sub new
 {

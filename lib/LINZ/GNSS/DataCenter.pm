@@ -59,7 +59,7 @@ use fields qw (
     _checkfilelist
     _ndownloads
     _retrywait
-    _retrylimitlogged
+    _retrywaitpid
     );
 
 # scratchdir, fileid, and ftp are managed internally to 
@@ -98,6 +98,19 @@ our $default_maxretrywait=600;
 
 # Counts of requests to each data center by this process (see TransferStats)
 our %transferstats=();
+our $transferstatspid=$$;
+
+# Transfer statistics for this process (a forked process starts its own)
+
+sub _transferStats
+{
+    if( $transferstatspid != $$ )
+    {
+        %transferstats=();
+        $transferstatspid=$$;
+    }
+    return \%transferstats;
+}
 
 sub makepublicpath
 {
@@ -1146,7 +1159,13 @@ sub _withRetry
     my $count=exists $options{count} ? $options{count} : 1;
     my $reconnect=exists $options{reconnect} ? $options{reconnect} : 1;
     my $name=$self->name;
-    my $stats=($transferstats{$name} ||= {
+    # A forked process has its own retry waiting limit
+    if( ($self->{_retrywaitpid} // $$) != $$ )
+    {
+        $self->{_retrywait}=0;
+    }
+    $self->{_retrywaitpid}=$$;
+    my $stats=(_transferStats()->{$name} ||= {
         requests=>0, succeeded=>0, unavailable=>0, failed=>0,
         retries=>0, throttled=>0, waited=>0 });
     my $retry=0;
@@ -1181,7 +1200,7 @@ sub _withRetry
         if( ! defined($delay) )
         {
             $delay=$self->{retrydelay}*(2**$retry);
-            $delay += rand($delay/4);
+            $delay += rand($delay/4) if $delay > 0;
         }
         my $reason;
         if( $retry >= $self->{maxretries} )
@@ -1227,7 +1246,8 @@ spent waiting to retry).  A forked process has its own counts.
 
 sub TransferStats
 {
-    return { map { $_ => { %{$transferstats{$_}} } } keys %transferstats };
+    my $stats=_transferStats();
+    return { map { $_ => { %{$stats->{$_}} } } keys %$stats };
 }
 
 =head2 @lines=LINZ::GNSS::DataCenter::TransferSummary()
@@ -1242,9 +1262,10 @@ example
 sub TransferSummary
 {
     my @lines;
-    foreach my $name (sort keys %transferstats)
+    my $stats=_transferStats();
+    foreach my $name (sort keys %$stats)
     {
-        my $s=$transferstats{$name};
+        my $s=$stats->{$name};
         next if ! $s->{requests} && ! $s->{retries};
         push(@lines,sprintf("Data center %s: %d requests: %d succeeded, %d unavailable, %d failed; %d retries, %d throttled, waited %.0f s",
             $name,@{$s}{qw(requests succeeded unavailable failed retries throttled waited)}));
@@ -1263,9 +1284,10 @@ sub LogTransferSummary
 {
     my $logger=Log::Log4perl->get_logger('LINZ.GNSS.DataCenter');
     my @lines=TransferSummary();
-    foreach my $name (sort keys %transferstats)
+    my $stats=_transferStats();
+    foreach my $name (sort keys %$stats)
     {
-        my $s=$transferstats{$name};
+        my $s=$stats->{$name};
         next if ! $s->{requests} && ! $s->{retries};
         my $line=shift(@lines);
         if( $s->{retries} || $s->{throttled} || $s->{failed} )

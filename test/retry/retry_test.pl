@@ -138,6 +138,10 @@ getfile($limited,'/data/always503','w2.dat');
 ok(requests('/data/always503/w1.dat') == 2,"MaxRetryWait: first file retried until the limit (".requests('/data/always503/w1.dat')." requests)");
 ok(requests('/data/always503/w2.dat') == 1,"MaxRetryWait: later file not retried (".requests('/data/always503/w2.dat')." requests)");
 
+my $nodelay=newcenter('nodelay',retrydelay=>0,maxretrydelay=>0,maxretrywait=>0);
+getfile($nodelay,'/data/unavailable2','z.dat');
+ok(requests('/data/unavailable2/z.dat') == 3,"RetryDelay 0: retried without waiting (".requests('/data/unavailable2/z.dat')." requests)");
+
 my $invalid=eval { newcenter('invalid',maxretries=>'lots'); 1 };
 ok(! $invalid,"invalid MaxRetries is rejected");
 
@@ -160,6 +164,22 @@ if( $pid == 0 )
 }
 waitpid($pid,0);
 ok($? == 0,"fork: forked process retrieved a file");
+
+# A forked process starts with its own statistics and retry waiting limit
+getfile($limited,'/data/always503','w3.dat');
+$pid=fork();
+if( $pid == 0 )
+{
+    my $before=LINZ::GNSS::DataCenter::TransferStats();
+    getfile($limited,'/data/always503','w4.dat');
+    my $after=LINZ::GNSS::DataCenter::TransferStats();
+    exit(1) if %$before;
+    exit(2) if $after->{limited}->{requests} != 2;
+    exit(0);
+}
+waitpid($pid,0);
+ok($? == 0,"fork: forked process has its own statistics (exit ".($? >> 8).")");
+ok(requests('/data/always503/w4.dat') == 2,"fork: forked process has its own MaxRetryWait (".requests('/data/always503/w4.dat')." requests)");
 getfile($reuse,'/data/ok','r4.dat');
 my $s=serverstats();
 my ($p1,$p2,$p3,$p4)=map { $s->{"/data/ok/r$_.dat"}->{ports}->[0] } 1 .. 4;
@@ -177,6 +197,16 @@ ok(! $@ && requests('/auth') == 2,"archive: auth retried after a 429 (".requests
 ok(! $error && ($content // '') eq 'content of /archive/g1.dat',"archive: file retrieved with the auth cookie");
 ok(serverstats()->{'/auth'}->{authorization},"archive: credentials sent to AuthKeyUri");
 ok(! serverstats()->{'/archive/g1.dat'}->{authorization},"archive: credentials not sent with file requests");
+
+# A temporary failure of the main URI is retried even if the alternative URI says not found
+
+my $altarchive=LINZ::GNSS::DataCenter::GNSSArchive->new({
+    name=>'altarchive', uri=>$base, alternativeuri=>"$base/nowhere", authkeyuri=>"$base/auth",
+    filelisturi=>"$base/list[path]", user=>'client', password=>'secret',
+    retrydelay=>0.2, maxretrydelay=>5, timeout=>1 });
+$altarchive->connect();
+($error,$content)=getfile($altarchive,'/archive503','a1.dat');
+ok(! $error && requests('/archive503/a1.dat') == 2,"archive: retried after a 503 when the alternative URI gives 404 (".requests('/archive503/a1.dat')." requests)");
 
 print "1..$ntest\n";
 print $nfail ? "# $nfail of $ntest tests failed\n" : "# All $ntest tests passed\n";

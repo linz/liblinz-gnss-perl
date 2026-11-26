@@ -173,6 +173,7 @@ sub getfile
     my($self,$path,$file,$target)=@_;
     my $ua=$self->_useragent('plain');
     my $response;
+    my $retryable;
     foreach my $base ($self->{uri},$self->{alturi})
     {
         next if ! $base;
@@ -185,10 +186,14 @@ sub getfile
         }
         $response=$ua->request($request);
         last if $response->code eq '200';
+        # Keep the first response worth retrying, so that a temporary failure of one
+        # URI is retried even if another URI says the file is not there.
+        $retryable ||= $response if $LINZ::GNSS::TransferError::RetryableHttpCodes{$response->code};
     }
     my $name=$self->name;
     if($response->code ne '200')
     {
+        $response=$retryable if $retryable;
         my $error=LINZ::GNSS::TransferError->FromHttpResponse($response,"Cannot retrieve $file from $name");
         $self->_logger->warn("$error") if ! $error->retryable;
         die $error;

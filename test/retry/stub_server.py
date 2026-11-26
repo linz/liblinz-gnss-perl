@@ -14,6 +14,7 @@ serves until killed.  The first part of the path chooses the behaviour:
   /auth                 429 with Retry-After: 1 the first time, then the GNSS Archive
                         auth response with a cookie
   /archive/F            200 if the auth cookie is sent, otherwise 403
+  /archive503/F         503 the first time, then as /archive/F
   /_stats               JSON: for each path the number of requests, the client ports
                         used, and whether an Authorization header was sent
 """
@@ -88,7 +89,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(429, headers={"Retry-After": "1"})
             body = json.dumps({"cookies": ["archiveauth=ok; Path=/; HttpOnly"]}).encode()
             return self.send(200, body)
-        if kind == "archive":
+        if kind == "archive503" and count == 1:
+            return self.send(503)
+        if kind in ("archive", "archive503"):
             if "archiveauth=ok" in (self.headers.get("Cookie") or ""):
                 return self.send(200, content)
             return self.send(403)

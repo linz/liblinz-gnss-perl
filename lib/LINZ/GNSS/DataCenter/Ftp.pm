@@ -12,6 +12,25 @@ use fields qw (
 use LINZ::GNSS::DataCenter;
 use Net::FTP;
 use Carp;
+use LINZ::GNSS::TransferError;
+
+# Error for a failed FTP command, retryable if the reply code is transient (or there was
+# no reply, as for a dropped connection or timeout)
+
+sub _ftpError
+{
+    my($self,$message)=@_;
+    my $ftp=$self->{ftp};
+    my $code=$ftp ? $ftp->code : 0;
+    my $reply=$ftp ? $ftp->message : '';
+    $reply =~ s/\s+$//;
+    $message .= " ($code $reply)" if $code;
+    return LINZ::GNSS::TransferError->new(
+        message=>"$message\n",
+        code=>$code,
+        retryable=>LINZ::GNSS::TransferError::IsRetryableFtpCode($code),
+        );
+}
 
 sub new
 {
@@ -55,19 +74,22 @@ sub connect
             $self->_logger->debug("Connection info: passive $passive");
 
             $self->_logger->debug("Connection info: host $host: user $user: password $pwd");
+            # Failing to connect (refused, timed out, ...) may succeed if retried
             my $ftp=Net::FTP->new( $host, Timeout=>$timeout, %options )
-               || croak "Cannot connect to $host\n";
+               || die LINZ::GNSS::TransferError->new(message=>"Cannot connect to $host: $@\n",retryable=>1);
 
             $self->{ftp}=$ftp;
             $ftp->login( $user, $pwd )
-               || croak "Cannot login to $host as $user\n";
+               || die $self->_ftpError("Cannot login to $host as $user");
             $ftp->binary();
        };
        if( $@ )
        {
-           my $message=$@;
-           $self->_logger->warn($@);
-           croak $@;
+           my $error=$@;
+           $self->_logger->warn("$error");
+           eval { $self->{ftp}->quit() if $self->{ftp}; };
+           $self->{ftp}=undef;
+           die $error;
        }
    }
    $self->SUPER::connect();
@@ -82,7 +104,7 @@ Terminates an FTP connection with the server
 sub disconnect
 {
     my($self) = @_;
-    $self->{ftp}->quit() if $self->{ftp};
+    eval { $self->{ftp}->quit() if $self->{ftp}; };
     $self->{ftp} = undef;
     $self->SUPER::disconnect();
 }
@@ -99,8 +121,9 @@ sub getfile
     $self->_logger->debug("Retrieving file $path/$file");
     if( ! $ftp || ! $ftp->cwd($path) || ! $ftp->get($file,$target) )
     {
-        $self->_logger->warn("Cannot retrieve file $path/$file from $host");
-        croak "Cannot retrieve $file from $host\n";
+        my $error=$self->_ftpError("Cannot retrieve $file from $host");
+        $self->_logger->warn("Cannot retrieve file $path/$file from $host") if ! $error->retryable;
+        die $error;
     }
     my $size= -s $target;
     $self->_logger->info("Retrieved $file ($size bytes) from $host");
@@ -113,13 +136,13 @@ sub getfilelist
     my ($self,$spec) = @_;
     my $path=$spec->path;
     my $ftp = $self->{ftp};
-    $ftp->cwd($path);
     my $filelist;
     if( ! $ftp || ! $ftp->cwd($path) || ! ($filelist = $ftp->ls()))
     {
         my $host = $self->{host};
-        $self->_logger->warn("Cannot get file list from $path on $host");
-        croak "Cannot get file list from $path on $host\n";
+        my $error=$self->_ftpError("Cannot get file list from $path on $host");
+        $self->_logger->warn("$error") if ! $error->retryable;
+        die $error;
     }
     return $filelist;
 }

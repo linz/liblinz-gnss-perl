@@ -190,6 +190,7 @@ eval
             }
         }
     }
+    LINZ::GNSS::DataCenter::LogTransferSummary();
 };
 if( $@ )
 {
